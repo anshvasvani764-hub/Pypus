@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
 export interface WorkspaceContext {
@@ -14,6 +14,7 @@ export interface WorkspaceContext {
 export async function getCurrentWorkspaceContext(
   workspaceSlug: string
 ): Promise<WorkspaceContext> {
+  const supabase = await createClient();
   const { data: workspace, error } = await supabase
     .from("workspaces")
     .select("id, slug")

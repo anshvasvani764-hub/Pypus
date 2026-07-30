@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react'
+import { useWorkspace } from '@/hooks/useWorkspace'
 
 interface Message {
   id: string
@@ -15,21 +17,8 @@ const INITIAL_MESSAGES: Message[] = [
     id: '1',
     role: 'assistant',
     content:
-      "Hello! I'm Pypus, your AI assistant. How can I assist you with your business operations, team management, or workflows today?",
-    timestamp: '10:00 AM',
-  },
-  {
-    id: '2',
-    role: 'user',
-    content: 'Can you summarize our team activity for this week?',
-    timestamp: '10:01 AM',
-  },
-  {
-    id: '3',
-    role: 'assistant',
-    content:
-      'Certainly! Here is a summary of your workspace activity:\n• 14 automated workflows executed successfully\n• 4 active team members currently online\n• Overall system health: Optimal with 99.9% uptime',
-    timestamp: '10:01 AM',
+      "Hello! I'm Pypus, your AI assistant. Ask me about members, attendance, fees or pending reminders in this workspace.",
+    timestamp: '',
   },
 ]
 
@@ -41,10 +30,13 @@ const QUICK_PROMPTS = [
 ]
 
 export default function AssistantPage() {
+  const params = useParams<{ app: string }>()
+  const { workspace } = useWorkspace(params?.app ?? '')
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -54,13 +46,13 @@ export default function AssistantPage() {
     scrollToBottom()
   }, [messages, isTyping])
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const text = (textToSend || input).trim()
-    if (!text) return
+    if (!text || isTyping || !workspace?.id) return
 
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const userMsg: Message = {
-      id: Date.now().toString(),
+      id: String(nextIdRef.current++),
       role: 'user',
       content: text,
       timestamp: now,
@@ -70,16 +62,33 @@ export default function AssistantPage() {
     if (!textToSend) setInput('')
     setIsTyping(true)
 
-    setTimeout(() => {
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
+    let reply: string
+    try {
+      const res = await fetch('/api/pypus/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: workspace?.id, message: text }),
+      })
+      const data = await res.json()
+      reply =
+        data.reply ??
+        (res.status === 401
+          ? 'Your session expired — please sign in again.'
+          : 'Something went wrong. Please try again.')
+    } catch {
+      reply = "I couldn't reach the server. Check your connection and try again."
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: String(nextIdRef.current++),
         role: 'assistant',
-        content: `I've received your request: "${text}". As this is currently the UI shell, API integration will process this in the next release!`,
+        content: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }
-      setMessages((prev) => [...prev, assistantMsg])
-      setIsTyping(false)
-    }, 1000)
+      },
+    ])
+    setIsTyping(false)
   }
 
   return (
@@ -113,7 +122,8 @@ export default function AssistantPage() {
           <button
             key={idx}
             onClick={() => handleSend(prompt)}
-            className="whitespace-nowrap px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shrink-0 cursor-pointer"
+            disabled={isTyping || !workspace}
+            className="whitespace-nowrap px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-all shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {prompt}
           </button>
@@ -146,13 +156,15 @@ export default function AssistantPage() {
               }`}
             >
               <div className="whitespace-pre-line leading-relaxed">{msg.content}</div>
-              <p
-                className={`text-[10px] mt-1.5 text-right ${
-                  msg.role === 'user' ? 'text-gray-400' : 'text-gray-400'
-                }`}
-              >
-                {msg.timestamp}
-              </p>
+              {msg.timestamp && (
+                <p
+                  className={`text-[10px] mt-1.5 text-right ${
+                    msg.role === 'user' ? 'text-gray-400' : 'text-gray-400'
+                  }`}
+                >
+                  {msg.timestamp}
+                </p>
+              )}
             </div>
           </div>
         ))}
@@ -189,7 +201,7 @@ export default function AssistantPage() {
           />
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={!input.trim() || isTyping || !workspace}
             className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white transition-colors shrink-0 cursor-pointer disabled:cursor-not-allowed"
             aria-label="Send message"
           >

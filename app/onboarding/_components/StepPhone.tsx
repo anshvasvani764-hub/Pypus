@@ -11,6 +11,7 @@ export default function StepPhone() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawDigits = e.target.value.replace(/\D/g, '').slice(0, 10)
     setPhone(rawDigits)
+    
     if (error) setError(null)
   }
 

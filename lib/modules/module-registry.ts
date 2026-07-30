@@ -1,7 +1,7 @@
-import { Users, Clock, Wallet, UsersRound, BarChart3, Sparkles } from "lucide-react";
+import { Users, Clock, Wallet, CreditCard, UsersRound, BarChart3, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type ModuleSlug = "members" | "attendance" | "expenses" | "team" | "reports";
+export type ModuleSlug = "members" | "attendance" | "fees" | "expenses" | "team" | "reports";
 
 export interface ModuleRegistryEntry {
   slug: ModuleSlug;
@@ -16,7 +16,7 @@ export interface ModuleRegistryEntry {
 export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
   {
     slug: "members",
-    title: "Customers",
+    title: "Members",
     description: "Members, dues, memberships and history",
     icon: Users,
     iconBg: "bg-emerald-50",
@@ -31,6 +31,15 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
     iconBg: "bg-emerald-50",
     iconColor: "text-emerald-600",
     requiredPermission: "attendance.view",
+  },
+  {
+    slug: "fees",
+    title: "Fees",
+    description: "Manage memberships, payments and billing",
+    icon: CreditCard,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    requiredPermission: "fees.view",
   },
   {
     slug: "expenses",

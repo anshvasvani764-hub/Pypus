@@ -85,9 +85,9 @@ export default function Sidebar() {
         {/* Main nav */}
         <nav className="flex flex-col gap-1 px-3">
           <NavItem href={base} icon={Home} label="Home" />
-          <NavItem href={`${base}/workspace`} icon={LayoutGrid} label="Workspace" />
-          <NavItem href={`${base}/agents`} icon={Workflow} label="Agents" />
           <NavItem href={`${base}/assistant`} icon={Bot} label="AI Assistant" />
+          <NavItem href={`${base}/agents`} icon={Workflow} label="Agents" />
+          <NavItem href={`${base}/workspace`} icon={LayoutGrid} label="Workspace" />
         </nav>
 
         {/* Business section */}

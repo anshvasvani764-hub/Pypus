@@ -1,11 +1,86 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { TrendingUp } from "lucide-react";
 import type { SnapshotStats } from "@/lib/dashboard/get-snapshot-stats";
+import { createClient } from "@/lib/supabase/client";
+import { getISTDateString } from "@/lib/utils/date";
 
-export function SnapshotBar({ stats }: { stats: SnapshotStats }) {
+export function SnapshotBar({ stats, workspaceId }: { stats: SnapshotStats; workspaceId: string }) {
+  const [liveStats, setLiveStats] = useState<SnapshotStats>(stats);
+  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function refetchCheckInsCount() {
+    const supabase = createClient();
+    const today = getISTDateString();
+    const { count, error } = await supabase
+      .from("attendance")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .eq("date", today)
+      .eq("status", "present");
+
+    if (error) {
+      console.error("SnapshotBar count error:", error);
+      return;
+    }
+
+    setLiveStats((prev) => ({
+      ...prev,
+      checkIns: { value: String(count ?? 0) },
+    }));
+  }
+
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`attendance-workspace-${workspaceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "attendance",
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
+        (payload) => {
+          console.log("SnapshotBar realtime payload:", payload);
+          refetchCheckInsCount();
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.error("SnapshotBar subscription error:", err);
+        }
+        console.log("SnapshotBar subscription status:", status);
+      });
+
+    channelRef.current = channel;
+
+    // Immediately fetch real count on mount (bypass stale server prop)
+    refetchCheckInsCount();
+
+    // Polling fallback every 10 seconds
+    intervalRef.current = setInterval(() => {
+      refetchCheckInsCount();
+    }, 10000);
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [workspaceId]);
+
   const items = [
-    { label: "Check-ins", value: stats.checkIns.value },
-    { label: "New members", value: stats.newMembers.value, context: stats.newMembers.context },
-    { label: "Dues to collect", value: stats.duesToCollect.value, context: stats.duesToCollect.context },
+    { label: "Check-ins", value: liveStats.checkIns.value },
+    { label: "New members this month", value: liveStats.newMembers.value, context: liveStats.newMembers.context },
+    { label: "Dues to collect", value: liveStats.duesToCollect.value, context: liveStats.duesToCollect.context },
   ];
 
   return (

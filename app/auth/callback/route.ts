@@ -13,12 +13,28 @@ export async function GET(request: Request) {
     const { data: sessionData, error: sessionErr } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!sessionErr && sessionData.user) {
-      const userId = sessionData.user.id
+      const user = sessionData.user
+
+      // Member QR self-check-in: if a `next` param was passed, redirect there
+      // instead of running the staff workspace_members lookup.
+      const next = searchParams.get('next')
+      if (next && next.startsWith('/m/')) {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
+
+      // Upsert into public.users so every authenticated user has a profile row
+      await supabase.from('users').upsert({
+        id: user.id,
+        email: user.email ?? '',
+        full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? '',
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+        updated_at: new Date().toISOString(),
+      })
 
       const { data: memberRow } = await supabase
         .from('workspace_members')
         .select('workspace_id, workspaces(id, slug)')
-        .eq('user_id', userId)
+        .eq('user_id', user.id)
         .eq('is_active', true)
         .limit(1)
         .single()
