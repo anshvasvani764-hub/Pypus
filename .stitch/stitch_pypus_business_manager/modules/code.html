@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pypus - Modules Grid</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "primary-container": "#00ff41",
+                        "on-primary-container": "#007117",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#131b2e",
+                        "on-primary-fixed": "#002203",
+                        "tertiary-fixed": "#ffddb8",
+                        "primary-fixed": "#72ff70",
+                        "on-surface": "#131b2e",
+                        "background": "#faf8ff",
+                        "on-secondary-container": "#fffbff",
+                        "inverse-surface": "#283044",
+                        "on-secondary-fixed-variant": "#2f2ebe",
+                        "surface-container": "#eaedff",
+                        "tertiary": "#855300",
+                        "surface-bright": "#faf8ff",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#6063ee",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "on-secondary-fixed": "#07006c",
+                        "error-container": "#ffdad6",
+                        "tertiary-container": "#ffd6a8",
+                        "surface-dim": "#d2d9f4",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dae2fd",
+                        "on-tertiary-fixed": "#2a1700",
+                        "outline": "#6b7c65",
+                        "secondary": "#4648d4",
+                        "inverse-primary": "#00e639",
+                        "surface": "#faf8ff",
+                        "surface-container-low": "#f2f3ff",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "surface-variant": "#dae2fd",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#006e16",
+                        "on-tertiary-container": "#895600",
+                        "primary-fixed-dim": "#00e639",
+                        "surface-container-high": "#e2e7ff",
+                        "surface-tint": "#006e16",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#00530e",
+                        "outline-variant": "#b9ccb2",
+                        "on-surface-variant": "#3b4b37"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "margin-mobile": "20px",
+                        "sm": "8px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "base": "4px",
+                        "lg": "24px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"],
+                        "stats-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "stats-display": ["32px", {"lineHeight": "40px", "fontWeight": "800"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-lite {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .card-lift {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+        }
+        .card-lift:active {
+            transform: scale(0.96);
+        }
+        .card-lift:hover {
+            transform: translateY(-4px) scale(1.02);
+        }
+        .terminal-glow {
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 bg-surface/80 dark:bg-surface-container/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm px-margin-mobile py-sm flex justify-between items-center w-full">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">business_center</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-black text-primary">Pypus</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-primary/5 transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined text-primary">search</span>
+</button>
+</div>
+</header>
+<main class="px-margin-mobile pt-lg">
+<!-- Quick Stats Row -->
+<section class="grid grid-cols-3 gap-gutter mb-xl">
+<div class="bg-surface-container-high p-md rounded-lg flex flex-col items-center justify-center text-center shadow-sm">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase mb-xs">Today</span>
+<span class="font-stats-display text-stats-display text-primary">42</span>
+<span class="font-label-bold text-label-bold text-primary/70">Check-ins</span>
+</div>
+<div class="bg-surface-container-high p-md rounded-lg flex flex-col items-center justify-center text-center shadow-sm">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase mb-xs">New</span>
+<span class="font-stats-display text-stats-display text-secondary">08</span>
+<span class="font-label-bold text-label-bold text-secondary/70">Members</span>
+</div>
+<div class="bg-surface-container-high p-md rounded-lg flex flex-col items-center justify-center text-center shadow-sm">
+<span class="font-label-bold text-label-bold text-on-surface-variant uppercase mb-xs">Pending</span>
+<span class="font-stats-display text-stats-display text-error">12</span>
+<span class="font-label-bold text-label-bold text-error/70">Dues</span>
+</div>
+</section>
+<!-- Modules Grid -->
+<section class="grid grid-cols-2 gap-gutter mb-xl">
+<!-- Members Module -->
+<div class="card-lift relative overflow-hidden h-44 rounded-lg bg-gradient-to-br from-primary to-primary-container p-lg flex flex-col justify-between shadow-[0_8px_20px_rgba(0,110,22,0.2)]">
+<div class="glass-lite w-12 h-12 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-2xl" style="font-variation-settings: 'FILL' 1;">groups</span>
+</div>
+<div>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-white">Members</h3>
+<p class="font-label-bold text-label-bold text-white/80">Manage database</p>
+</div>
+</div>
+<!-- Attendance Module -->
+<div class="card-lift relative overflow-hidden h-44 rounded-lg bg-gradient-to-br from-secondary to-secondary-fixed p-lg flex flex-col justify-between shadow-[0_8px_20px_rgba(70,72,212,0.2)]">
+<div class="glass-lite w-12 h-12 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-2xl" style="font-variation-settings: 'FILL' 1;">event_available</span>
+</div>
+<div>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-white">Attendance</h3>
+<p class="font-label-bold text-label-bold text-white/80">Track visits</p>
+</div>
+</div>
+<!-- Fees Module -->
+<div class="card-lift relative overflow-hidden h-44 rounded-lg bg-gradient-to-br from-tertiary to-tertiary-fixed p-lg flex flex-col justify-between shadow-[0_8px_20px_rgba(133,83,0,0.2)]">
+<div class="glass-lite w-12 h-12 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-2xl" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<div>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-white">Fees</h3>
+<p class="font-label-bold text-label-bold text-white/80">Ledgers &amp; Dues</p>
+</div>
+</div>
+<!-- Coming Soon Card -->
+<div class="h-44 rounded-lg border-2 border-dashed border-outline-variant/50 bg-surface-container-lowest p-lg flex flex-col items-center justify-center opacity-60">
+<span class="material-symbols-outlined text-on-surface-variant text-4xl mb-sm">more_horiz</span>
+<h3 class="font-label-bold text-label-bold text-on-surface-variant text-center">More modules coming soon</h3>
+</div>
+</section>
+<!-- Dynamic Content / Info Card -->
+<section class="mb-xl">
+<div class="bg-white rounded-lg p-lg shadow-sm border border-outline-variant/20 flex items-center gap-lg">
+<div class="flex-1">
+<h4 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-xs">Optimization Tip</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Your member retention is up by 12% this month. Try automating Fee Reminders for the remaining 5%.</p>
+</div>
+<div class="w-20 h-20 bg-primary-container/20 rounded-lg flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-4xl">trending_up</span>
+</div>
+</div>
+</section>
+</main>
+<!-- FAB: Ask Pypus AI -->
+<button class="fixed bottom-24 right-6 z-50 bg-primary-container text-on-primary-container terminal-glow px-6 py-4 rounded-full flex items-center gap-2 shadow-lg active:scale-90 transition-all duration-200 group border border-primary/20">
+<span class="material-symbols-outlined group-hover:rotate-12 transition-transform" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-label-bold text-label-bold">Ask Pypus AI</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface/90 dark:bg-surface-container-highest/90 backdrop-blur-2xl flex justify-around items-center px-4 pb-4 pt-2 border-t border-outline-variant/20 shadow-[0_-4px_20px_0_rgba(0,110,22,0.12)] rounded-t-lg">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 scale-110 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">apps</span>
+<span class="font-label-bold text-label-bold">Modules</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-bold text-label-bold">Assistant</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-bold text-label-bold">Settings</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for module cards
+        document.querySelectorAll('.card-lift').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                const icon = card.querySelector('.material-symbols-outlined');
+                if (icon) icon.style.transform = 'scale(1.1) rotate(5deg)';
+            });
+            card.addEventListener('mouseleave', () => {
+                const icon = card.querySelector('.material-symbols-outlined');
+                if (icon) icon.style.transform = 'scale(1) rotate(0deg)';
+            });
+        });
+    </script>
+</body></html>

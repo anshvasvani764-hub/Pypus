@@ -4,24 +4,26 @@ import { SnapshotBar } from "@/components/dashboard/SnapshotBar";
 import { ModuleCard } from "@/components/dashboard/ModuleCard";
 import { COMING_SOON_CARD, MODULE_REGISTRY } from "@/lib/modules/module-registry";
 import { getCurrentWorkspaceContext } from "@/lib/auth/get-current-workspace-context";
+import { ModulesView } from "@/components/mobile/ModulesView.mobile";
+import { getDevice } from "@/lib/device";
 
 export default async function WorkspacePage({
   params,
 }: {
-  params: Promise<{ app: string }>;   // 👈 Promise wrap kiya
+  params: Promise<{ app: string }>;
 }) {
-  const { app: workspaceSlug } = await params;   // 👈 await se unwrap kiya
+  const { app: workspaceSlug } = await params;
   const { workspaceId } = await getCurrentWorkspaceContext(workspaceSlug);
 
-
-
-  // baaki sab same rahega...
-
   const stats = await getSnapshotStats(workspaceId);
-  const visibleModules = MODULE_REGISTRY; // ⚠️ TEMP: permission filter hata di, baad mein wapas laani hai
+  const visibleModules = MODULE_REGISTRY;
+
+  if ((await getDevice()) === "mobile") {
+    return <ModulesView workspaceSlug={workspaceSlug} stats={stats} />;
+  }
 
   return (
-   <div className="w-full max-w-6xl px-8 py-10">
+    <div className="w-full max-w-6xl px-8 py-10">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Your workspace</h1>
@@ -62,3 +64,4 @@ export default async function WorkspacePage({
     </div>
   );
 }
+

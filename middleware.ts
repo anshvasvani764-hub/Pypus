@@ -2,8 +2,22 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const isMobile = /Android|iPhone|iPod|Windows Phone|webOS|BlackBerry|IEMobile|Opera Mini|\biPad\b/i.test(
+    request.headers.get('user-agent') ?? ''
+  )
+  const forced = request.nextUrl.searchParams.get('device')
+  const override =
+    forced === 'mobile' || forced === 'desktop'
+      ? forced
+      : request.cookies.get('device-override')?.value
+  const device =
+    override === 'mobile' || override === 'desktop' ? override : isMobile ? 'mobile' : 'desktop'
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-device', device)
+
   let supabaseResponse = NextResponse.next({
-    request,
+    request: { headers: requestHeaders },
   })
 
   const supabase = createServerClient(
@@ -17,7 +31,7 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
-            request,
+            request: { headers: requestHeaders },
           })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -45,6 +59,10 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)
+  }
+
+  if (forced === 'mobile' || forced === 'desktop') {
+    supabaseResponse.cookies.set('device-override', forced, { path: '/' })
   }
 
   return supabaseResponse

@@ -1,6 +1,10 @@
 import { MemberRegistryView } from "@/components/members/MemberRegistryView";
+import { MemberRegistryViewMobile } from "@/components/members/MemberRegistryView.mobile";
+import { getDevice } from "@/lib/device";
 import { getMembers, getAttendanceForToday } from "@/lib/supabase/queries";
 import { createClient } from "@/lib/supabase/server";
+import { deriveFeeSummary, type DerivedFeeStatus } from "@/lib/members/fee-status";
+import type { FeeRecord } from "@/lib/members/types";
 
 export default async function MembersPage({
   params,
@@ -44,38 +48,34 @@ export default async function MembersPage({
 
   const { data: feeData } = await supabase
     .from("fees")
-    .select("member_id, status, due_date")
+    .select("*")
     .eq("workspace_id", workspaceId)
     .in("member_id", members.map((m) => m.id));
 
-  const fees = (feeData ?? []) as { member_id: string; status: string; due_date: string }[];
+  const fees = (feeData ?? []) as FeeRecord[];
 
-  const today = new Date().toISOString().slice(0, 10);
-  const feeStatusMap: Record<string, string> = {};
+  const feeStatusMap: Record<string, DerivedFeeStatus> = {};
+  const planNameMap: Record<string, string | null> = {};
 
   for (const m of members) {
-    const memberFees = fees.filter((f) => f.member_id === m.id);
-    const hasPlan = m.plan_id != null;
+    const summary = deriveFeeSummary(
+      m,
+      fees.filter((f) => f.member_id === m.id)
+    );
+    feeStatusMap[m.id] = summary.status;
+    planNameMap[m.id] = summary.planName ?? m.plan?.name ?? null;
+  }
 
-    if (!hasPlan) {
-      feeStatusMap[m.id] = "no_plan";
-      continue;
-    }
-
-    if (memberFees.length === 0) {
-      feeStatusMap[m.id] = "due";
-      continue;
-    }
-
-    const latest = memberFees.sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())[0];
-
-    if (latest.status === "paid") {
-      feeStatusMap[m.id] = "paid";
-    } else if (latest.due_date < today || latest.status === "overdue") {
-      feeStatusMap[m.id] = "overdue";
-    } else {
-      feeStatusMap[m.id] = "due";
-    }
+  if ((await getDevice()) === "mobile") {
+    return (
+      <MemberRegistryViewMobile
+        members={members}
+        workspaceSlug={workspaceSlug}
+        attendanceMap={attendanceMap}
+        feeStatusMap={feeStatusMap}
+        planNameMap={planNameMap}
+      />
+    );
   }
 
   return (
@@ -84,6 +84,7 @@ export default async function MembersPage({
       workspaceSlug={workspaceSlug}
       attendanceMap={attendanceMap}
       feeStatusMap={feeStatusMap}
+      planNameMap={planNameMap}
     />
   );
 }

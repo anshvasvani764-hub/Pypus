@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { revalidatePath } from "next/cache";
 
 export async function sendReminder({
@@ -20,7 +20,7 @@ export async function sendReminder({
   feeId: string | null;
   type: "fees" | "attendance";
 }): Promise<{ success: boolean; error?: string; url?: string }> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const cleanPhone = memberPhone.replace(/[^0-9]/g, "");
   const message =

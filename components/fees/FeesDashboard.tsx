@@ -1,28 +1,76 @@
 "use client";
 
-import { CreditCard, Plus } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { CreditCard } from "lucide-react";
 import type { Member, FeeRecord } from "@/lib/members/types";
+import { deriveFeeSummary } from "@/lib/members/fee-status";
 import { FeesSnapshotCards } from "@/components/fees/FeesSnapshotCards";
 import { FeesPaymentsTable } from "@/components/fees/FeesPaymentsTable";
 
 interface FeesDashboardProps {
   workspaceSlug: string;
+  workspaceId: string;
   members: Member[];
-  upcomingFees: FeeRecord[];
+  fees: FeeRecord[];
   monthlyRevenue: number;
 }
 
 export function FeesDashboard({
   workspaceSlug,
+  workspaceId,
   members,
-  upcomingFees,
-  monthlyRevenue,
+  fees: initialFees,
+  monthlyRevenue: initialRevenue,
 }: FeesDashboardProps) {
-  const activeSubscriptions = members.length;
-  const pendingCollection = upcomingFees.reduce(
-    (sum, f) => sum + f.amount_snapshot,
-    0
+  const [fees, setFees] = useState<FeeRecord[]>(initialFees);
+  const [planIds, setPlanIds] = useState<Record<string, string | null>>(() =>
+    Object.fromEntries(members.map((m) => [m.id, m.plan_id ?? null]))
   );
+  const [revenue, setRevenue] = useState(initialRevenue);
+
+  const summaries = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof deriveFeeSummary>>();
+    for (const m of members) {
+      map.set(
+        m.id,
+        deriveFeeSummary(
+          { plan_id: planIds[m.id] ?? null },
+          fees.filter((f) => f.member_id === m.id)
+        )
+      );
+    }
+    return map;
+  }, [members, fees, planIds]);
+
+  const snapshot = useMemo(() => {
+    let pendingCollection = 0;
+    let expectedRevenue = 0;
+
+    for (const m of members) {
+      const s = summaries.get(m.id);
+      if (!s || s.status === "no_plan") continue;
+      pendingCollection += s.totalPending;
+      expectedRevenue += s.monthlyValue;
+    }
+
+    return { pendingCollection, expectedRevenue };
+  }, [members, summaries]);
+
+  const handlePlanAssigned = useCallback(
+    (memberId: string, planId: string | null, fee: FeeRecord) => {
+      setPlanIds((prev) => ({ ...prev, [memberId]: planId }));
+      setFees((prev) => [...prev, fee]);
+    },
+    []
+  );
+
+  const handlePaid = useCallback((fee: FeeRecord, amount: number) => {
+    setFees((prev) => {
+      const exists = prev.some((f) => f.id === fee.id);
+      return exists ? prev.map((f) => (f.id === fee.id ? fee : f)) : [...prev, fee];
+    });
+    setRevenue((prev) => prev + amount);
+  }, []);
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
@@ -33,35 +81,31 @@ export function FeesDashboard({
             Track memberships, payments and pending collections.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm">
-            <Plus className="h-4 w-4" />
-            Add Payment
-          </button>
-          <a
-            href={`/${workspaceSlug}/fees/plans`}
-            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <CreditCard className="h-4 w-4" />
-            Plans & Pricing
-          </a>
-        </div>
+        <a
+          href={`/${workspaceSlug}/fees/plans`}
+          className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <CreditCard className="h-4 w-4" />
+          Plans & Pricing
+        </a>
       </div>
 
       <div className="mt-6">
         <FeesSnapshotCards
-          activeSubscriptions={activeSubscriptions}
-          pendingCollection={pendingCollection}
-          upcomingRenewals={upcomingFees.length}
-          monthlyRevenue={monthlyRevenue}
+          feesCollected={revenue}
+          pendingCollection={snapshot.pendingCollection}
+          expectedRevenue={snapshot.expectedRevenue}
         />
       </div>
 
       <div className="mt-6">
         <FeesPaymentsTable
           members={members}
-          fees={upcomingFees}
+          summaries={summaries}
           workspaceSlug={workspaceSlug}
+          workspaceId={workspaceId}
+          onPlanAssigned={handlePlanAssigned}
+          onPaid={handlePaid}
         />
       </div>
     </div>

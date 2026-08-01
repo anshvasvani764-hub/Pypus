@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import type { Plan } from "@/lib/members/types";
 
 interface PlanCardProps {

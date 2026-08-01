@@ -4,7 +4,9 @@ import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Search, LogIn, ChevronRight } from "lucide-react";
 import type { Member, AttendanceRecord } from "@/lib/members/types";
+import type { MemberFeeSummary } from "@/lib/members/fee-status";
 import { MemberSearchBar } from "@/components/members/MemberSearchBar";
+import { PendingFeesAlert } from "@/components/attendance/PendingFeesAlert";
 import { createClient } from "@/lib/supabase/client";
 import MemberAvatar from "@/components/shared/MemberAvatar";
 
@@ -23,6 +25,7 @@ interface AttendanceRegisterProps {
   onCheckIn: (memberId: string, time: string) => void;
   workspaceSlug: string;
   workspaceId: string;
+  feeSummaries: Record<string, MemberFeeSummary>;
 }
 
 import { getISTDateString, formatISTTime } from "@/lib/utils/date";
@@ -74,9 +77,11 @@ export function AttendanceRegister({
   onCheckIn,
   workspaceSlug,
   workspaceId,
+  feeSummaries,
 }: AttendanceRegisterProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<AttendanceFilter>("all");
+  const [pendingAlertMember, setPendingAlertMember] = useState<Member | null>(null);
 
   const filtered = useMemo(() => {
     let result = members;
@@ -94,7 +99,7 @@ export function AttendanceRegister({
   }, [members, todayRecords, activeFilter, searchQuery]);
 
   const handleCheckIn = useCallback(
-    async (memberId: string) => {
+    async (member: Member) => {
       const supabase = createClient();
       const now = new Date();
       const today = getISTDateString(now);
@@ -105,7 +110,7 @@ export function AttendanceRegister({
         .upsert(
           {
             workspace_id: workspaceId,
-            member_id: memberId,
+            member_id: member.id,
             date: today,
             check_in: checkInIso,
             check_out: null,
@@ -122,13 +127,30 @@ export function AttendanceRegister({
         return;
       }
 
-      onCheckIn(memberId, checkInIso);
+      onCheckIn(member.id, checkInIso);
+
+      const summary = feeSummaries[member.id];
+      if (summary?.status === "due" || summary?.status === "overdue") {
+        setPendingAlertMember(member);
+      }
     },
-    [onCheckIn, workspaceId]
+    [onCheckIn, workspaceId, feeSummaries]
   );
+
+  const alertSummary = pendingAlertMember ? feeSummaries[pendingAlertMember.id] : null;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <PendingFeesAlert
+        isOpen={pendingAlertMember != null}
+        onClose={() => setPendingAlertMember(null)}
+        memberName={pendingAlertMember?.name ?? ""}
+        planName={alertSummary?.planName ?? null}
+        amount={alertSummary?.totalPending ?? null}
+        dueDate={alertSummary?.dueDate ?? null}
+        isOverdue={alertSummary?.status === "overdue"}
+      />
+
       {/* Search + Filters */}
       <div className="px-5 pt-5 pb-3 space-y-3">
         <MemberSearchBar
@@ -212,7 +234,7 @@ export function AttendanceRegister({
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleCheckIn(member.id);
+                        handleCheckIn(member);
                       }}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                     >

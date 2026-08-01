@@ -4,16 +4,22 @@ import { useState, useEffect, useRef } from "react";
 import { TrendingUp } from "lucide-react";
 import type { SnapshotStats } from "@/lib/dashboard/get-snapshot-stats";
 import { createClient } from "@/lib/supabase/client";
-import { getISTDateString } from "@/lib/utils/date";
 
 export function SnapshotBar({ stats, workspaceId }: { stats: SnapshotStats; workspaceId: string }) {
   const [liveStats, setLiveStats] = useState<SnapshotStats>(stats);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  function getTodayIst(): string {
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffset);
+    return istNow.toISOString().slice(0, 10);
+  }
+
   async function refetchCheckInsCount() {
     const supabase = createClient();
-    const today = getISTDateString();
+    const today = getTodayIst();
     const { count, error } = await supabase
       .from("attendance")
       .select("*", { count: "exact", head: true })
@@ -59,10 +65,8 @@ export function SnapshotBar({ stats, workspaceId }: { stats: SnapshotStats; work
 
     channelRef.current = channel;
 
-    // Immediately fetch real count on mount (bypass stale server prop)
     refetchCheckInsCount();
 
-    // Polling fallback every 10 seconds
     intervalRef.current = setInterval(() => {
       refetchCheckInsCount();
     }, 10000);

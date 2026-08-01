@@ -1,11 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { Member, AttendanceRecord, FeeRecord, Plan } from "@/lib/members/types";
 
 export async function getMembers(workspaceId: string): Promise<Member[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("members")
-    .select("*, plan:plans!members_plan_id_fkey(name)")
+    .select("*, plan:plans!members_plan_id_fkey(name, duration)")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: true });
   if (error) {
@@ -19,7 +19,7 @@ export async function getMemberById(
   workspaceId: string,
   memberId: string
 ): Promise<Member | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("members")
     .select("*")
@@ -38,7 +38,7 @@ import { getISTDateString } from "@/lib/utils/date";
 export async function getAttendanceForToday(
   workspaceId: string
 ): Promise<AttendanceRecord[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const today = getISTDateString();
   const { data, error } = await supabase
     .from("attendance")
@@ -57,7 +57,7 @@ export async function getAttendanceForMember(
   workspaceId: string,
   memberId: string
 ): Promise<AttendanceRecord[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("attendance")
     .select("*")
@@ -77,7 +77,7 @@ export async function getAttendanceForDateRange(
   startDate: string,
   endDate: string
 ): Promise<AttendanceRecord[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("attendance")
     .select("*")
@@ -97,7 +97,7 @@ export async function upsertAttendance(
   workspaceId: string,
   record: Omit<AttendanceRecord, "id">
 ): Promise<AttendanceRecord | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("attendance")
     .upsert({
@@ -118,7 +118,7 @@ export async function upsertAttendance(
 }
 
 export async function getPlans(workspaceId: string): Promise<Plan[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("plans")
     .select("*")
@@ -135,7 +135,7 @@ export async function getPlanById(
   workspaceId: string,
   planId: string
 ): Promise<Plan | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("plans")
     .select("*")
@@ -153,7 +153,7 @@ export async function getFeesForMember(
   workspaceId: string,
   memberId: string
 ): Promise<FeeRecord[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("fees")
     .select("*")
@@ -171,7 +171,7 @@ export async function getFeeById(
   workspaceId: string,
   feeId: string
 ): Promise<FeeRecord | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("fees")
     .select("*")
@@ -189,7 +189,7 @@ export async function upsertFee(
   workspaceId: string,
   record: Omit<FeeRecord, "id">
 ): Promise<FeeRecord | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("fees")
     .upsert({
@@ -203,7 +203,6 @@ export async function upsertFee(
       paid_date: record.paid_date,
       payment_method: record.payment_method,
       status: record.status,
-      description: record.description,
     })
     .select()
     .single();
@@ -214,11 +213,27 @@ export async function upsertFee(
   return data as FeeRecord;
 }
 
+export async function getFeesForWorkspace(
+  workspaceId: string
+): Promise<FeeRecord[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("fees")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("due_date", { ascending: false });
+  if (error) {
+    console.error("getFeesForWorkspace error:", error);
+    return [];
+  }
+  return (data ?? []) as FeeRecord[];
+}
+
 export async function getUpcomingFees(
   workspaceId: string,
   daysAhead: number = 14
 ): Promise<FeeRecord[]> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(endDate.getDate() + daysAhead);
@@ -242,7 +257,7 @@ export async function getMonthlyRevenue(
   month: number,
   year: number
 ): Promise<number> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
   const endDate = new Date(year, month, 0);
   const endDateStr = endDate.toISOString().slice(0, 10);

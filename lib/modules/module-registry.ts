@@ -1,7 +1,7 @@
-import { Users, Clock, Wallet, CreditCard, UsersRound, BarChart3, Sparkles } from "lucide-react";
+import { Users, Clock, CreditCard, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type ModuleSlug = "members" | "attendance" | "fees" | "expenses" | "team" | "reports";
+export type ModuleSlug = "members" | "attendance" | "fees";
 
 export interface ModuleRegistryEntry {
   slug: ModuleSlug;
@@ -41,37 +41,10 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
     iconColor: "text-emerald-600",
     requiredPermission: "fees.view",
   },
-  {
-    slug: "expenses",
-    title: "Expenses",
-    description: "Track rent, salaries, supplies and more",
-    icon: Wallet,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
-    requiredPermission: "expenses.view",
-  },
-  {
-    slug: "team",
-    title: "Team",
-    description: "Staff, coaches, shifts and payroll",
-    icon: UsersRound,
-    iconBg: "bg-violet-50",
-    iconColor: "text-violet-600",
-    requiredPermission: "team.view",
-  },
-  {
-    slug: "reports",
-    title: "Reports",
-    description: "Sales, retention and business health",
-    icon: BarChart3,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
-    requiredPermission: "reports.view",
-  },
 ];
 
 export const COMING_SOON_CARD = {
   title: "More modules",
-  description: "Inventory, Marketing and Bookings are coming soon.",
+  description: "Expenses, Team, Reports and more are coming soon.",
   icon: Sparkles,
 };

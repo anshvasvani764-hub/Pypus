@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Members Registry | Pypus</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "primary-container": "#00ff41",
+                    "on-primary-container": "#007117",
+                    "surface-container-lowest": "#ffffff",
+                    "on-background": "#131b2e",
+                    "on-primary-fixed": "#002203",
+                    "tertiary-fixed": "#ffddb8",
+                    "primary-fixed": "#72ff70",
+                    "on-surface": "#131b2e",
+                    "background": "#faf8ff",
+                    "on-secondary-container": "#fffbff",
+                    "inverse-surface": "#283044",
+                    "on-secondary-fixed-variant": "#2f2ebe",
+                    "surface-container": "#eaedff",
+                    "tertiary": "#855300",
+                    "surface-bright": "#faf8ff",
+                    "on-secondary": "#ffffff",
+                    "secondary-container": "#6063ee",
+                    "secondary-fixed": "#e1e0ff",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "on-secondary-fixed": "#07006c",
+                    "error-container": "#ffdad6",
+                    "tertiary-container": "#ffd6a8",
+                    "surface-dim": "#d2d9f4",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-error": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-tertiary-fixed": "#2a1700",
+                    "outline": "#6b7c65",
+                    "secondary": "#4648d4",
+                    "inverse-primary": "#00e639",
+                    "surface": "#faf8ff",
+                    "surface-container-low": "#f2f3ff",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "surface-variant": "#dae2fd",
+                    "on-tertiary": "#ffffff",
+                    "primary": "#006e16",
+                    "on-tertiary-container": "#895600",
+                    "primary-fixed-dim": "#00e639",
+                    "surface-container-high": "#e2e7ff",
+                    "surface-tint": "#006e16",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#00530e",
+                    "outline-variant": "#b9ccb2",
+                    "on-surface-variant": "#3b4b37"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "margin-mobile": "20px",
+                    "sm": "8px",
+                    "gutter": "16px",
+                    "md": "16px",
+                    "base": "4px",
+                    "lg": "24px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "label-bold": ["Inter"],
+                    "body-md": ["Inter"],
+                    "stats-display": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "stats-display": ["32px", {"lineHeight": "40px", "fontWeight": "800"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf8ff;
+            color: #131b2e;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .glass-lite {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .card-interaction:active {
+            transform: scale(0.98);
+            transition: transform 0.1s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface-container/80 backdrop-blur-xl docked full-width top-0 sticky z-40 border-b border-outline-variant/30 shadow-sm flex justify-between items-center w-full px-margin-mobile py-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">business_center</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-black text-primary dark:text-primary-fixed">Pypus</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary/5 transition-colors active:scale-95 duration-100 text-on-surface-variant">
+<span class="material-symbols-outlined">search</span>
+</button>
+</header>
+<main class="px-margin-mobile pt-lg">
+<!-- Search Section -->
+<div class="mb-lg">
+<div class="relative group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60">search</span>
+<input class="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-outline-variant/30 bg-surface-container-lowest focus:border-primary focus:ring-0 transition-all font-body-md text-body-md" placeholder="Search members by name or ID..." type="text"/>
+</div>
+</div>
+<!-- Filter Chips -->
+<div class="flex gap-sm overflow-x-auto hide-scrollbar mb-xl -mx-margin-mobile px-margin-mobile">
+<button class="px-5 py-2.5 rounded-full bg-primary text-on-primary font-label-bold text-label-bold whitespace-nowrap shadow-md shadow-primary/20">All</button>
+<button class="px-5 py-2.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-bold text-label-bold whitespace-nowrap hover:bg-surface-container-highest transition-colors">Fees Due</button>
+<button class="px-5 py-2.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-bold text-label-bold whitespace-nowrap hover:bg-surface-container-highest transition-colors">Low Attendance</button>
+<button class="px-5 py-2.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-bold text-label-bold whitespace-nowrap hover:bg-surface-container-highest transition-colors">Recently Joined</button>
+</div>
+<!-- Section Title -->
+<div class="flex justify-between items-end mb-md">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Registry</h2>
+<span class="font-label-bold text-label-bold text-on-surface-variant/60 uppercase tracking-widest">128 Members</span>
+</div>
+<!-- Members List -->
+<div class="grid grid-cols-1 gap-md">
+<!-- Member Card 1: Paid -->
+<div class="card-interaction bg-surface-container-lowest p-md rounded-lg shadow-sm border border-outline-variant/10 flex items-center gap-md" onclick="window.location.href='#profile'">
+<div class="relative">
+<img class="w-14 h-14 rounded-full object-cover border-2 border-primary-container" data-alt="A professional studio headshot of a smiling young woman with curly hair, wearing a vibrant green modern athletic top. The lighting is soft and high-key, emphasizing a clean, energetic business-management app aesthetic. The background is a minimalist, softly blurred modern gym interior with bright daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7OJE5nQidb3uMO6wcDGZoTsbmYwcPfLfws-8nfWHq7GBFwEDuaNii-Z96zyaCM7vglokPmgNHCXfs9009fyQdYRnyXbVqRgSvLYN-G2NJUBXUKVJGtgR_w4-tdFvvqw4FlM659ea1yEthR0y2Ll7QEW9As1ju4vW3lknWVOovzwMBuYJvvKsT7Am0PCaW-ie7cLy7PsGEdtrLHs4YcGljSnSmjXrA_3316RNepVkmq2Xz_PJpqCmC"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-primary rounded-full border-2 border-white"></div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-bold text-body-md text-on-surface truncate">Sarah Jenkins</h3>
+<p class="font-body-md text-label-bold text-on-surface-variant/70">+1 (555) 012-3456</p>
+</div>
+<div class="px-3 py-1 rounded-full bg-primary-container text-on-primary-container font-label-bold text-[10px] uppercase tracking-wider">
+                    Paid
+                </div>
+<span class="material-symbols-outlined text-on-surface-variant/40">chevron_right</span>
+</div>
+<!-- Member Card 2: Due -->
+<div class="card-interaction bg-surface-container-lowest p-md rounded-lg shadow-sm border border-outline-variant/10 flex items-center gap-md" onclick="window.location.href='#profile'">
+<div class="relative">
+<img class="w-14 h-14 rounded-full object-cover border-2 border-tertiary-container" data-alt="A clear portrait of a middle-aged man with short hair and a neat beard, wearing a charcoal grey polo shirt. He has a friendly, professional expression. The lighting is warm and natural, suggesting an upscale corporate wellness center environment with glass partitions and soft highlights." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBetcaypYYXa8rtd3DGdw6xF40GLvb9ff6ScqDx_z3JMTisiEFe-IrQXSVB_4syNNam7swOSV4MJwuYksKf6CLRizgQJPm5e5XfAmNFTDKpn1HaJ9IKa7Jv8fOBPlYalWAQgCPSqiuk0InjLzMxcha-GprVT0WjouoAMMCutU03bOCVllGYSRWMBgG_uWn0pO9M0o062bGTyJPfi_JvM2fUd2aEcUF0_kvxcsDF19G3ohVh2jbiFSy"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-tertiary rounded-full border-2 border-white"></div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-bold text-body-md text-on-surface truncate">Marcus Chen</h3>
+<p class="font-body-md text-label-bold text-on-surface-variant/70">+1 (555) 987-6543</p>
+</div>
+<div class="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container font-label-bold text-[10px] uppercase tracking-wider">
+                    Due
+                </div>
+<span class="material-symbols-outlined text-on-surface-variant/40">chevron_right</span>
+</div>
+<!-- Member Card 3: Overdue -->
+<div class="card-interaction bg-surface-container-lowest p-md rounded-lg shadow-sm border border-outline-variant/10 flex items-center gap-md" onclick="window.location.href='#profile'">
+<div class="relative">
+<img class="w-14 h-14 rounded-full object-cover border-2 border-error-container" data-alt="A focused headshot of a woman with her hair in a sleek ponytail, wearing a modern blue fitness jersey. She is looking directly at the camera with a confident, neutral expression. The scene is bright and airy with subtle cyan and white tones, matching a professional business dashboard style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjg5So6m62mdZfm5L-W9CkriJ4RtZJnq81V0xuRWAc4MHuoWMS80h4JJiXMIJZAAYJDBEz_hhTFETxMaLOcdb7Va-jhuyGAn184nmCJn4vTR4eQK-hZvKKHeFGZyC_OIsiNkJYVQ543bdGAYW2iVSPf8GkwaBTAZoOLqfu10TWDleKPVqB2uLBupVSSoJo31q3t6tkplCTeU_k7F9aKlm3yV3BY3jbL7aDjI_mgNfRmo8kKA3VI7yw"/>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-bold text-body-md text-on-surface truncate">Elena Rodriguez</h3>
+<p class="font-body-md text-label-bold text-on-surface-variant/70">+1 (555) 246-8101</p>
+</div>
+<div class="px-3 py-1 rounded-full bg-error-container text-on-error-container font-label-bold text-[10px] uppercase tracking-wider">
+                    Overdue
+                </div>
+<span class="material-symbols-outlined text-on-surface-variant/40">chevron_right</span>
+</div>
+<!-- Member Card 4: No Plan -->
+<div class="card-interaction bg-surface-container-lowest p-md rounded-lg shadow-sm border border-outline-variant/10 flex items-center gap-md" onclick="window.location.href='#profile'">
+<div class="relative">
+<img class="w-14 h-14 rounded-full object-cover border-2 border-outline-variant" data-alt="A youthful man with a modern haircut wearing a simple white t-shirt, appearing relaxed and approachable. The background is a very clean, high-key white studio setting with soft grey shadows, conveying a minimalist and professional vibe consistent with a modern SaaS application interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCNaD6VC-795JQdDy_6lY4bIiX85qSdfJqvriKRkP4MBYCith24Z7VMHQ0Vc4ICjDm8bQvLdy0GCEM0UgGlGxkJnk3L8D8QBniFHj4oXrX2BFxlTbjjm6R2Gdy9HYgrDM93a826S5jU7LbKn1vuw1H5COaYOMmP2WDeiIvI0YL8Vs5_xOVpU7PHdpAmcnPVU_eYiRzQjYIsLfLlkVzMGN5Voia1CT42pBFtSELZmGgPp73lDTj7G2F6"/>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-bold text-body-md text-on-surface truncate">David Kim</h3>
+<p class="font-body-md text-label-bold text-on-surface-variant/70">+1 (555) 135-7924</p>
+</div>
+<div class="px-3 py-1 rounded-full bg-surface-container-high text-on-surface-variant font-label-bold text-[10px] uppercase tracking-wider">
+                    No Plan
+                </div>
+<span class="material-symbols-outlined text-on-surface-variant/40">chevron_right</span>
+</div>
+<!-- Member Card 5: Paid -->
+<div class="card-interaction bg-surface-container-lowest p-md rounded-lg shadow-sm border border-outline-variant/10 flex items-center gap-md" onclick="window.location.href='#profile'">
+<div class="relative">
+<img class="w-14 h-14 rounded-full object-cover border-2 border-primary-container" data-alt="A portrait of an older woman with elegant silver hair, wearing a stylish navy blue blazer. She has a warm, trustworthy smile. The lighting is sophisticated, with gentle backlighting that creates a soft halo effect, reinforcing a premium and reliable business brand image." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5MOPokZQoFw3AcdzcBj_iuuvvVYyz0_AQbXu6if9hvisqc_PCgvK8e5Du6IG-MJRdj8z1SqswENz3HJVZw6YzxqecTYsCm7qFXxKRfRtlXQGFYUXgHBudeCxpd-aUsHJ3zAZqhj34zrElMCYbkHd9xk1qdxr-78qGtpwprus8yHm3rTZSfpBeVs58QPHr2EPIxZFsup-jmadjexrBHYN435uTefmJIeCp2A7CVClX6lrLLyqeju-y"/>
+<div class="absolute bottom-0 right-0 w-4 h-4 bg-primary rounded-full border-2 border-white"></div>
+</div>
+<div class="flex-1 min-w-0">
+<h3 class="font-label-bold text-body-md text-on-surface truncate">Beryl Thompson</h3>
+<p class="font-body-md text-label-bold text-on-surface-variant/70">+1 (555) 444-5555</p>
+</div>
+<div class="px-3 py-1 rounded-full bg-primary-container text-on-primary-container font-label-bold text-[10px] uppercase tracking-wider">
+                    Paid
+                </div>
+<span class="material-symbols-outlined text-on-surface-variant/40">chevron_right</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface/90 dark:bg-surface-container-highest/90 backdrop-blur-2xl border-t border-outline-variant/20 shadow-[0_-4px_20px_0_rgba(0,110,22,0.12)] rounded-t-lg">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all py-2 px-4 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-label-bold text-label-bold">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 scale-110 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">apps</span>
+<span class="font-label-bold text-label-bold">Modules</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all py-2 px-4 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">smart_toy</span>
+<span class="font-label-bold text-label-bold">Assistant</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all py-2 px-4 rounded-xl" href="#">
+<span class="material-symbols-outlined mb-1">settings</span>
+<span class="font-label-bold text-label-bold">Settings</span>
+</a>
+</nav>
+<!-- FAB (Suppressed as per rules for Registry/List screens, but usually present for adding members. Given the task "Members Registry", we prioritize clarity, but adding a subtle 'Add' action for utility) -->
+<button class="fixed bottom-24 right-6 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg shadow-primary/30 flex items-center justify-center active:scale-90 transition-transform z-40">
+<span class="material-symbols-outlined" style="font-size: 28px;">person_add</span>
+</button>
+<script>
+        // Micro-interactions for filtering
+        const filterChips = document.querySelectorAll('.flex.gap-sm button');
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                filterChips.forEach(c => {
+                    c.classList.remove('bg-primary', 'text-on-primary', 'shadow-md', 'shadow-primary/20');
+                    c.classList.add('bg-surface-container-high', 'text-on-surface-variant');
+                });
+                chip.classList.add('bg-primary', 'text-on-primary', 'shadow-md', 'shadow-primary/20');
+                chip.classList.remove('bg-surface-container-high', 'text-on-surface-variant');
+            });
+        });
+    </script>
+</body></html>

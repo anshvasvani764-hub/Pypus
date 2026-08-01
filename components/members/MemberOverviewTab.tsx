@@ -5,6 +5,7 @@ import {
   CreditCard,
   StickyNote,
 } from "lucide-react";
+import MemberAvatar from "@/components/shared/MemberAvatar";
 import type { Member } from "@/lib/members/types";
 
 interface MemberOverviewTabProps {
@@ -48,15 +49,16 @@ export function MemberOverviewTab({ member }: MemberOverviewTabProps) {
 
   return (
     <div className="grid grid-cols-1 gap-5 mt-5">
-      {/* Contact & Identity */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">
-          Contact Details
-        </h2>
+      {/* Avatar + Contact */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 flex items-center gap-4">
+        <MemberAvatar name={member.name} avatarUrl={member.avatar_url} size={56} />
         <div>
-          <InfoRow icon={Mail} label="Email" value={member.email} />
-          <InfoRow icon={Phone} label="Phone" value={member.phone} />
-          <InfoRow icon={CalendarDays} label="Joined" value={joinedDate} />
+          <h2 className="text-sm font-semibold text-gray-900 mb-2">Contact Details</h2>
+          <div>
+            <InfoRow icon={Mail} label="Email" value={member.email} />
+            <InfoRow icon={Phone} label="Phone" value={member.phone} />
+            <InfoRow icon={CalendarDays} label="Joined" value={joinedDate} />
+          </div>
         </div>
       </div>
 

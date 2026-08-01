@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
 import { getMemberById, getFeesForMember } from "@/lib/supabase/queries";
 import { createClient } from "@/lib/supabase/server";
+import { deriveFeeSummary } from "@/lib/members/fee-status";
 import { MemberBreadcrumbs } from "@/components/members/MemberBreadcrumbs";
 import { MemberProfileHeader } from "@/components/members/MemberProfileHeader";
 import { MemberTabs } from "@/components/members/MemberTabs";
 import { MemberFeesView } from "@/components/members/MemberFeesView";
+import { MemberProfileFeesView } from "@/components/mobile/MemberProfileFeesView.mobile";
+import { getDevice } from "@/lib/device";
 
 export default async function MemberFeesPage({
   params,
@@ -25,7 +28,28 @@ export default async function MemberFeesPage({
   const member = await getMemberById(workspaceId, memberId);
   if (!member) notFound();
 
+  const fees = await getFeesForMember(workspaceId, memberId);
+  const summary = deriveFeeSummary(member, fees);
+
   const basePath = `/${workspaceSlug}/members/${memberId}`;
+
+  if ((await getDevice()) === "mobile") {
+    return (
+      <MemberProfileFeesView
+        member={member}
+        workspaceSlug={workspaceSlug}
+        workspaceId={workspaceId}
+        feeStatus={summary.status}
+        planName={summary.planName}
+        amount={summary.amount}
+        dueDate={summary.dueDate}
+        totalPaid={summary.totalPaid}
+        totalPending={summary.totalPending}
+        fees={fees}
+        payableFeeId={summary.payableFee?.id ?? null}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
@@ -39,7 +63,13 @@ export default async function MemberFeesPage({
       />
 
       <div className="mt-4">
-        <MemberProfileHeader member={member} workspaceName={workspaceName} />
+        <MemberProfileHeader
+          member={member}
+          workspaceName={workspaceName}
+          feeStatus={summary.status}
+          planName={summary.planName}
+          payableFeeId={summary.payableFee?.id ?? null}
+        />
       </div>
 
       <div className="mt-6">
@@ -50,3 +80,4 @@ export default async function MemberFeesPage({
     </div>
   );
 }
+

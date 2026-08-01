@@ -24,7 +24,7 @@ export interface Member {
   trainer_name: string | null;
   joined_at: string; // ISO date
   plan_id?: string | null;
-  plan?: { name: string } | null;
+  plan?: { name: string; duration?: PlanDuration } | null;
   notes?: string;
 }
 
@@ -58,7 +58,6 @@ export interface FeeRecord {
   paid_date: string | null; // ISO date
   payment_method: string | null; // "UPI" | "Cash" | "Bank Transfer" | null
   status: SubscriptionStatus;
-  description?: string;
 }
 
 export interface PaymentReminder {

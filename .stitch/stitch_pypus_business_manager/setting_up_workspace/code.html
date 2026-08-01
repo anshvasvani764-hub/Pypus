@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pypus — Setting Up Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    /* Custom font-family assignments from Design System */
+    .font-label-bold { font-family: 'Inter', sans-serif; }
+    .font-body-md { font-family: 'Inter', sans-serif; }
+    .font-stats-display { font-family: 'Inter', sans-serif; }
+    .font-headline-lg-mobile { font-family: 'Inter', sans-serif; }
+    .font-headline-lg { font-family: 'Inter', sans-serif; }
+    .font-headline-xl { font-family: 'Inter', sans-serif; }
+
+    /* Glassmorphism utility */
+    .glass-lite {
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(32px);
+      -webkit-backdrop-filter: blur(32px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    /* Success Checkmark Animation */
+    @keyframes drawCheck {
+      to { stroke-dashoffset: 0; }
+    }
+    .checkmark-path {
+      stroke-dasharray: 100;
+      stroke-dashoffset: 100;
+      animation: drawCheck 0.6s ease-out forwards;
+    }
+
+    /* Confetti Particle Animation */
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      opacity: 0;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* Progress Item Animation */
+    .item-appear {
+      animation: slideUpFade 0.5s ease-out forwards;
+    }
+    @keyframes slideUpFade {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Terminal Green Pulse */
+    .pulse-green {
+      box-shadow: 0 0 0 0 rgba(0, 230, 57, 0.4);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(0, 230, 57, 0.7); }
+      70% { box-shadow: 0 0 0 15px rgba(0, 230, 57, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(0, 230, 57, 0); }
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-error-container": "#93000a",
+            "primary-container": "#00ff41",
+            "on-primary-container": "#007117",
+            "surface-container-lowest": "#ffffff",
+            "on-background": "#131b2e",
+            "on-primary-fixed": "#002203",
+            "tertiary-fixed": "#ffddb8",
+            "primary-fixed": "#72ff70",
+            "on-surface": "#131b2e",
+            "background": "#faf8ff",
+            "on-secondary-container": "#fffbff",
+            "inverse-surface": "#283044",
+            "on-secondary-fixed-variant": "#2f2ebe",
+            "surface-container": "#eaedff",
+            "tertiary": "#855300",
+            "surface-bright": "#faf8ff",
+            "on-secondary": "#ffffff",
+            "secondary-container": "#6063ee",
+            "secondary-fixed": "#e1e0ff",
+            "on-tertiary-fixed-variant": "#653e00",
+            "secondary-fixed-dim": "#c0c1ff",
+            "on-secondary-fixed": "#07006c",
+            "error-container": "#ffdad6",
+            "tertiary-container": "#ffd6a8",
+            "surface-dim": "#d2d9f4",
+            "inverse-on-surface": "#eef0ff",
+            "on-error": "#ffffff",
+            "on-primary": "#ffffff",
+            "surface-container-highest": "#dae2fd",
+            "on-tertiary-fixed": "#2a1700",
+            "outline": "#6b7c65",
+            "secondary": "#4648d4",
+            "inverse-primary": "#00e639",
+            "surface": "#faf8ff",
+            "surface-container-low": "#f2f3ff",
+            "tertiary-fixed-dim": "#ffb95f",
+            "surface-variant": "#dae2fd",
+            "on-tertiary": "#ffffff",
+            "primary": "#006e16",
+            "on-tertiary-container": "#895600",
+            "primary-fixed-dim": "#00e639",
+            "surface-container-high": "#e2e7ff",
+            "surface-tint": "#006e16",
+            "error": "#ba1a1a",
+            "on-primary-fixed-variant": "#00530e",
+            "outline-variant": "#b9ccb2",
+            "on-surface-variant": "#3b4b37"
+          },
+          "borderRadius": {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "xs": "4px",
+            "margin-mobile": "20px",
+            "sm": "8px",
+            "gutter": "16px",
+            "md": "16px",
+            "base": "4px",
+            "lg": "24px",
+            "xl": "32px"
+          },
+          "fontFamily": {
+            "label-bold": ["Inter"],
+            "body-md": ["Inter"],
+            "stats-display": ["Inter"],
+            "headline-lg-mobile": ["Inter"],
+            "headline-lg": ["Inter"],
+            "headline-xl": ["Inter"]
+          },
+          "fontSize": {
+            "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+            "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "stats-display": ["32px", { "lineHeight": "40px", "fontWeight": "800" }],
+            "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "headline-xl": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background text-on-background min-h-screen overflow-hidden font-body-md text-body-md">
+<!-- Atmospheric Background Gradient -->
+<div class="fixed inset-0 -z-10 bg-gradient-to-br from-primary/10 via-surface-container-highest to-secondary/10 overflow-hidden">
+<!-- Animated Shader Background -->
+
+<!-- Large Blur Orbs -->
+<div class="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary-container/20 blur-[120px]"></div>
+<div class="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-secondary-container/20 blur-[100px]"></div>
+</div>
+<!-- Confetti Container (Populated via JS) -->
+<div class="fixed inset-0 pointer-events-none z-50" id="confetti-container"></div>
+<main class="relative z-10 flex flex-col items-center justify-center min-h-screen px-margin-mobile text-center">
+<!-- Loading Phase Content -->
+<div class="flex flex-col items-center gap-xl w-full max-w-md" id="loading-phase">
+<!-- Spinner / Brand Logo Container -->
+<div class="relative w-32 h-32 md:w-40 md:h-40">
+<!-- Rotating Outer Spinner -->
+<div class="absolute inset-0 border-[6px] border-outline-variant/30 rounded-full"></div>
+<div class="absolute inset-0 border-[6px] border-t-primary border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+<!-- Central Icon -->
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[48px] md:text-[64px]" data-icon="business_center" style="font-variation-settings: 'FILL' 1;">business_center</span>
+</div>
+</div>
+<!-- Headline -->
+<div class="space-y-sm">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background tracking-tight">
+          Preparing your space
+        </h1>
+<p class="text-on-surface-variant font-body-md text-body-md">This will only take a few moments.</p>
+</div>
+<!-- Animated Checklist -->
+<div class="w-full space-y-md">
+<!-- Checklist Item 1 -->
+<div class="flex items-center gap-md p-md glass-lite rounded-lg transition-all duration-500 opacity-0 transform translate-y-4" id="check-1">
+<div class="status-icon w-8 h-8 flex items-center justify-center rounded-full bg-surface-container">
+<span class="material-symbols-outlined text-primary text-[20px] hidden" data-icon="check">check</span>
+<div class="loading-dot w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+</div>
+<span class="font-label-bold text-label-bold text-on-surface">Creating workspace</span>
+</div>
+<!-- Checklist Item 2 -->
+<div class="flex items-center gap-md p-md glass-lite rounded-lg transition-all duration-500 opacity-0 transform translate-y-4" id="check-2">
+<div class="status-icon w-8 h-8 flex items-center justify-center rounded-full bg-surface-container">
+<span class="material-symbols-outlined text-primary text-[20px] hidden" data-icon="check">check</span>
+<div class="loading-dot w-2 h-2 bg-primary rounded-full animate-pulse hidden"></div>
+</div>
+<span class="font-label-bold text-label-bold text-on-surface-variant/60">Setting roles</span>
+</div>
+<!-- Checklist Item 3 -->
+<div class="flex items-center gap-md p-md glass-lite rounded-lg transition-all duration-500 opacity-0 transform translate-y-4" id="check-3">
+<div class="status-icon w-8 h-8 flex items-center justify-center rounded-full bg-surface-container">
+<span class="material-symbols-outlined text-primary text-[20px] hidden" data-icon="check">check</span>
+<div class="loading-dot w-2 h-2 bg-primary rounded-full animate-pulse hidden"></div>
+</div>
+<span class="font-label-bold text-label-bold text-on-surface-variant/60">Activating modules</span>
+</div>
+</div>
+</div>
+<!-- Success Phase Content (Hidden initially) -->
+<div class="hidden flex flex-col items-center gap-xl w-full max-w-lg scale-90 opacity-0 transition-all duration-700 ease-out" id="success-phase">
+<!-- Big Checkmark -->
+<div class="relative flex items-center justify-center w-48 h-48 md:w-56 md:h-56">
+<div class="absolute inset-0 bg-primary/20 rounded-full pulse-green"></div>
+<div class="absolute inset-4 bg-primary-container rounded-full flex items-center justify-center">
+<svg class="w-24 h-24 text-on-primary-container" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewbox="0 0 24 24">
+<polyline class="checkmark-path" points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+<!-- Success Messaging -->
+<div class="space-y-sm">
+<h2 class="font-headline-xl text-headline-xl text-on-background tracking-tighter">You're all set!</h2>
+<p class="text-on-surface-variant font-body-md text-body-md max-w-xs mx-auto">Your Pypus workspace is ready and optimized for your business.</p>
+</div>
+<!-- Final Action -->
+<div class="w-full flex justify-center pt-xl">
+<button class="group relative px-xl py-lg bg-primary-container text-on-primary-container rounded-lg font-label-bold text-label-bold flex items-center gap-sm shadow-xl hover:scale-105 active:scale-95 transition-all" onclick="window.location.reload()">
+<span>Go to Dashboard</span>
+<span class="material-symbols-outlined transition-transform group-hover:translate-x-1" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loadingPhase = document.getElementById('loading-phase');
+      const successPhase = document.getElementById('success-phase');
+      const items = [
+        document.getElementById('check-1'),
+        document.getElementById('check-2'),
+        document.getElementById('check-3')
+      ];
+
+      // Sequential animation of checklist
+      const startOnboardingSequence = async () => {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const text = item.querySelector('span');
+          const statusIconContainer = item.querySelector('.status-icon');
+          const dot = item.querySelector('.loading-dot');
+          const check = item.querySelector('.material-symbols-outlined');
+
+          // Reveal item
+          await sleep(800);
+          item.classList.remove('opacity-0', 'translate-y-4');
+          item.classList.add('opacity-100', 'translate-y-0');
+          dot.classList.remove('hidden');
+          text.classList.remove('text-on-surface-variant/60');
+          text.classList.add('text-on-surface');
+
+          // Simulate work
+          await sleep(1500);
+          dot.classList.add('hidden');
+          check.classList.remove('hidden');
+          statusIconContainer.classList.remove('bg-surface-container');
+          statusIconContainer.classList.add('bg-primary-container');
+        }
+
+        // Transition to success
+        await sleep(1000);
+        loadingPhase.classList.add('scale-95', 'opacity-0');
+        await sleep(500);
+        loadingPhase.classList.add('hidden');
+        
+        successPhase.classList.remove('hidden');
+        // Force reflow
+        successPhase.offsetHeight;
+        successPhase.classList.remove('scale-90', 'opacity-0');
+        successPhase.classList.add('scale-100', 'opacity-100');
+
+        triggerConfetti();
+      };
+
+      const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const triggerConfetti = () => {
+        const container = document.getElementById('confetti-container');
+        const colors = ['#00ff41', '#4648d4', '#ffb95f', '#ffdad6', '#ffffff'];
+        
+        for (let i = 0; i < 100; i++) {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + 'vw';
+          confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+          
+          const duration = 2 + Math.random() * 3;
+          confetti.style.animation = `confettiFall ${duration}s ease-out forwards`;
+          confetti.style.animationDelay = Math.random() * 1.5 + 's';
+          
+          container.appendChild(confetti);
+          
+          // Cleanup
+          setTimeout(() => confetti.remove(), (duration + 1.5) * 1000);
+        }
+      };
+
+      startOnboardingSequence();
+    });
+  </script>
+</body></html>

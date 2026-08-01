@@ -194,30 +194,30 @@ export const MOCK_PLANS: Plan[] = [
 
 export const MOCK_FEES: FeeRecord[] = [
   // Rahul Sharma (mem-001) — Premium Annual, paid
-  { id: "fee-001", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2026-08-15", paid_date: "2026-08-10", payment_method: "Bank Transfer", status: "paid", description: "Annual membership renewal" },
-  { id: "fee-002", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2025-08-15", paid_date: "2025-08-12", payment_method: "Bank Transfer", status: "paid", description: "Annual membership renewal" },
-  { id: "fee-003", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-08-15", paid_date: "2024-08-14", payment_method: "Bank Transfer", status: "paid", description: "Annual membership renewal" },
+  { id: "fee-001", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2026-08-15", paid_date: "2026-08-10", payment_method: "Bank Transfer", status: "paid" },
+  { id: "fee-002", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2025-08-15", paid_date: "2025-08-12", payment_method: "Bank Transfer", status: "paid" },
+  { id: "fee-003", member_id: "mem-001", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-08-15", paid_date: "2024-08-14", payment_method: "Bank Transfer", status: "paid" },
   // Priya Patel (mem-002) — Monthly Basic, has due
-  { id: "fee-004", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 0, due_date: "2026-04-10", paid_date: null, payment_method: null, status: "due", description: "April 2026" },
-  { id: "fee-005", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-10", paid_date: "2026-03-08", payment_method: "UPI", status: "paid", description: "March 2026" },
-  { id: "fee-006", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-02-10", paid_date: "2026-02-09", payment_method: "UPI", status: "paid", description: "February 2026" },
+  { id: "fee-004", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 0, due_date: "2026-04-10", paid_date: null, payment_method: null, status: "due" },
+  { id: "fee-005", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-10", paid_date: "2026-03-08", payment_method: "UPI", status: "paid" },
+  { id: "fee-006", member_id: "mem-002", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-02-10", paid_date: "2026-02-09", payment_method: "UPI", status: "paid" },
   // Amit Verma (mem-003) — expired, overdue
-  { id: "fee-007", member_id: "mem-003", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 0, due_date: "2025-06-01", paid_date: null, payment_method: null, status: "overdue", description: "June 2025 renewal" },
-  { id: "fee-008", member_id: "mem-003", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-06-01", paid_date: "2024-05-28", payment_method: "Cash", status: "paid", description: "June 2024 renewal" },
+  { id: "fee-007", member_id: "mem-003", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 0, due_date: "2025-06-01", paid_date: null, payment_method: null, status: "overdue" },
+  { id: "fee-008", member_id: "mem-003", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-06-01", paid_date: "2024-05-28", payment_method: "Cash", status: "paid" },
   // Sneha Reddy (mem-004) — Quarterly Pro, paid
-  { id: "fee-009", member_id: "mem-004", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 4999, due_date: "2026-05-20", paid_date: "2026-05-18", payment_method: "UPI", status: "paid", description: "May-Jul 2026" },
-  { id: "fee-010", member_id: "mem-004", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 4999, due_date: "2026-02-20", paid_date: "2026-02-18", payment_method: "UPI", status: "paid", description: "Feb-Apr 2026" },
+  { id: "fee-009", member_id: "mem-004", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 4999, due_date: "2026-05-20", paid_date: "2026-05-18", payment_method: "UPI", status: "paid" },
+  { id: "fee-010", member_id: "mem-004", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 4999, due_date: "2026-02-20", paid_date: "2026-02-18", payment_method: "UPI", status: "paid" },
   // Vikram Joshi (mem-005) — Monthly Basic, paid
-  { id: "fee-011", member_id: "mem-005", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-04-05", paid_date: "2026-04-03", payment_method: "UPI", status: "paid", description: "April 2026" },
-  { id: "fee-012", member_id: "mem-005", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-05", paid_date: "2026-03-04", payment_method: "UPI", status: "paid", description: "March 2026" },
+  { id: "fee-011", member_id: "mem-005", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-04-05", paid_date: "2026-04-03", payment_method: "UPI", status: "paid" },
+  { id: "fee-012", member_id: "mem-005", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-05", paid_date: "2026-03-04", payment_method: "UPI", status: "paid" },
   // Ananya Gupta (mem-006) — Quarterly Pro, due
-  { id: "fee-013", member_id: "mem-006", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 0, due_date: "2026-04-01", paid_date: null, payment_method: null, status: "due", description: "Apr-Jun 2026" },
+  { id: "fee-013", member_id: "mem-006", plan_id: "plan-quarterly-pro", plan_name_snapshot: "Quarterly Pro", amount_snapshot: 4999, paid_amount: 0, due_date: "2026-04-01", paid_date: null, payment_method: null, status: "due" },
   // Rohit Mehta (mem-007) — expired, overdue
-  { id: "fee-014", member_id: "mem-007", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 0, due_date: "2025-04-10", paid_date: null, payment_method: null, status: "overdue", description: "April 2025 renewal" },
-  { id: "fee-015", member_id: "mem-007", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-04-10", paid_date: "2024-04-08", payment_method: "Cash", status: "paid", description: "April 2024 renewal" },
+  { id: "fee-014", member_id: "mem-007", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 0, due_date: "2025-04-10", paid_date: null, payment_method: null, status: "overdue" },
+  { id: "fee-015", member_id: "mem-007", plan_id: "plan-premium-annual", plan_name_snapshot: "Premium Annual", amount_snapshot: 14999, paid_amount: 14999, due_date: "2024-04-10", paid_date: "2024-04-08", payment_method: "Cash", status: "paid" },
   // Kavita Nair (mem-008) — Monthly Basic, paid
-  { id: "fee-016", member_id: "mem-008", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-04-28", paid_date: "2026-04-26", payment_method: "UPI", status: "paid", description: "April 2026" },
-  { id: "fee-017", member_id: "mem-008", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-28", paid_date: "2026-03-27", payment_method: "UPI", status: "paid", description: "March 2026" },
+  { id: "fee-016", member_id: "mem-008", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-04-28", paid_date: "2026-04-26", payment_method: "UPI", status: "paid" },
+  { id: "fee-017", member_id: "mem-008", plan_id: "plan-monthly-basic", plan_name_snapshot: "Monthly Basic", amount_snapshot: 1999, paid_amount: 1999, due_date: "2026-03-28", paid_date: "2026-03-27", payment_method: "UPI", status: "paid" },
 ];
 
 // ── Today's Attendance Records (2026-07-29) ──

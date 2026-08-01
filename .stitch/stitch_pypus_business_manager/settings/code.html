@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pypus - Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error-container": "#93000a",
+                    "primary-container": "#00ff41",
+                    "on-primary-container": "#007117",
+                    "surface-container-lowest": "#ffffff",
+                    "on-background": "#131b2e",
+                    "on-primary-fixed": "#002203",
+                    "tertiary-fixed": "#ffddb8",
+                    "primary-fixed": "#72ff70",
+                    "on-surface": "#131b2e",
+                    "background": "#faf8ff",
+                    "on-secondary-container": "#fffbff",
+                    "inverse-surface": "#283044",
+                    "on-secondary-fixed-variant": "#2f2ebe",
+                    "surface-container": "#eaedff",
+                    "tertiary": "#855300",
+                    "surface-bright": "#faf8ff",
+                    "on-secondary": "#ffffff",
+                    "secondary-container": "#6063ee",
+                    "secondary-fixed": "#e1e0ff",
+                    "on-tertiary-fixed-variant": "#653e00",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "on-secondary-fixed": "#07006c",
+                    "error-container": "#ffdad6",
+                    "tertiary-container": "#ffd6a8",
+                    "surface-dim": "#d2d9f4",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-error": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#dae2fd",
+                    "on-tertiary-fixed": "#2a1700",
+                    "outline": "#6b7c65",
+                    "secondary": "#4648d4",
+                    "inverse-primary": "#00e639",
+                    "surface": "#faf8ff",
+                    "surface-container-low": "#f2f3ff",
+                    "tertiary-fixed-dim": "#ffb95f",
+                    "surface-variant": "#dae2fd",
+                    "on-tertiary": "#ffffff",
+                    "primary": "#006e16",
+                    "on-tertiary-container": "#895600",
+                    "primary-fixed-dim": "#00e639",
+                    "surface-container-high": "#e2e7ff",
+                    "surface-tint": "#006e16",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#00530e",
+                    "outline-variant": "#b9ccb2",
+                    "on-surface-variant": "#3b4b37"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "margin-mobile": "20px",
+                    "sm": "8px",
+                    "gutter": "16px",
+                    "md": "16px",
+                    "base": "4px",
+                    "lg": "24px",
+                    "xl": "32px"
+            },
+            "fontFamily": {
+                    "label-bold": ["Inter"],
+                    "body-md": ["Inter"],
+                    "stats-display": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "stats-display": ["32px", {"lineHeight": "40px", "fontWeight": "800"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #faf8ff;
+        }
+        .glass-lite {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .card-lift {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+        }
+        .card-lift:active {
+            transform: scale(0.98);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .terminal-shadow {
+            box-shadow: 0 4px 14px 0 rgba(0, 110, 22, 0.15);
+        }
+    </style>
+</head>
+<body class="text-on-surface antialiased pb-32">
+<!-- Top App Bar -->
+<header class="bg-surface/80 dark:bg-surface-container/80 backdrop-blur-xl border-b border-outline-variant/30 shadow-sm fixed top-0 w-full z-50 flex justify-between items-center px-margin-mobile py-sm">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A sophisticated corporate logo for a high-end business tool named Pypus, featuring minimalist geometric shapes and a vibrant terminal green accent color. The logo is set against a clean white background with soft, professional lighting that emphasizes its premium quality and modern aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfPPp9-9DIfMbcuIhw7O2M_HAIJp2SlGSMlGk6FTYtxms8C8CLQWAl1l1DXevQUiuint0sVScCa-Hp2_9zu2g7mU1hFqymVNGufYW4kjvImut1ydvgDVU-DOq_dq2HMupqgj2SSiaMvCzmbGn6FmVzgVXkebpyYgUTnCiyKlGoKB3QU8YFYDjKVgOiZf_D1lkpffXqmjcUe0oOwsEegq0AOCxReLFhJkWv-LObh0rYA9BCLUvq0cjv"/>
+</div>
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-black text-primary">Pypus</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary/5 transition-colors active:scale-95 duration-100">
+<span class="material-symbols-outlined text-primary">search</span>
+</button>
+</header>
+<main class="mt-20 px-margin-mobile space-y-xl">
+<!-- Page Title -->
+<section class="pt-4">
+<h1 class="font-headline-xl text-headline-xl text-on-surface">Settings</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage your account and preferences</p>
+</section>
+<!-- Profile Section -->
+<section class="bg-surface-container-low rounded-lg p-lg shadow-sm space-y-lg border border-outline-variant/20">
+<div class="flex items-center gap-md">
+<div class="p-2 bg-primary-container rounded-full text-on-primary-container">
+<span class="material-symbols-outlined">person</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile">Profile</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="space-y-xs">
+<label class="font-label-bold text-label-bold text-primary uppercase">Full Name</label>
+<input class="w-full p-md bg-white border-2 border-outline-variant/30 rounded-md focus:border-primary focus:ring-0 transition-all font-body-md outline-none" type="text" value="Alexander Sterling"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-bold text-label-bold text-primary uppercase">Business Name</label>
+<input class="w-full p-md bg-white border-2 border-outline-variant/30 rounded-md focus:border-primary focus:ring-0 transition-all font-body-md outline-none" type="text" value="Sterling Ventures Group"/>
+</div>
+</div>
+<button class="bg-primary text-on-primary font-label-bold text-label-bold py-md px-xl rounded-full terminal-shadow hover:brightness-110 active:scale-95 transition-all w-full md:w-auto">
+                Save Profile
+            </button>
+</section>
+<!-- Plan Details -->
+<section class="bg-secondary text-white rounded-lg p-lg shadow-lg relative overflow-hidden">
+<div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-md">
+<div class="space-y-xs">
+<span class="font-label-bold text-label-bold uppercase text-secondary-fixed opacity-90">Current Plan</span>
+<h2 class="font-headline-lg text-headline-lg">Enterprise Elite</h2>
+<p class="font-body-md text-body-md opacity-80">Next billing cycle: Oct 24, 2023</p>
+</div>
+<div class="glass-lite rounded-md p-md border-white/20">
+<div class="flex items-baseline gap-xs">
+<span class="font-stats-display text-stats-display">$499</span>
+<span class="font-label-bold text-label-bold">/year</span>
+</div>
+</div>
+</div>
+<!-- Decorative light shimmer -->
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+</section>
+<!-- Action Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<!-- Customer Support -->
+<section class="bg-surface-container-high rounded-lg p-lg flex flex-col justify-between items-start card-lift h-full border border-outline-variant/10">
+<div class="space-y-sm mb-xl">
+<span class="material-symbols-outlined text-secondary text-4xl" style="font-variation-settings: 'FILL' 1;">headset_mic</span>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile">Customer Support</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Need help? Our dedicated agents are available 24/7 for you.</p>
+</div>
+<button class="flex items-center gap-sm bg-white text-secondary font-label-bold text-label-bold py-md px-lg rounded-full border-2 border-secondary/20 hover:bg-secondary/5 transition-all">
+<span class="material-symbols-outlined">call</span>
+                    Call Support
+                </button>
+</section>
+<!-- Feedback -->
+<section class="bg-tertiary-container rounded-lg p-lg flex flex-col justify-between items-start card-lift h-full border border-outline-variant/10">
+<div class="space-y-sm mb-xl">
+<span class="material-symbols-outlined text-tertiary text-4xl" style="font-variation-settings: 'FILL' 1;">rate_review</span>
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-tertiary-container">Feedback</h3>
+<p class="font-body-md text-body-md text-on-tertiary-container/80">Help us improve Pypus. Share your ideas and report issues.</p>
+</div>
+<button class="flex items-center gap-sm bg-tertiary text-on-tertiary font-label-bold text-label-bold py-md px-lg rounded-full hover:brightness-110 transition-all">
+<span class="material-symbols-outlined">send</span>
+                    Send Feedback
+                </button>
+</section>
+</div>
+<!-- System Status Footer -->
+<footer class="py-xl flex flex-col items-center justify-center text-center space-y-sm">
+<div class="flex items-center gap-xs">
+<div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+<span class="font-label-bold text-label-bold text-on-surface-variant">SYSTEMS OPERATIONAL</span>
+</div>
+<p class="font-label-bold text-label-bold text-outline uppercase">v2.4.0-build.82</p>
+</footer>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface/90 dark:bg-surface-container-highest/90 backdrop-blur-2xl border-t border-outline-variant/20 rounded-t-lg shadow-[0_-4px_20px_0_rgba(0,110,22,0.12)]">
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-bold text-label-bold">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">apps</span>
+<span class="font-label-bold text-label-bold">Modules</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant/70 hover:bg-surface-container-high transition-all px-4 py-2 rounded-xl" href="#">
+<span class="material-symbols-outlined">smart_toy</span>
+<span class="font-label-bold text-label-bold">Assistant</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 scale-110 duration-200 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-label-bold text-label-bold">Settings</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for input focus effects
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.classList.add('scale-[1.01]');
+                input.parentElement.style.transition = 'transform 0.2s ease-out';
+            });
+            input.addEventListener('blur', () => {
+                input.parentElement.classList.remove('scale-[1.01]');
+            });
+        });
+
+        // Save button simulation
+        const saveBtn = document.querySelector('button.bg-primary');
+        saveBtn.addEventListener('click', () => {
+            const originalText = saveBtn.innerText;
+            saveBtn.innerText = 'Saved!';
+            saveBtn.classList.remove('bg-primary');
+            saveBtn.classList.add('bg-on-primary-container');
+            
+            setTimeout(() => {
+                saveBtn.innerText = originalText;
+                saveBtn.classList.remove('bg-on-primary-container');
+                saveBtn.classList.add('bg-primary');
+            }, 2000);
+        });
+    </script>
+</body></html>

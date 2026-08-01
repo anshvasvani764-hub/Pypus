@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { Member, AttendanceRecord } from "@/lib/members/types";
+import type { MemberFeeSummary } from "@/lib/members/fee-status";
 import { AttendanceSnapshotCards } from "@/components/attendance/AttendanceSnapshotCards";
 import { AttendanceRegister } from "@/components/attendance/AttendanceRegister";
 import { PrintQrButton } from "@/components/attendance/PrintQrButton";
@@ -12,6 +13,7 @@ interface AttendanceModuleViewProps {
   workspaceName: string;
   members: Member[];
   todayRecords: AttendanceRecord[];
+  feeSummaries: Record<string, MemberFeeSummary>;
 }
 
 export function AttendanceModuleView({
@@ -20,6 +22,7 @@ export function AttendanceModuleView({
   workspaceName,
   members,
   todayRecords,
+  feeSummaries,
 }: AttendanceModuleViewProps) {
   const [checkedInMemberIds, setCheckedInMemberIds] = useState<
     Record<string, string>
@@ -62,6 +65,7 @@ export function AttendanceModuleView({
           onCheckIn={handleCheckIn}
           workspaceSlug={workspaceSlug}
           workspaceId={workspaceId}
+          feeSummaries={feeSummaries}
         />
       </div>
     </div>

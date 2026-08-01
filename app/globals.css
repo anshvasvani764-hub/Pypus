@@ -12,6 +12,100 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Vibrant Enterprise design system (mobile UI) ──
+   Radius/spacing tokens are namespaced (ve-*) because DESIGN.md's scale
+   redefines lg/xl, which the desktop UI already uses with Tailwind defaults. */
+@theme {
+  --color-ve-surface: #faf8ff;
+  --color-ve-surface-dim: #d2d9f4;
+  --color-ve-surface-bright: #faf8ff;
+  --color-ve-surface-container-lowest: #ffffff;
+  --color-ve-surface-container-low: #f2f3ff;
+  --color-ve-surface-container: #eaedff;
+  --color-ve-surface-container-high: #e2e7ff;
+  --color-ve-surface-container-highest: #dae2fd;
+  --color-ve-surface-variant: #dae2fd;
+  --color-ve-on-surface: #131b2e;
+  --color-ve-on-surface-variant: #3b4b37;
+  --color-ve-inverse-surface: #283044;
+  --color-ve-inverse-on-surface: #eef0ff;
+  --color-ve-outline: #6b7c65;
+  --color-ve-outline-variant: #b9ccb2;
+  --color-ve-background: #faf8ff;
+  --color-ve-on-background: #131b2e;
+
+  --color-ve-primary: #006e16;
+  --color-ve-on-primary: #ffffff;
+  --color-ve-primary-container: #00ff41;
+  --color-ve-on-primary-container: #007117;
+  --color-ve-inverse-primary: #00e639;
+  --color-ve-primary-fixed: #72ff70;
+  --color-ve-primary-fixed-dim: #00e639;
+  --color-ve-on-primary-fixed: #002203;
+  --color-ve-on-primary-fixed-variant: #00530e;
+
+  --color-ve-secondary: #4648d4;
+  --color-ve-on-secondary: #ffffff;
+  --color-ve-secondary-container: #6063ee;
+  --color-ve-on-secondary-container: #fffbff;
+  --color-ve-secondary-fixed: #e1e0ff;
+  --color-ve-secondary-fixed-dim: #c0c1ff;
+  --color-ve-on-secondary-fixed: #07006c;
+  --color-ve-on-secondary-fixed-variant: #2f2ebe;
+
+  --color-ve-tertiary: #855300;
+  --color-ve-on-tertiary: #ffffff;
+  --color-ve-tertiary-container: #ffd6a8;
+  --color-ve-on-tertiary-container: #895600;
+  --color-ve-tertiary-fixed: #ffddb8;
+  --color-ve-tertiary-fixed-dim: #ffb95f;
+  --color-ve-on-tertiary-fixed: #2a1700;
+  --color-ve-on-tertiary-fixed-variant: #653e00;
+
+  --color-ve-error: #ba1a1a;
+  --color-ve-on-error: #ffffff;
+  --color-ve-error-container: #ffdad6;
+  --color-ve-on-error-container: #93000a;
+
+  --radius-ve-sm: 0.5rem;
+  --radius-ve: 1rem;
+  --radius-ve-md: 1.5rem;
+  --radius-ve-lg: 2rem;
+  --radius-ve-xl: 3rem;
+
+  --spacing-ve-xs: 4px;
+  --spacing-ve-sm: 8px;
+  --spacing-ve-md: 16px;
+  --spacing-ve-lg: 24px;
+  --spacing-ve-xl: 32px;
+  --spacing-ve-gutter: 16px;
+  --spacing-ve-margin: 20px;
+
+  --text-ve-label: 12px;
+  --text-ve-label--line-height: 16px;
+  --text-ve-label--letter-spacing: 0.05em;
+  --text-ve-label--font-weight: 700;
+  --text-ve-body: 16px;
+  --text-ve-body--line-height: 24px;
+  --text-ve-body--font-weight: 400;
+  --text-ve-stats: 32px;
+  --text-ve-stats--line-height: 40px;
+  --text-ve-stats--font-weight: 800;
+  --text-ve-headline-mobile: 24px;
+  --text-ve-headline-mobile--line-height: 32px;
+  --text-ve-headline-mobile--font-weight: 700;
+  --text-ve-headline: 30px;
+  --text-ve-headline--line-height: 36px;
+  --text-ve-headline--letter-spacing: -0.01em;
+  --text-ve-headline--font-weight: 700;
+  --text-ve-headline-xl: 40px;
+  --text-ve-headline-xl--line-height: 48px;
+  --text-ve-headline-xl--letter-spacing: -0.02em;
+  --text-ve-headline-xl--font-weight: 800;
+
+  --font-ve: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -23,4 +117,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@utility glass-lite {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Keeps columns of currency figures aligned in fees tables. */
+@utility tabular-nums-lining {
+  font-variant-numeric: tabular-nums lining-nums;
 }

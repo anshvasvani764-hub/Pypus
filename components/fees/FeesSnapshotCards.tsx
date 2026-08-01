@@ -1,40 +1,12 @@
 "use client";
 
-import { CreditCard, Clock, TrendingUp, Wallet } from "lucide-react";
+import { Wallet, Clock, TrendingUp } from "lucide-react";
 
 interface FeesSnapshotCardsProps {
-  activeSubscriptions: number;
+  feesCollected: number;
   pendingCollection: number;
-  upcomingRenewals: number;
-  monthlyRevenue: number;
+  expectedRevenue: number;
 }
-
-const CARDS = [
-  {
-    label: "Active Subscriptions",
-    icon: CreditCard,
-    iconColor: "text-emerald-600",
-    iconBg: "bg-emerald-50",
-  },
-  {
-    label: "Pending Collection",
-    icon: Wallet,
-    iconColor: "text-amber-600",
-    iconBg: "bg-amber-50",
-  },
-  {
-    label: "Upcoming Renewals",
-    icon: Clock,
-    iconColor: "text-emerald-600",
-    iconBg: "bg-emerald-50",
-  },
-  {
-    label: "Monthly Revenue",
-    icon: TrendingUp,
-    iconColor: "text-emerald-600",
-    iconBg: "bg-emerald-50",
-  },
-];
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -45,21 +17,39 @@ function formatCurrency(amount: number) {
 }
 
 export function FeesSnapshotCards({
-  activeSubscriptions,
+  feesCollected,
   pendingCollection,
-  upcomingRenewals,
-  monthlyRevenue,
+  expectedRevenue,
 }: FeesSnapshotCardsProps) {
-  const values = [
-    { value: String(activeSubscriptions) },
-    { value: formatCurrency(pendingCollection) },
-    { value: String(upcomingRenewals) },
-    { value: formatCurrency(monthlyRevenue), context: "this month" },
+  const cards = [
+    {
+      label: "Fees Collected",
+      value: formatCurrency(feesCollected),
+      context: "this month",
+      icon: Wallet,
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-50",
+    },
+    {
+      label: "Pending to Collect",
+      value: formatCurrency(pendingCollection),
+      icon: Clock,
+      iconColor: "text-amber-600",
+      iconBg: "bg-amber-50",
+    },
+    {
+      label: "Expected Revenue",
+      value: formatCurrency(expectedRevenue),
+      context: "per month",
+      icon: TrendingUp,
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-50",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {CARDS.map((card) => {
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {cards.map((card) => {
         const Icon = card.icon;
         return (
           <div
@@ -72,13 +62,13 @@ export function FeesSnapshotCards({
               >
                 <Icon className={`h-5 w-5 ${card.iconColor}`} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-gray-500 font-medium">{card.label}</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">
-                  {values[CARDS.indexOf(card)].value}
-                  {values[CARDS.indexOf(card)].context && (
+                  {card.value}
+                  {card.context && (
                     <span className="ml-2 text-sm font-normal text-emerald-600">
-                      {values[CARDS.indexOf(card)].context}
+                      {card.context}
                     </span>
                   )}
                 </p>

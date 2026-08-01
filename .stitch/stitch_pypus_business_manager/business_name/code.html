@@ -1,0 +1,212 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .glass-lite {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .gradient-bg {
+            background: radial-gradient(circle at top right, rgba(0, 230, 57, 0.15), transparent 40%),
+                        radial-gradient(circle at bottom left, rgba(70, 72, 212, 0.1), transparent 40%);
+        }
+        /* Custom input focus ring */
+        .input-focus-ring:focus {
+            outline: none;
+            border-color: #006e16;
+            box-shadow: 0 0 0 4px rgba(0, 230, 57, 0.15);
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error-container": "#93000a",
+                        "primary-container": "#00ff41",
+                        "on-primary-container": "#007117",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#131b2e",
+                        "on-primary-fixed": "#002203",
+                        "tertiary-fixed": "#ffddb8",
+                        "primary-fixed": "#72ff70",
+                        "on-surface": "#131b2e",
+                        "background": "#faf8ff",
+                        "on-secondary-container": "#fffbff",
+                        "inverse-surface": "#283044",
+                        "on-secondary-fixed-variant": "#2f2ebe",
+                        "surface-container": "#eaedff",
+                        "tertiary": "#855300",
+                        "surface-bright": "#faf8ff",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#6063ee",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "on-secondary-fixed": "#07006c",
+                        "error-container": "#ffdad6",
+                        "tertiary-container": "#ffd6a8",
+                        "surface-dim": "#d2d9f4",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-container-highest": "#dae2fd",
+                        "on-tertiary-fixed": "#2a1700",
+                        "outline": "#6b7c65",
+                        "secondary": "#4648d4",
+                        "inverse-primary": "#00e639",
+                        "surface": "#faf8ff",
+                        "surface-container-low": "#f2f3ff",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "surface-variant": "#dae2fd",
+                        "on-tertiary": "#ffffff",
+                        "primary": "#006e16",
+                        "on-tertiary-container": "#895600",
+                        "primary-fixed-dim": "#00e639",
+                        "surface-container-high": "#e2e7ff",
+                        "surface-tint": "#006e16",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#00530e",
+                        "outline-variant": "#b9ccb2",
+                        "on-surface-variant": "#3b4b37"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "margin-mobile": "20px",
+                        "sm": "8px",
+                        "gutter": "16px",
+                        "md": "16px",
+                        "base": "4px",
+                        "lg": "24px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"],
+                        "stats-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-xl": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "stats-display": ["32px", {"lineHeight": "40px", "fontWeight": "800"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col gradient-bg">
+<!-- Navigation Shell Suppressed for Transactional Onboarding Flow as per Mandate -->
+<main class="flex-grow flex flex-col px-margin-mobile pt-xl pb-lg max-w-lg mx-auto w-full">
+<!-- Header & Progress -->
+<div class="flex flex-col gap-lg mb-xl animate-slide-up">
+<div class="flex items-center justify-between">
+<button class="w-12 h-12 flex items-center justify-center rounded-full bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-all active:scale-90">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;wght&quot; 600;">arrow_back</span>
+</button>
+<div class="flex flex-col items-end">
+<span class="font-label-bold text-label-bold text-on-surface-variant/60 uppercase tracking-widest">Step 2 of 4</span>
+<div class="h-1.5 w-32 bg-outline-variant/30 rounded-full mt-2 overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-700 ease-out" style="width: 50%;"></div>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background leading-tight">
+                    What's the name of <br>
+<span class="text-primary">your Gym?</span>
+</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">This is how your brand will appear to your clients and staff.</p>
+</div>
+</div>
+<!-- Form Section -->
+<div class="flex-grow flex flex-col gap-lg animate-slide-up" style="animation-delay: 0.1s;">
+<div class="relative">
+<label class="sr-only" for="business_name">Business Name</label>
+<input class="w-full bg-white border-2 border-outline-variant rounded-lg p-lg font-headline-lg-mobile text-headline-lg-mobile text-on-surface input-focus-ring transition-all placeholder:text-on-surface-variant/30" id="business_name" placeholder="e.g. Iron Temple Fitness" type="text">
+<!-- Error Message -->
+<div class="flex items-center gap-2 mt-4 text-error" id="error_container">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: &quot;FILL&quot; 1;">error</span>
+<p class="font-label-bold text-label-bold uppercase">Name cannot be empty</p>
+</div>
+</div>
+<!-- Visual Context Card -->
+<div class="mt-auto pt-xl">
+
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="mt-xl flex flex-col gap-md animate-slide-up" style="animation-delay: 0.2s;">
+<button class="w-full bg-primary-container text-on-primary-container py-lg rounded-lg font-headline-lg-mobile text-headline-lg-mobile shadow-[0_8px_20px_-4px_rgba(0,255,65,0.4)] active:scale-[0.98] transition-transform hover:brightness-105">
+                Continue
+            </button>
+<p class="text-center font-label-bold text-label-bold text-on-surface-variant/50 px-8">
+                By continuing, you agree to Pypus’s Terms of Service and Privacy Policy.
+            </p>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for input reactivity
+        const input = document.getElementById('business_name');
+        const previewText = document.getElementById('preview_text');
+        const errorContainer = document.getElementById('error_container');
+
+        input.addEventListener('input', (e) => {
+            const val = e.target.value;
+            previewText.textContent = val || "Iron Temple Fitness";
+            
+            // Toggle error state visually
+            if (val.trim() === "") {
+                errorContainer.classList.remove('opacity-0');
+                input.classList.add('border-error');
+                input.classList.remove('border-primary');
+            } else {
+                errorContainer.classList.add('opacity-0');
+                input.classList.remove('border-error');
+                input.classList.add('border-primary');
+            }
+        });
+
+        // Initialize with error visible as requested
+        document.addEventListener('DOMContentLoaded', () => {
+            input.focus();
+        });
+    </script>
+
+
+</body></html>

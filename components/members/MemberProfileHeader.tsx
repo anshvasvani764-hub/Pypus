@@ -1,26 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { MessageCircle, CreditCard } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import type { Member } from "@/lib/members/types";
-import { getMemberPlanName } from "@/lib/members/mock-data";
+import { feeStatusStyle, type DerivedFeeStatus } from "@/lib/members/fee-status";
 import MemberAvatar from "@/components/shared/MemberAvatar";
 import { sendReminder } from "@/app/actions/member-reminders";
 
 interface MemberProfileHeaderProps {
   member: Member;
   workspaceName: string;
+  feeStatus: DerivedFeeStatus;
+  planName: string | null;
+  payableFeeId: string | null;
 }
 
-export function MemberProfileHeader({ member, workspaceName }: MemberProfileHeaderProps) {
+export function MemberProfileHeader({
+  member,
+  workspaceName,
+  feeStatus,
+  planName,
+  payableFeeId,
+}: MemberProfileHeaderProps) {
   const joinedDate = new Date(member.joined_at).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
-  const planName = getMemberPlanName(member.id);
-  const feeStatus: "paid" | "due" | "overdue" | null = member.plan_id ? "due" : null;
+  const badge = feeStatusStyle(feeStatus);
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -31,7 +39,7 @@ export function MemberProfileHeader({ member, workspaceName }: MemberProfileHead
       memberPhone: member.phone,
       memberName: member.name,
       workspaceName,
-      feeId: null,
+      feeId: payableFeeId,
       type,
     });
 
@@ -59,12 +67,12 @@ export function MemberProfileHeader({ member, workspaceName }: MemberProfileHead
 
           <div>
             <h1 className="text-xl font-semibold text-gray-900">{member.name}</h1>
-            {feeStatus && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-600">
-                Due
-              </span>
-            )}
-            <p className="mt-1 text-sm text-gray-500">{planName}</p>
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.classes}`}
+            >
+              {badge.label}
+            </span>
+            <p className="mt-1 text-sm text-gray-500">{planName ?? "No plan assigned"}</p>
             <p className="text-xs text-gray-400 mt-0.5">Joined {joinedDate}</p>
           </div>
         </div>
@@ -99,13 +107,6 @@ export function MemberProfileHeader({ member, workspaceName }: MemberProfileHead
               </>
             )}
           </div>
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-            title="Mark payment received (UI only)"
-          >
-            <CreditCard className="h-4 w-4" />
-            Mark Paid
-          </button>
         </div>
       </div>
     </div>

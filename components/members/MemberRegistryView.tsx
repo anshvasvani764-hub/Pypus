@@ -6,12 +6,14 @@ import { MemberSearchBar } from "./MemberSearchBar";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import type { Member } from "@/lib/members/types";
+import type { DerivedFeeStatus } from "@/lib/members/fee-status";
 
 interface MemberRegistryViewProps {
   members: Member[];
   workspaceSlug: string;
   attendanceMap: Record<string, { total: number; percentage: number }>;
-  feeStatusMap: Record<string, string>;
+  feeStatusMap: Record<string, DerivedFeeStatus>;
+  planNameMap: Record<string, string | null>;
 }
 
 function filterMembers(
@@ -19,7 +21,7 @@ function filterMembers(
   filter: string,
   query: string,
   attendanceMap: Record<string, { total: number; percentage: number }>,
-  feeStatusMap: Record<string, string>
+  feeStatusMap: Record<string, DerivedFeeStatus>
 ): Member[] {
   let result = members;
 
@@ -65,6 +67,7 @@ export function MemberRegistryView({
   workspaceSlug,
   attendanceMap,
   feeStatusMap,
+  planNameMap,
 }: MemberRegistryViewProps) {
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
@@ -102,6 +105,7 @@ export function MemberRegistryView({
                 member={member}
                 href={`/${workspaceSlug}/members/${member.id}`}
                 feeStatus={feeStatusMap[member.id]}
+                planName={planNameMap[member.id]}
               />
             ))}
           </div>

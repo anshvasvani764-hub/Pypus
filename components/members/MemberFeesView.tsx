@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard, Receipt, Plus } from "lucide-react";
+import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard } from "lucide-react";
+import MemberAvatar from "@/components/shared/MemberAvatar";
 import { createClient } from "@/lib/supabase/client";
-import type { FeeRecord, Member, Plan } from "@/lib/members/types";
-import { getMemberPlanName } from "@/lib/members/mock-data";
+import type { FeeRecord, Member } from "@/lib/members/types";
+import { deriveFeeSummary } from "@/lib/members/fee-status";
 import { PlanSelectorModal } from "@/components/members/PlanSelectorModal";
-import { assignPlanToMember } from "@/app/actions/member-plan";
-import { markFeeAsPaid } from "@/app/actions/member-plan";
+import { MarkPaidModal, type PaymentMethod } from "@/components/fees/MarkPaidModal";
+import { assignPlanToMember, markFeeAsPaid } from "@/app/actions/member-plan";
 import { sendReminder } from "@/app/actions/member-reminders";
 
 interface MemberFeesViewProps {
@@ -61,8 +62,11 @@ function PaymentStatusBadge({ status }: { status: FeeRecord["status"] }) {
 
 export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesViewProps) {
   const [fees, setFees] = useState<FeeRecord[]>([]);
+  const [planId, setPlanId] = useState<string | null>(member.plan_id ?? null);
   const [loading, setLoading] = useState(true);
   const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [markPaidOpen, setMarkPaidOpen] = useState(false);
+  const [settling, setSettling] = useState(false);
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
@@ -100,98 +104,69 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
     fetchData();
   }, [workspaceId, memberId]);
 
-  const upcoming = fees.find((f) => f.status === "due" || f.status === "overdue") ?? null;
-  const totalPaid = fees
-    .filter((f) => f.status === "paid")
-    .reduce((sum, f) => sum + f.paid_amount, 0);
-  const totalPending = fees
-    .filter((f) => f.status === "due" || f.status === "overdue")
-    .reduce((sum, f) => sum + f.amount_snapshot, 0);
+  const summary = deriveFeeSummary({ plan_id: planId }, fees);
+  const owes = summary.payableFee != null;
 
-  const hasPlan = member.plan_id != null;
-
-  async function handlePlanSubmit(planId: string | null, planName: string, amount: number, duration: string) {
-    const result = await assignPlanToMember({
-      workspaceId,
-      memberId,
-      planId,
-      planName,
-      amount,
-      duration,
-    });
-
-    if (result.success) {
-      setToast("Plan assigned successfully");
-      const newDueDate = new Date(Date.now() + (duration === "yearly" ? 365 : duration === "quarterly" ? 90 : 30) * 86400000).toISOString().slice(0, 10);
-      setFees((prev) => [
-        ...prev,
-        {
-          id: `fee-${Date.now()}`,
-          workspace_id: workspaceId,
-          member_id: memberId,
-          plan_id: planId ?? "",
-          plan_name_snapshot: planName,
-          amount_snapshot: amount,
-          paid_amount: 0,
-          due_date: newDueDate,
-          paid_date: null,
-          payment_method: null,
-          status: "due",
-          description: "",
-        } as FeeRecord,
-      ]);
-    } else {
-      setToast(result.error || "Failed to assign plan");
-    }
+  function flashToast(message: string) {
+    setToast(message);
     setTimeout(() => setToast(null), 3000);
   }
 
-  async function handleMarkPaid() {
-    if (!hasPlan) {
-      setPlanModalOpen(true);
-      setToast("Please select a plan first");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-
-    const latestDue = fees
-      .filter((f) => f.status === "due" || f.status === "overdue")
-      .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())[0];
-
-    if (!latestDue) {
-      setToast("No pending fees to mark as paid");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-
-    const paidDate = new Date().toLocaleDateString("en-CA", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
+  async function handlePlanSubmit(
+    newPlanId: string | null,
+    planName: string,
+    amount: number,
+    dueDate: string
+  ) {
+    const result = await assignPlanToMember({
+      workspaceId,
+      memberId,
+      planId: newPlanId,
+      planName,
+      amount,
+      dueDate,
     });
 
+    if (result.success && result.fee) {
+      setPlanId(newPlanId);
+      setFees((prev) => [...prev, result.fee!]);
+      flashToast("Plan assigned successfully");
+    } else {
+      flashToast(result.error || "Failed to assign plan");
+    }
+  }
+
+  function handleMarkPaidClick() {
+    setMarkPaidOpen(true);
+  }
+
+  async function handleMarkPaidConfirm(amount: number, method: PaymentMethod) {
+    const target = summary.payableFee;
+    if (!target || settling) return;
+
+    setSettling(true);
     const result = await markFeeAsPaid({
       workspaceId,
       memberId,
-      feeId: latestDue.id,
-      amount: latestDue.amount_snapshot,
-      paidDate,
+      feeId: target.id,
+      amount,
+      paymentMethod: method,
     });
 
-    if (result.success) {
-      setFees((prev) =>
-        prev.map((f) =>
-          f.id === latestDue.id
-            ? { ...f, status: "paid" as const, paid_amount: f.amount_snapshot, paid_date: paidDate }
-            : f
-        )
-      );
-      setToast("Payment marked as paid");
+    setMarkPaidOpen(false);
+    setSettling(false);
+
+    if (result.success && result.fee) {
+      setFees((prev) => {
+        const exists = prev.some((f) => f.id === result.fee!.id);
+        return exists
+          ? prev.map((f) => (f.id === result.fee!.id ? result.fee! : f))
+          : [...prev, result.fee!];
+      });
+      flashToast(result.recorded ? "Payment recorded" : "Already paid up");
     } else {
-      setToast(result.error || "Failed to mark as paid");
+      flashToast(result.error || "Failed to mark as paid");
     }
-    setTimeout(() => setToast(null), 3000);
   }
 
   async function handleSendReminder(type: "fees" | "attendance") {
@@ -201,18 +176,17 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
       memberPhone: member.phone,
       memberName: member.name,
       workspaceName,
-      feeId: upcoming ? upcoming.id : null,
+      feeId: summary.payableFee?.id ?? null,
       type,
     });
 
     if (result.success && result.url) {
       window.open(result.url, "_blank", "noopener,noreferrer");
-      setToast("Reminder sent");
+      flashToast("Reminder sent");
     } else {
-      setToast(result.error || "Failed to send reminder");
+      flashToast(result.error || "Failed to send reminder");
     }
     setShowReminderMenu(false);
-    setTimeout(() => setToast(null), 3000);
   }
 
   if (loading) {
@@ -235,45 +209,64 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         </div>
       )}
 
-      {/* Plan selector modal */}
       <PlanSelectorModal
         isOpen={planModalOpen}
         onClose={() => setPlanModalOpen(false)}
         onSubmit={handlePlanSubmit}
         workspaceId={workspaceId}
+        memberName={member.name}
       />
+
+      <MarkPaidModal
+        isOpen={markPaidOpen}
+        onClose={() => setMarkPaidOpen(false)}
+        onConfirm={handleMarkPaidConfirm}
+        memberName={member.name}
+        planName={summary.planName}
+        defaultAmount={summary.payableFee?.amount_snapshot ?? 0}
+        dueDate={summary.dueDate}
+      />
+
+      {/* Member header */}
+      <div className="flex items-center gap-4">
+        <MemberAvatar name={member.name} avatarUrl={member.avatar_url} size={48} />
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">{member.name}</h2>
+          <p className="text-xs text-gray-500">Member ID: #{member.id.slice(-6).toUpperCase()}</p>
+        </div>
+      </div>
 
       {/* Header actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          {upcoming && (
+          {owes && summary.dueDate && (
             <div
               className={`flex items-start gap-3 rounded-2xl border px-5 py-4 ${
-                upcoming.status === "overdue"
+                summary.status === "overdue"
                   ? "border-red-200 bg-red-50"
                   : "border-amber-200 bg-amber-50"
               }`}
             >
               <AlertCircle
                 className={`h-5 w-5 shrink-0 mt-0.5 ${
-                  upcoming.status === "overdue" ? "text-red-500" : "text-amber-500"
+                  summary.status === "overdue" ? "text-red-500" : "text-amber-500"
                 }`}
               />
               <div>
                 <p
                   className={`text-sm font-semibold ${
-                    upcoming.status === "overdue" ? "text-red-700" : "text-amber-700"
+                    summary.status === "overdue" ? "text-red-700" : "text-amber-700"
                   }`}
                 >
-                  {upcoming.status === "overdue" ? "Payment Overdue" : "Payment Due Soon"}
+                  {summary.status === "overdue" ? "Payment Overdue" : "Payment Due Soon"}
                 </p>
                 <p
                   className={`text-sm mt-0.5 ${
-                    upcoming.status === "overdue" ? "text-red-600" : "text-amber-600"
+                    summary.status === "overdue" ? "text-red-600" : "text-amber-600"
                   }`}
                 >
-                  {formatCurrency(upcoming.amount_snapshot)} due on {formatDate(upcoming.due_date)} ·{" "}
-                  {upcoming.plan_name_snapshot}
+                  {formatCurrency(summary.amount ?? 0)} due on {formatDate(summary.dueDate)} ·{" "}
+                  {summary.planName}
                 </p>
               </div>
             </div>
@@ -309,19 +302,16 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
               </>
             )}
           </div>
-          <button
-            onClick={handleMarkPaid}
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-          >
-            <CreditCard className="h-4 w-4" />
-            Mark Paid
-          </button>
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-          >
-            <Receipt className="h-4 w-4 text-emerald-600" />
-            Generate Receipt
-          </button>
+          {owes && (
+            <button
+              onClick={handleMarkPaidClick}
+              disabled={settling}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-200 bg-emerald-50 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <CreditCard className="h-4 w-4" />
+              Mark Paid
+            </button>
+          )}
         </div>
       </div>
 
@@ -335,17 +325,20 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
             <div>
               <p className="text-xs text-gray-400 font-medium">Current Plan</p>
               <p className="text-sm font-bold text-gray-900 mt-0.5">
-                {hasPlan ? (
-                  getMemberPlanName(member.id)
-                ) : (
+                {summary.planName ?? (
                   <button
                     onClick={() => setPlanModalOpen(true)}
                     className="text-emerald-600 underline underline-offset-2"
                   >
-                    Select plan
+                    Assign plan
                   </button>
                 )}
               </p>
+              {summary.planName && summary.amount != null && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {formatCurrency(summary.amount)}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -357,7 +350,9 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
             </div>
             <div>
               <p className="text-xs text-gray-400 font-medium">Total Paid</p>
-              <p className="text-xl font-bold text-gray-900 mt-0.5">{formatCurrency(totalPaid)}</p>
+              <p className="text-xl font-bold text-gray-900 mt-0.5">
+                {formatCurrency(summary.totalPaid)}
+              </p>
             </div>
           </div>
         </div>
@@ -366,21 +361,21 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
           <div className="flex items-center gap-3">
             <div
               className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                totalPending > 0 ? "bg-red-50" : "bg-gray-50"
+                summary.totalPending > 0 ? "bg-red-50" : "bg-gray-50"
               }`}
             >
               <AlertCircle
-                className={`h-5 w-5 ${totalPending > 0 ? "text-red-500" : "text-gray-300"}`}
+                className={`h-5 w-5 ${summary.totalPending > 0 ? "text-red-500" : "text-gray-300"}`}
               />
             </div>
             <div>
               <p className="text-xs text-gray-400 font-medium">Pending Amount</p>
               <p
                 className={`text-xl font-bold mt-0.5 ${
-                  totalPending > 0 ? "text-red-600" : "text-gray-900"
+                  summary.totalPending > 0 ? "text-red-600" : "text-gray-900"
                 }`}
               >
-                {formatCurrency(totalPending)}
+                {formatCurrency(summary.totalPending)}
               </p>
             </div>
           </div>
@@ -409,10 +404,11 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
                 className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50/60 transition-colors gap-4 flex-wrap"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{record.description ?? record.plan_name_snapshot}</p>
+                  <p className="text-sm font-medium text-gray-900">{record.plan_name_snapshot}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Due: {formatDate(record.due_date)}
                     {record.paid_date && ` · Paid: ${formatDate(record.paid_date)}`}
+                    {record.payment_method && ` · ${record.payment_method}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">

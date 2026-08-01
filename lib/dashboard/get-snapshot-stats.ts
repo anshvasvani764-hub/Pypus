@@ -6,15 +6,17 @@ export interface SnapshotStats {
   checkIns: { value: string; delta?: string };
   newMembers: { value: string; context: string };
   duesToCollect: { value: string; context: string };
+  activeMembers: number;
+  todayAttendance: number;
+  pendingFeesCount: number;
 }
 
 export async function getSnapshotStats(workspaceId: string): Promise<SnapshotStats> {
   const supabase = await createClient();
-  const todayStr = getISTDateString();
-
   const now = new Date();
   const istOffset = 5.5 * 60 * 60 * 1000;
   const istNow = new Date(now.getTime() + istOffset);
+  const todayStr = istNow.toISOString().slice(0, 10);
 
   const monthStart = new Date(istNow.getFullYear(), istNow.getMonth(), 1);
   const monthEnd = new Date(istNow.getFullYear(), istNow.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -36,8 +38,7 @@ export async function getSnapshotStats(workspaceId: string): Promise<SnapshotSta
       supabase
         .from("members")
         .select("id")
-        .eq("workspace_id", workspaceId)
-        .not("plan_id", "is", null),
+        .eq("workspace_id", workspaceId),
       supabase
         .from("fees")
         .select("member_id, amount_snapshot, paid_amount")
@@ -62,5 +63,8 @@ export async function getSnapshotStats(workspaceId: string): Promise<SnapshotSta
       value: `₹${totalDuesAmount.toLocaleString("en-IN")}`,
       context: `${pendingFeesCount} people`,
     },
+    activeMembers: totalMemberCount,
+    todayAttendance: checkInCount ?? 0,
+    pendingFeesCount,
   };
 }

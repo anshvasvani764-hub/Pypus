@@ -1,10 +1,13 @@
 import { notFound } from "next/navigation";
-import { getMembers, getMemberById } from "@/lib/supabase/queries";
+import { getMemberById, getFeesForMember } from "@/lib/supabase/queries";
 import { createClient } from "@/lib/supabase/server";
+import { deriveFeeSummary } from "@/lib/members/fee-status";
 import { MemberBreadcrumbs } from "@/components/members/MemberBreadcrumbs";
 import { MemberProfileHeader } from "@/components/members/MemberProfileHeader";
 import { MemberTabs } from "@/components/members/MemberTabs";
 import { MemberOverviewTab } from "@/components/members/MemberOverviewTab";
+import { MemberProfileOverviewView } from "@/components/mobile/MemberProfileOverviewView.mobile";
+import { getDevice } from "@/lib/device";
 
 export default async function MemberProfilePage({
   params,
@@ -25,7 +28,27 @@ export default async function MemberProfilePage({
   const member = await getMemberById(workspaceId, memberId);
   if (!member) notFound();
 
+  const fees = await getFeesForMember(workspaceId, memberId);
+  const summary = deriveFeeSummary(member, fees);
+
   const basePath = `/${workspaceSlug}/members/${memberId}`;
+
+  if ((await getDevice()) === "mobile") {
+    return (
+      <MemberProfileOverviewView
+        member={member}
+        workspaceSlug={workspaceSlug}
+        workspaceId={workspaceId}
+        workspaceName={workspaceName}
+        feeStatus={summary.status}
+        planName={summary.planName}
+        amount={summary.amount}
+        dueDate={summary.dueDate}
+        payableFeeId={summary.payableFee?.id ?? null}
+        fees={fees}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
@@ -38,7 +61,13 @@ export default async function MemberProfilePage({
       />
 
       <div className="mt-4">
-        <MemberProfileHeader member={member} workspaceName={workspaceName} />
+        <MemberProfileHeader
+          member={member}
+          workspaceName={workspaceName}
+          feeStatus={summary.status}
+          planName={summary.planName}
+          payableFeeId={summary.payableFee?.id ?? null}
+        />
       </div>
 
       <div className="mt-6">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, Check } from "lucide-react";
+import { useState } from "react";
+import { X } from "lucide-react";
 import type { Plan, PlanDuration } from "@/lib/members/types";
 
 interface CreatePlanModalProps {
@@ -14,30 +14,21 @@ interface CreatePlanModalProps {
 }
 
 export function CreatePlanModal({ isOpen, onClose, onSave, editPlan }: CreatePlanModalProps) {
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState<PlanDuration>("monthly");
-  const [price, setPrice] = useState("");
-  const [features, setFeatures] = useState("");
-  const [status, setStatus] = useState("active");
-
-  useEffect(() => {
-    if (!isOpen) {
-      setName("");
-      setDuration("monthly");
-      setPrice("");
-      setFeatures("");
-      setStatus("active");
-    }
-    if (editPlan && isOpen) {
-      setName(editPlan.name);
-      setDuration(editPlan.duration);
-      setPrice(String(editPlan.price));
-      setFeatures(editPlan.features.join("\n"));
-      setStatus(editPlan.status);
-    }
-  }, [isOpen, editPlan]);
-
   if (!isOpen) return null;
+  // Remounts per open so the form always starts from the plan being edited.
+  return <PlanDialog onClose={onClose} onSave={onSave} editPlan={editPlan} />;
+}
+
+function PlanDialog({
+  onClose,
+  onSave,
+  editPlan,
+}: Pick<CreatePlanModalProps, "onClose" | "onSave" | "editPlan">) {
+  const [name, setName] = useState(editPlan?.name ?? "");
+  const [duration, setDuration] = useState<PlanDuration>(editPlan?.duration ?? "monthly");
+  const [price, setPrice] = useState(editPlan ? String(editPlan.price) : "");
+  const [features, setFeatures] = useState(editPlan?.features.join("\n") ?? "");
+  const [status, setStatus] = useState(editPlan?.status ?? "active");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,23 +132,23 @@ export function CreatePlanModal({ isOpen, onClose, onSave, editPlan }: CreatePla
           <p className="text-xs text-gray-400">
             Changing a plan price does not retroactively affect existing member subscriptions. Price is snapshotted at subscription time.
           </p>
-        </form>
 
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/60">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-full text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-          >
-            {editPlan ? "Save Changes" : "Save Plan"}
-          </button>
-        </div>
+          <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/60">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-full text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+            >
+              {editPlan ? "Save Changes" : "Save Plan"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
