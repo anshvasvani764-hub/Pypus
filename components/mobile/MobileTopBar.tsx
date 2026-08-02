@@ -7,10 +7,9 @@ type Props = {
   workspaceSlug: string
   backHref?: string
   action?: React.ReactNode
-  ownerAvatarUrl?: string | null
 }
 
-export function MobileTopBar({ label, title, workspaceSlug, backHref, action, ownerAvatarUrl }: Props) {
+export function MobileTopBar({ label, title, workspaceSlug, backHref, action }: Props) {
   return (
     <header className="font-ve sticky top-0 z-40 bg-ve-surface/80 px-ve-margin pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
       <div className="flex items-center gap-3">
@@ -23,17 +22,8 @@ export function MobileTopBar({ label, title, workspaceSlug, backHref, action, ow
             <ArrowLeft size={20} />
           </Link>
         ) : (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ve-surface-container overflow-hidden">
-            {ownerAvatarUrl ? (
-              <img
-                src={ownerAvatarUrl}
-                alt="Owner"
-                referrerPolicy="no-referrer"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="text-lg font-extrabold text-ve-on-surface">{title.charAt(0).toUpperCase()}</span>
-            )}
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-ve-primary text-ve-on-primary">
+            <span className="text-lg font-extrabold">{title.charAt(0).toUpperCase()}</span>
           </div>
         )}
 

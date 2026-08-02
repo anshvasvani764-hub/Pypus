@@ -65,12 +65,10 @@ export function HomeOverviewView({
   overview,
   workspaceSlug,
   workspaceName,
-  ownerAvatarUrl,
 }: {
   overview: HomeOverview;
   workspaceSlug: string;
   workspaceName: string;
-  ownerAvatarUrl: string | null;
 }) {
   const heroStats = [
     { label: "Active members", value: String(overview.activeMembers) },
@@ -85,27 +83,11 @@ export function HomeOverviewView({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      <div className="flex items-center gap-4">
-        <div className="h-12 w-12 rounded-full overflow-hidden bg-gray-100 shrink-0">
-          {ownerAvatarUrl ? (
-            <img
-              src={ownerAvatarUrl}
-              alt="Owner"
-              referrerPolicy="no-referrer"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center text-lg font-bold text-gray-500">
-              {workspaceName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">{workspaceName}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Everything that needs your attention today, in one place.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">{workspaceName}</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Everything that needs your attention today, in one place.
+        </p>
       </div>
 
       {/* 1 — Top snapshot strip */}

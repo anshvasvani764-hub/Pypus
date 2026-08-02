@@ -21,7 +21,10 @@ export async function performWorkspaceCreation(
   location: string,
   userId: string
 ): Promise<string> {
-  // Generate a clean URL slug for the workspace
+  if (!userId) {
+    throw new Error('User ID is required to create a workspace')
+  }
+
   const baseSlug = bizName
     .toLowerCase()
     .trim()
@@ -29,7 +32,6 @@ export async function performWorkspaceCreation(
     .replace(/^-+|-+$/g, '') || 'workspace'
   const slug = `${baseSlug}-${Math.floor(1000 + Math.random() * 9000)}`
 
-  // 1. Create workspace
   const { data: ws, error: wsErr } = await supabase
     .from('workspaces')
     .insert({
@@ -43,13 +45,12 @@ export async function performWorkspaceCreation(
     .select()
     .single()
 
-  if (wsErr) {
+  if (wsErr || !ws?.id) {
     console.error('Workspace creation error:', wsErr)
-    throw new Error(wsErr.message || 'Failed to create workspace')
+    throw new Error(wsErr?.message || 'Failed to create workspace')
   }
   const workspaceId = ws.id
 
-  // 2. Create system "Owner" role for this workspace
   const { data: role, error: roleErr } = await supabase
     .from('roles')
     .insert({
@@ -61,13 +62,12 @@ export async function performWorkspaceCreation(
     .select()
     .single()
 
-  if (roleErr) {
+  if (roleErr || !role?.id) {
     console.error('Role creation error:', roleErr)
-    throw new Error(roleErr.message || 'Failed to create Owner role')
+    throw new Error(roleErr?.message || 'Failed to create Owner role')
   }
   const ownerRoleId = role.id
 
-  // 3. Grant all existing permissions to Owner role
   const { data: perms, error: permsErr } = await supabase
     .from('permissions')
     .select('id')
@@ -90,7 +90,6 @@ export async function performWorkspaceCreation(
     }
   }
 
-  // 4. Add user as workspace member (owner)
   const { error: memErr } = await supabase.from('workspace_members').insert({
     workspace_id: workspaceId,
     user_id: userId,
@@ -104,7 +103,6 @@ export async function performWorkspaceCreation(
     throw new Error(memErr.message || 'Failed to add workspace owner member')
   }
 
-  // 5. Activate this template's modules
   if (selectedTemplate.modules?.length) {
     const rows = selectedTemplate.modules.map((m, i) => ({
       workspace_id: workspaceId,

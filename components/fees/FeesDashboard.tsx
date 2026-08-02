@@ -13,6 +13,8 @@ interface FeesDashboardProps {
   members: Member[];
   fees: FeeRecord[];
   monthlyRevenue: number;
+  expectedRevenue?: number;
+  pendingCollection?: number;
 }
 
 export function FeesDashboard({
@@ -21,6 +23,8 @@ export function FeesDashboard({
   members,
   fees: initialFees,
   monthlyRevenue: initialRevenue,
+  expectedRevenue: expectedRevenueProp,
+  pendingCollection: pendingCollectionProp,
 }: FeesDashboardProps) {
   const [fees, setFees] = useState<FeeRecord[]>(initialFees);
   const [planIds, setPlanIds] = useState<Record<string, string | null>>(() =>
@@ -43,18 +47,32 @@ export function FeesDashboard({
   }, [members, fees, planIds]);
 
   const snapshot = useMemo(() => {
-    let pendingCollection = 0;
-    let expectedRevenue = 0;
+    let pendingCollection = pendingCollectionProp ?? 0;
+    let expectedRevenue = expectedRevenueProp ?? 0;
 
-    for (const m of members) {
-      const s = summaries.get(m.id);
-      if (!s || s.status === "no_plan") continue;
-      pendingCollection += s.totalPending;
-      expectedRevenue += s.monthlyValue;
+    if (expectedRevenueProp == null && pendingCollectionProp == null) {
+      for (const m of members) {
+        const s = summaries.get(m.id);
+        if (!s || s.status === "no_plan") continue;
+        pendingCollection += s.totalPending;
+        expectedRevenue += s.monthlyValue;
+      }
+    } else if (pendingCollectionProp == null) {
+      for (const m of members) {
+        const s = summaries.get(m.id);
+        if (!s || s.status === "no_plan") continue;
+        pendingCollection += s.totalPending;
+      }
+    } else if (expectedRevenueProp == null) {
+      for (const m of members) {
+        const s = summaries.get(m.id);
+        if (!s || s.status === "no_plan") continue;
+        expectedRevenue += s.monthlyValue;
+      }
     }
 
     return { pendingCollection, expectedRevenue };
-  }, [members, summaries]);
+  }, [members, summaries, expectedRevenueProp, pendingCollectionProp]);
 
   const handlePlanAssigned = useCallback(
     (memberId: string, planId: string | null, fee: FeeRecord) => {

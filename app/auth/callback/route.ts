@@ -31,20 +31,38 @@ export async function GET(request: Request) {
         updated_at: new Date().toISOString(),
       })
 
-      const { data: memberRow } = await supabase
+      const { data: ownerRow } = await supabase
         .from('workspace_members')
-        .select('workspace_id, workspaces(id, slug)')
+        .select('workspace_id, role')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .limit(1)
         .single()
 
-      if (memberRow && memberRow.workspaces) {
-        const wsSlug = (memberRow.workspaces as any).slug
-        return NextResponse.redirect(`${origin}/${wsSlug}`)
-      } else {
-        return NextResponse.redirect(`${origin}/onboarding`)
+      if (ownerRow) {
+        const { data: ws } = await supabase
+          .from('workspaces')
+          .select('slug')
+          .eq('id', ownerRow.workspace_id)
+          .single()
+
+        if (ws?.slug) {
+          return NextResponse.redirect(`${origin}/${ws.slug}`)
+        }
       }
+
+      const { data: memberRow } = await supabase
+        .from('members')
+        .select('workspace_id')
+        .eq('auth_user_id', user.id)
+        .limit(1)
+        .single()
+
+      if (memberRow) {
+        return NextResponse.redirect(`${origin}/m/${memberRow.workspace_id}/checkin`)
+      }
+
+      return NextResponse.redirect(`${origin}/onboarding`)
     }
   }
 

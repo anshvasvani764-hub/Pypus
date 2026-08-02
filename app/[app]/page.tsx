@@ -22,20 +22,12 @@ export default async function HomePage({
   const overview = await getHomeOverview(workspaceId);
   const workspaceName = wsData?.name ?? workspaceSlug;
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("avatar_url")
-    .limit(1)
-    .maybeSingle();
-  const ownerAvatarUrl = userData?.avatar_url ?? null;
-
   if ((await getDevice()) === "mobile") {
     return (
       <HomeOverviewViewMobile
         overview={overview}
         workspaceSlug={workspaceSlug}
         workspaceName={workspaceName}
-        ownerAvatarUrl={ownerAvatarUrl}
       />
     );
   }
@@ -45,7 +37,6 @@ export default async function HomePage({
       overview={overview}
       workspaceSlug={workspaceSlug}
       workspaceName={workspaceName}
-      ownerAvatarUrl={ownerAvatarUrl}
     />
   );
 }

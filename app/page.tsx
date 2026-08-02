@@ -8,24 +8,40 @@ export default async function RootPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 1. If not logged in -> redirect straight to login
   if (!user) {
     redirect('/login')
   }
 
-  // 2. If logged in -> check workspace membership
-  const { data: memberRow } = await supabase
+  const { data: ownerRow } = await supabase
     .from('workspace_members')
-    .select('workspace_id, workspaces(id, slug)')
+    .select('workspace_id, role')
     .eq('user_id', user.id)
     .eq('is_active', true)
     .limit(1)
     .single()
 
-  if (memberRow && memberRow.workspaces) {
-    const slug = (memberRow.workspaces as any).slug
-    redirect(`/${slug}`)
-  } else {
-    redirect('/onboarding')
+  if (ownerRow) {
+    const { data: ws } = await supabase
+      .from('workspaces')
+      .select('slug')
+      .eq('id', ownerRow.workspace_id)
+      .single()
+
+    if (ws?.slug) {
+      redirect(`/${ws.slug}`)
+    }
   }
+
+  const { data: memberRow } = await supabase
+    .from('members')
+    .select('workspace_id')
+    .eq('auth_user_id', user.id)
+    .limit(1)
+    .single()
+
+  if (memberRow) {
+    redirect(`/m/${memberRow.workspace_id}/checkin`)
+  }
+
+  redirect('/onboarding')
 }

@@ -32,7 +32,7 @@ function formatCurrency(amount: number) {
 function feedbackMessage(name: string, business: string) {
   const who = name.trim() || "there";
   const gym = business.trim() || "my gym";
-  return `Hi Ansh, this is ${who}. I'm using FlowOS to run ${gym} and I'd like to share some feedback:`;
+  return `Hi Ansh, this is ${who}. I'm using Pypus to run ${gym} and I'd like to share some feedback:`;
 }
 
 export function SettingsView({

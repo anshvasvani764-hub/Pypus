@@ -79,19 +79,17 @@ export function HomeOverviewViewMobile({
   overview,
   workspaceSlug,
   workspaceName,
-  ownerAvatarUrl,
 }: {
   overview: HomeOverview
   workspaceSlug: string
   workspaceName: string
-  ownerAvatarUrl: string | null
 }) {
   const base = `/${workspaceSlug}`
   const expected = overview.collectedThisMonth + overview.pendingDues
 
   return (
     <div className="pb-4">
-      <MobileTopBar label="Hello," title={workspaceName} workspaceSlug={workspaceSlug} ownerAvatarUrl={ownerAvatarUrl} />
+      <MobileTopBar label="Hello," title={workspaceName} workspaceSlug={workspaceSlug} />
 
       <div className="px-ve-margin">
         <div className="grid grid-cols-2 gap-ve-gutter">

@@ -229,6 +229,29 @@ export async function getFeesForWorkspace(
   return (data ?? []) as FeeRecord[];
 }
 
+export async function getFeesForWorkspaceByMonth(
+  workspaceId: string,
+  month: number,
+  year: number
+): Promise<FeeRecord[]> {
+  const supabase = createServiceClient();
+  const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
+  const endDate = new Date(year, month + 1, 0);
+  const endDateStr = endDate.toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("fees")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .gte("due_date", startDate)
+    .lte("due_date", endDateStr)
+    .order("due_date", { ascending: false });
+  if (error) {
+    console.error("getFeesForWorkspaceByMonth error:", error);
+    return [];
+  }
+  return (data ?? []) as FeeRecord[];
+}
+
 export async function getUpcomingFees(
   workspaceId: string,
   daysAhead: number = 14

@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Mission Feb",
-  description: "Business OS for SMBs",
+  description: "Pypus for SMBs",
 };
 
 export const viewport = {

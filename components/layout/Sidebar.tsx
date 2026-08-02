@@ -77,8 +77,8 @@ export default function Sidebar() {
               isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
             }`}
           >
-            <p className="font-bold text-gray-900 leading-tight">FlowOS</p>
-            <p className="text-xs text-gray-500 leading-tight">Business OS</p>
+            <p className="font-bold text-gray-900 leading-tight">Pypus</p>
+            <p className="text-xs text-gray-500 leading-tight">Gym OS</p>
           </div>
         </div>
 

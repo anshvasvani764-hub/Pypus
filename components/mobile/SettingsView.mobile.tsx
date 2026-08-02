@@ -1,19 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, User, Headset, MessageSquare, Send, CheckCircle2, Phone } from 'lucide-react'
+import Link from 'next/link'
+import { Search, User, Headset, MessageSquare, Send, CheckCircle2, Phone, CreditCard } from 'lucide-react'
 import { updateProfileSettings } from '@/app/actions/settings'
-import type { Plan } from '@/lib/members/types'
 
 interface Props {
   workspaceId: string
+  workspaceSlug: string
   initialFullName: string
   initialBusinessName: string
-  plans: Plan[]
+  plans: any[]
 }
 
 export function SettingsView({
   workspaceId,
+  workspaceSlug,
   initialFullName,
   initialBusinessName,
   plans,
@@ -37,8 +39,6 @@ export function SettingsView({
       setErrorMsg(result.error ?? 'Could not save')
     }
   }
-
-  const activePlan = plans.find((p) => p.status === 'active') ?? plans[0]
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
@@ -109,23 +109,28 @@ export function SettingsView({
           {errorMsg && <p className="text-xs font-semibold text-ve-error">{errorMsg}</p>}
         </section>
 
-        {/* Plan Details */}
-        <section className="bg-ve-secondary text-white rounded-2xl p-5 shadow-lg relative overflow-hidden">
-          <div className="relative z-10 flex flex-col justify-between gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Current Plan</span>
-              <h2 className="text-2xl font-black">{activePlan ? activePlan.name : 'Enterprise Elite'}</h2>
-              <p className="text-xs opacity-80 mt-1">Next billing cycle: Oct 24, 2026</p>
-            </div>
-            <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 border border-white/20 self-start">
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-black">{activePlan ? `₹${activePlan.price}` : '₹4,999'}</span>
-                <span className="text-xs font-bold opacity-80">/{activePlan?.duration ?? 'year'}</span>
+        {/* Plans — link to dedicated Plans page */}
+        <Link
+          href={`/${workspaceSlug}/fees/plans`}
+          className="block bg-ve-surface-container-low rounded-2xl p-5 shadow-sm border border-ve-outline-variant/20 active:scale-[0.98] transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-ve-primary-container rounded-full text-ve-on-primary-container">
+                <CreditCard size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">Plans</h2>
+                <p className="text-xs text-ve-on-surface-variant">
+                  {plans.length} plan{plans.length !== 1 ? 's' : ''} configured
+                </p>
               </div>
             </div>
+            <div className="text-xs font-bold text-ve-primary uppercase tracking-wider">
+              Manage →
+            </div>
           </div>
-          <div className="absolute -right-10 -top-10 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
-        </section>
+        </Link>
 
         {/* Action Grid */}
         <div className="grid grid-cols-1 gap-4">
@@ -139,7 +144,7 @@ export function SettingsView({
               </p>
             </div>
             <a
-              href="tel:18001234567"
+              href="tel:+917827621580"
               className="flex items-center gap-2 bg-white text-ve-secondary font-bold text-xs py-3 px-5 rounded-full border-2 border-ve-secondary/20 hover:bg-ve-secondary/5 transition-all"
             >
               <Phone size={16} />
@@ -156,10 +161,15 @@ export function SettingsView({
                 Help us improve Pypus. Share your ideas and report issues.
               </p>
             </div>
-            <button className="flex items-center gap-2 bg-ve-tertiary text-white font-bold text-xs py-3 px-5 rounded-full hover:brightness-110 transition-all">
+            <a
+              href={`https://wa.me/917827621580?text=${encodeURIComponent('Hi Ansh, this is ' + (fullName.trim() || 'there') + '. I\'m using Pypus to run ' + (businessName.trim() || 'my gym') + ' and I\'d like to share some feedback:')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 bg-ve-tertiary text-white font-bold text-xs py-3 px-5 rounded-full hover:brightness-110 transition-all"
+            >
               <Send size={16} />
               Send Feedback
-            </button>
+            </a>
           </section>
         </div>
 
