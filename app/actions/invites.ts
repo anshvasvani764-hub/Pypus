@@ -41,11 +41,24 @@ export async function generateInvite({
   let resolvedRoleId = roleId.trim();
   let resolvedRoleName = roleName.trim();
 
+  const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val);
+
+  const sanitizedWorkspaceId = cleanUUID(workspaceId);
+  const sanitizedRoleId = cleanUUID(resolvedRoleId);
+
+  if (!sanitizedWorkspaceId) {
+    throw new Error('Workspace ID is required to generate an invite');
+  }
+
+  if (!sanitizedRoleId) {
+    throw new Error('Role ID is required to generate an invite');
+  }
+
   if (!resolvedRoleId && resolvedRoleName) {
     const { data: newRole, error: roleError } = await service
       .from('roles')
       .insert({
-        workspace_id: workspaceId,
+        workspace_id: sanitizedWorkspaceId,
         name: resolvedRoleName,
       })
       .select('id')
@@ -64,8 +77,8 @@ export async function generateInvite({
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   const { error } = await service.from('invites').insert({
-    workspace_id: workspaceId,
-    role_id: resolvedRoleId,
+    workspace_id: sanitizedWorkspaceId,
+    role_id: cleanUUID(resolvedRoleId),
     token,
     created_by: createdBy,
     expires_at: expiresAt.toISOString(),
@@ -133,11 +146,37 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
     return { success: true, workspaceSlug: ws?.slug };
   }
 
+  const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val);
+
+  const sanitizedWorkspaceId = cleanUUID(invite.workspace_id);
+  const sanitizedUserId = cleanUUID(user.id);
+  const sanitizedRoleId = cleanUUID(invite.role_id);
+  const sanitizedInvitedBy = cleanUUID(invite.created_by);
+
+  if (!sanitizedWorkspaceId) {
+    return { success: false, error: 'Invite is missing a valid workspace — please generate a new invite' };
+  }
+
+  if (!sanitizedUserId) {
+    return { success: false, error: 'Invalid user session — please log in again' };
+  }
+
+  if (!sanitizedRoleId) {
+    return { success: false, error: 'Invite is missing a valid role — please generate a new invite' };
+  }
+
+  const { data: roleData } = await service
+    .from('roles')
+    .select('name')
+    .eq('id', sanitizedRoleId)
+    .single();
+
   const { error: memberError } = await service.from('workspace_members').insert({
-    workspace_id: invite.workspace_id,
-    user_id: user.id,
-    role_id: invite.role_id,
-    invited_by: invite.created_by,
+    workspace_id: sanitizedWorkspaceId,
+    user_id: sanitizedUserId,
+    role_id: sanitizedRoleId,
+    invited_by: sanitizedInvitedBy,
+    role: roleData?.name ?? 'staff',
     is_active: true,
   });
 
