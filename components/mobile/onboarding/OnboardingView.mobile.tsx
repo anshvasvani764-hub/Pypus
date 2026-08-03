@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/context/OnboardingContext'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -10,6 +11,8 @@ import {
 } from 'lucide-react'
 
 export function OnboardingViewMobile() {
+  const router = useRouter()
+  const hasRedirected = useRef(false)
   const {
     step,
     prevStep,
@@ -26,6 +29,7 @@ export function OnboardingViewMobile() {
     setState,
     isSubmitting,
     creationError,
+    createdWorkspaceId,
     submitOnboarding,
   } = useOnboarding()
 
@@ -40,6 +44,19 @@ export function OnboardingViewMobile() {
       if (data) setTemplates(data)
     })
   }, [])
+
+  // Redirect to dashboard after successful workspace creation
+  useEffect(() => {
+    if (step === 5 && !isSubmitting && !creationError && createdWorkspaceId && !hasRedirected.current) {
+      const supabase = createClient()
+      supabase.from('workspaces').select('slug').eq('id', createdWorkspaceId).single().then(({ data }) => {
+        if (data?.slug) {
+          hasRedirected.current = true
+          router.push(`/${data.slug}`)
+        }
+      })
+    }
+  }, [step, isSubmitting, creationError, createdWorkspaceId, router])
 
   const progressPercent = Math.min((step / 4) * 100, 100)
 
