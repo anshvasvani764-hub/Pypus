@@ -55,7 +55,7 @@ export async function performWorkspaceCreation(
   const { data: role, error: roleErr } = await supabase
     .from('roles')
     .insert({
-      workspace_id: workspaceId,
+      workspace_id: cleanUUID(workspaceId),
       name: 'Owner',
       description: 'Full access to workspace',
       is_system: true,
@@ -80,8 +80,8 @@ export async function performWorkspaceCreation(
 
   if (perms?.length) {
     const rows = perms.map((p) => ({
-      role_id: ownerRoleId,
-      permission_id: p.id,
+      role_id: cleanUUID(ownerRoleId),
+      permission_id: cleanUUID(p.id),
       enabled: true,
     }))
     const { error: rpErr } = await supabase.from('role_permissions').insert(rows)
@@ -92,10 +92,10 @@ export async function performWorkspaceCreation(
   }
 
   const { error: memErr } = await supabase.from('workspace_members').insert({
-    workspace_id: workspaceId,
-    user_id: userId,
+    workspace_id: cleanUUID(workspaceId),
+    user_id: cleanUUID(userId),
     role: 'owner',
-    role_id: ownerRoleId,
+    role_id: cleanUUID(ownerRoleId),
     is_active: true,
   })
 
@@ -106,8 +106,8 @@ export async function performWorkspaceCreation(
 
   if (selectedTemplate.modules?.length) {
     const rows = selectedTemplate.modules.map((m, i) => ({
-      workspace_id: workspaceId,
-      module_id: m.id,
+      workspace_id: cleanUUID(workspaceId),
+      module_id: cleanUUID(m.id),
       position: i,
     }))
     const { error: actErr } = await supabase
