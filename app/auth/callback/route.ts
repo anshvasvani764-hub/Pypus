@@ -14,6 +14,7 @@ export async function GET(request: Request) {
 
     if (!sessionErr && sessionData.user) {
       const user = sessionData.user
+      const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val)
 
       // Member QR self-check-in: if a `next` param was passed, redirect there
       // instead of running the staff workspace_members lookup.
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 
       // Upsert into public.users so every authenticated user has a profile row
       await supabase.from('users').upsert({
-        id: user.id,
+        id: cleanUUID(user.id),
         email: user.email ?? '',
         full_name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? '',
         avatar_url: user.user_metadata?.avatar_url ?? null,

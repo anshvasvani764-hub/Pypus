@@ -24,6 +24,7 @@ export async function performWorkspaceCreation(
   if (!userId) {
     throw new Error('User ID is required to create a workspace')
   }
+  const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val)
 
   const baseSlug = bizName
     .toLowerCase()
@@ -38,8 +39,8 @@ export async function performWorkspaceCreation(
       name: bizName,
       slug: slug,
       industry: selectedTemplate.slug,
-      template_id: selectedTemplate.id,
-      owner_id: userId,
+      template_id: cleanUUID(selectedTemplate.id),
+      owner_id: cleanUUID(userId),
       settings: { phone: `+91${phone}`, location },
     })
     .select()
