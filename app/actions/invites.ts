@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { revalidatePath } from 'next/cache';
 import { randomBytes } from 'crypto';
+import { headers } from 'next/headers';
 
 export interface GeneratedInvite {
   token: string;
@@ -37,13 +38,34 @@ export async function generateInvite({
     throw new Error('Unauthenticated');
   }
 
+  let resolvedRoleId = roleId.trim();
+  let resolvedRoleName = roleName.trim();
+
+  if (!resolvedRoleId && resolvedRoleName) {
+    const { data: newRole, error: roleError } = await service
+      .from('roles')
+      .insert({
+        workspace_id: workspaceId,
+        name: resolvedRoleName,
+      })
+      .select('id')
+      .single();
+
+    if (roleError || !newRole?.id) {
+      console.error('generateInvite role creation error:', roleError);
+      throw new Error(roleError?.message || 'Failed to create role');
+    }
+
+    resolvedRoleId = newRole.id;
+  }
+
   const token = generateToken();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
   const { error } = await service.from('invites').insert({
     workspace_id: workspaceId,
-    role_id: roleId,
+    role_id: resolvedRoleId,
     token,
     created_by: createdBy,
     expires_at: expiresAt.toISOString(),
@@ -54,10 +76,13 @@ export async function generateInvite({
     throw new Error(error.message || 'Failed to create invite');
   }
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const headerList = await headers();
+  const host = headerList.get('x-forwarded-host') || headerList.get('host') || 'localhost:3000';
+  const protocol = headerList.get('x-forwarded-proto') || 'http';
+  const origin = `${protocol}://${host}`;
   const link = `${origin}/invite/${token}`;
 
-  return { token, link, roleName };
+  return { token, link, roleName: resolvedRoleName };
 }
 
 export async function acceptInvite(token: string): Promise<{ success: boolean; workspaceSlug?: string; error?: string }> {
