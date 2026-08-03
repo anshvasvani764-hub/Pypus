@@ -87,6 +87,7 @@ export default function Sidebar() {
           <NavItem href={base} icon={Home} label="Home" />
           <NavItem href={`${base}/assistant`} icon={Bot} label="AI Assistant" />
           <NavItem href={`${base}/workspace`} icon={LayoutGrid} label="Workspace" />
+          <NavItem href={`${base}/team`} icon={Users} label="Team" />
         </nav>
 
         {/* Business section */}
@@ -99,7 +100,6 @@ export default function Sidebar() {
             Business
           </p>
           <NavItem href={`${base}/settings`} icon={Settings} label="Settings" />
-          <NavItem href={`${base}/team`} icon={Users} label="Team" />
         </div>
 
         <div className="flex-1" />
