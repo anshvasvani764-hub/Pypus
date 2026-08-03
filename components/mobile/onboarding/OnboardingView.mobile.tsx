@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOnboarding } from '@/context/OnboardingContext'
+import { createClient } from '@/lib/supabase/client'
 import {
   Dumbbell, Scissors, GraduationCap, Utensils,
   Building2, Smartphone, MapPin, CheckCircle2,
@@ -31,15 +32,28 @@ export function OnboardingViewMobile() {
   const [bizError, setBizError] = useState<string | null>(null)
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [locError, setLocError] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<any[]>([])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('templates').select('*').then(({ data }) => {
+      if (data) setTemplates(data)
+    })
+  }, [])
 
   const progressPercent = Math.min((step / 4) * 100, 100)
 
   // Step 1: Industry Submit
-  const handleSelectIndustry = (templateId: string) => {
+  const handleSelectIndustry = (templateSlug: string) => {
+    const template = templates.find((t) => t.slug === templateSlug)
+    if (!template) {
+      return
+    }
     setSelectedTemplate({
-      id: templateId,
-      slug: templateId,
-      name: templateId === 'gym' ? 'Gym & Fitness' : templateId,
+      id: template.id,
+      slug: template.slug,
+      name: template.name,
+      modules: template.modules || [],
     })
     nextStep()
   }
