@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { acceptInvite } from '@/app/actions/invites';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,10 @@ export default async function AcceptInvitePage({
     }
   }
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const headerList = await headers();
+  const host = headerList.get('x-forwarded-host') || headerList.get('host') || 'localhost:3000';
+  const protocol = headerList.get('x-forwarded-proto') || 'http';
+  const origin = `${protocol}://${host}`;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
