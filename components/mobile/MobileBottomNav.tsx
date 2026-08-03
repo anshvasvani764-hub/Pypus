@@ -4,16 +4,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, LayoutGrid, Bot, Settings, Users } from 'lucide-react'
 
-export function MobileBottomNav({ workspaceSlug, workspaceName }: { workspaceSlug: string; workspaceName: string }) {
+export function MobileBottomNav({ workspaceSlug }: { workspaceSlug: string }) {
   const pathname = usePathname()
   const base = `/${workspaceSlug}`
 
   const items = [
     { href: base, icon: LayoutDashboard, label: 'Home', exact: true },
-    { href: `${base}/workspace`, icon: LayoutGrid, label: workspaceName, exact: false },
+    { href: `${base}/workspace`, icon: LayoutGrid, label: 'Modules', exact: false },
     { href: `${base}/assistant`, icon: Bot, label: 'Assistant', exact: false },
     { href: `${base}/settings`, icon: Settings, label: 'Settings', exact: false },
-    { href: `${base}/team`, icon: Users, label: 'Team', exact: false },
   ]
 
   return (

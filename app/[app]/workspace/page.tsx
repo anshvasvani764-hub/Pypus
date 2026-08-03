@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, Users } from "lucide-react";
 import { getSnapshotStats } from "@/lib/dashboard/get-snapshot-stats";
 import { SnapshotBar } from "@/components/dashboard/SnapshotBar";
 import { ModuleCard } from "@/components/dashboard/ModuleCard";
@@ -53,6 +53,14 @@ export default async function WorkspacePage({
             href={`/${workspaceSlug}/${m.slug}`}
           />
         ))}
+        <ModuleCard
+          title="Team"
+          description="Manage staff roles, invites and access"
+          icon={Users}
+          iconBg="bg-purple-50"
+          iconColor="text-purple-600"
+          href={`/${workspaceSlug}/team`}
+        />
         <ModuleCard
           title={COMING_SOON_CARD.title}
           description={COMING_SOON_CARD.description}

@@ -38,6 +38,14 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
       accent: 'from-amber-500 to-orange-600',
       shadow: 'shadow-[0_8px_24px_rgba(245,158,11,0.25)]',
     },
+    {
+      href: `/${workspaceSlug}/team`,
+      icon: Users,
+      title: 'Team',
+      description: 'Staff and invites',
+      accent: 'from-purple-500 to-purple-700',
+      shadow: 'shadow-[0_8px_24px_rgba(168,85,247,0.25)]',
+    },
   ]
 
   return (
