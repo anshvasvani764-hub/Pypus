@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, LayoutGrid, Bot, Settings } from 'lucide-react'
+import { LayoutDashboard, LayoutGrid, Bot, Settings, Users } from 'lucide-react'
 
 export function MobileBottomNav({ workspaceSlug }: { workspaceSlug: string }) {
   const pathname = usePathname()
@@ -13,6 +13,7 @@ export function MobileBottomNav({ workspaceSlug }: { workspaceSlug: string }) {
     { href: `${base}/workspace`, icon: LayoutGrid, label: 'Modules' },
     { href: `${base}/assistant`, icon: Bot, label: 'Assistant' },
     { href: `${base}/settings`, icon: Settings, label: 'Settings' },
+    { href: `${base}/team`, icon: Users, label: 'Team' },
   ]
 
   return (

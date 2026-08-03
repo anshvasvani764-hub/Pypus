@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { User, CreditCard, Phone, MessageCircle, Plus, Pencil, Trash2, X } from "lucide-react";
+import { User, CreditCard, Phone, MessageCircle, Plus, Pencil, Trash2, X, LogOut } from "lucide-react";
 import type { Plan, PlanDuration } from "@/lib/members/types";
 import { updateProfileSettings, savePlan, deletePlan } from "@/app/actions/settings";
+import { createClient } from "@/lib/supabase/client";
 
 const SUPPORT_PHONE = "+917827621580";
 const WHATSAPP_NUMBER = "917827621580";
@@ -47,6 +48,14 @@ export function SettingsView({
   const [plans, setPlans] = useState<Plan[]>(initialPlans);
   const [editing, setEditing] = useState<Plan | "new" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
 
   function flashToast(message: string) {
     setToast(message);
@@ -292,6 +301,18 @@ export function SettingsView({
             Send Feedback
           </a>
         </div>
+      </section>
+
+      {/* 5. Sign Out */}
+      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          {signingOut ? 'Signing out...' : 'Sign out'}
+        </button>
       </section>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Home, LayoutGrid, Bot, Settings, PanelLeft, Check } from 'lucide-react'
+import { Home, LayoutGrid, Bot, Settings, PanelLeft, Check, Users } from 'lucide-react'
 import { useSidebar, SidebarMode } from '@/context/SidebarContext'
 import { useUser } from '@/hooks/useUser'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -99,6 +99,7 @@ export default function Sidebar() {
             Business
           </p>
           <NavItem href={`${base}/settings`} icon={Settings} label="Settings" />
+          <NavItem href={`${base}/team`} icon={Users} label="Team" />
         </div>
 
         <div className="flex-1" />
