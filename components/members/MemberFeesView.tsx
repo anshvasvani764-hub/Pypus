@@ -142,7 +142,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
 
   async function handleMarkPaidConfirm(amount: number, method: PaymentMethod) {
     const target = summary.payableFee;
-    if (!target || settling) return;
+    if (!target || settling) return { success: false, error: "Invalid state" };
 
     setSettling(true);
     const result = await markFeeAsPaid({
@@ -153,7 +153,6 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
       paymentMethod: method,
     });
 
-    setMarkPaidOpen(false);
     setSettling(false);
 
     if (result.success && result.fee) {
@@ -167,6 +166,8 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
     } else {
       flashToast(result.error || "Failed to mark as paid");
     }
+
+    return result;
   }
 
   async function handleSendReminder(type: "fees" | "attendance") {
@@ -222,6 +223,8 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         onClose={() => setMarkPaidOpen(false)}
         onConfirm={handleMarkPaidConfirm}
         memberName={member.name}
+        memberPhone={member.phone}
+        workspaceName={workspaceName}
         planName={summary.planName}
         defaultAmount={summary.payableFee?.amount_snapshot ?? 0}
         dueDate={summary.dueDate}

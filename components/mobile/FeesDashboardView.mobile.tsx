@@ -26,6 +26,7 @@ interface MemberFeeRow {
 interface Props {
   workspaceSlug: string
   workspaceId: string
+  workspaceName: string
   rows: MemberFeeRow[]
   monthlyCollection: number
   pendingDues: number
@@ -62,6 +63,7 @@ const CHIP_COLORS: Record<DerivedFeeStatus, string> = {
 export function FeesDashboardView({
   workspaceSlug,
   workspaceId,
+  workspaceName,
   rows,
   monthlyCollection,
   pendingDues,
@@ -82,7 +84,7 @@ export function FeesDashboardView({
   }
 
   async function handleMarkPaidConfirm(amount: number, method: PaymentMethod) {
-    if (!markPaidRow?.payableFeeId || busy) return
+    if (!markPaidRow?.payableFeeId || busy) return { success: false, error: "Invalid state" };
     setBusy(true)
     const result = await markFeeAsPaid({
       workspaceId,
@@ -92,13 +94,13 @@ export function FeesDashboardView({
       paymentMethod: method,
     })
     setBusy(false)
-    setMarkPaidRow(null)
     if (result.success) {
       flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')
       router.refresh()
     } else {
       flashToast(result.error || 'Failed to mark as paid')
     }
+    return result;
   }
 
   async function handleAssignPlan(
@@ -320,6 +322,8 @@ export function FeesDashboardView({
         onClose={() => setMarkPaidRow(null)}
         onConfirm={handleMarkPaidConfirm}
         memberName={markPaidRow?.member.name ?? ''}
+        memberPhone={markPaidRow?.member.phone ?? ''}
+        workspaceName={workspaceName}
         planName={markPaidRow?.planName ?? null}
         defaultAmount={markPaidRow?.amount ?? 0}
         dueDate={markPaidRow?.dueDate ?? null}

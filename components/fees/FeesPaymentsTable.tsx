@@ -34,6 +34,7 @@ interface FeesPaymentsTableProps {
   summaries: Map<string, MemberFeeSummary>;
   workspaceSlug: string;
   workspaceId: string;
+  workspaceName: string;
   onPlanAssigned: (memberId: string, planId: string | null, fee: FeeRecord) => void;
   onPaid: (fee: FeeRecord, amount: number) => void;
 }
@@ -92,6 +93,7 @@ export function FeesPaymentsTable({
   summaries,
   workspaceSlug,
   workspaceId,
+  workspaceName,
   onPlanAssigned,
   onPaid,
 }: FeesPaymentsTableProps) {
@@ -152,7 +154,7 @@ export function FeesPaymentsTable({
   async function handlePaidConfirm(amount: number, method: PaymentMethod) {
     const member = paidTarget;
     const target = member ? summaries.get(member.id)?.payableFee : null;
-    if (!member || !target || settling) return;
+    if (!member || !target || settling) return { success: false, error: "Invalid state" };
 
     setSettling(true);
     const result = await markFeeAsPaid({
@@ -174,7 +176,8 @@ export function FeesPaymentsTable({
       flashToast(result.error || "Failed to record payment");
     }
     setSettling(false);
-    setPaidTarget(null);
+
+    return result;
   }
 
   const paidSummary = paidTarget ? summaries.get(paidTarget.id) : null;
@@ -200,6 +203,8 @@ export function FeesPaymentsTable({
         onClose={() => setPaidTarget(null)}
         onConfirm={handlePaidConfirm}
         memberName={paidTarget?.name ?? ""}
+        memberPhone={paidTarget?.phone ?? ""}
+        workspaceName={workspaceName}
         planName={paidSummary?.planName ?? null}
         defaultAmount={paidSummary?.payableFee?.amount_snapshot ?? 0}
         dueDate={paidSummary?.dueDate ?? null}

@@ -3,13 +3,15 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Phone, Mail, Users, Verified, BellRing, CreditCard, Plus, MoreVertical, CalendarCheck2 } from 'lucide-react'
+import { ArrowLeft, Phone, Mail, Users, Verified, BellRing, CreditCard, Plus, MoreVertical, CalendarCheck2, Pencil, Trash2 } from 'lucide-react'
 import type { Member, FeeRecord } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
 import { MarkPaidModal, type PaymentMethod } from '@/components/fees/MarkPaidModal'
 import { markFeeAsPaid } from '@/app/actions/member-plan'
 import { sendReminder } from '@/app/actions/member-reminders'
 import MemberAvatar from '@/components/shared/MemberAvatar'
+import { EditMemberDialog } from '@/components/members/EditMemberDialog'
+import { DeleteMemberDialog } from '@/components/members/DeleteMemberDialog'
 
 interface Props {
   member: Member
@@ -41,6 +43,9 @@ export function MemberProfileOverviewView({
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('Overview')
   const [markPaidOpen, setMarkPaidOpen] = useState(false)
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
@@ -50,7 +55,7 @@ export function MemberProfileOverviewView({
   }
 
   async function handleMarkPaidConfirm(paidAmount: number, method: PaymentMethod) {
-    if (!payableFeeId || busy) return
+    if (!payableFeeId || busy) return { success: false, error: 'Invalid state' }
     setBusy(true)
     const result = await markFeeAsPaid({
       workspaceId,
@@ -67,6 +72,7 @@ export function MemberProfileOverviewView({
     } else {
       flashToast(result.error || 'Failed to mark as paid')
     }
+    return result
   }
 
   async function handleRemind() {
@@ -132,7 +138,29 @@ export function MemberProfileOverviewView({
   ]
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <>
+      {showEditDialog && (
+        <EditMemberDialog
+          member={member}
+          workspaceId={workspaceId}
+          onClose={() => setShowEditDialog(false)}
+          onSuccess={() => {
+            router.refresh();
+            flashToast("Member updated successfully");
+          }}
+        />
+      )}
+
+      {showDeleteDialog && (
+        <DeleteMemberDialog
+          member={member}
+          workspaceId={workspaceId}
+          workspaceSlug={workspaceSlug}
+          onClose={() => setShowDeleteDialog(false)}
+        />
+      )}
+
+      <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
       {/* Top Bar */}
       <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
         <div className="flex items-center gap-3">
@@ -164,6 +192,43 @@ export function MemberProfileOverviewView({
               <span className="text-xs font-bold tracking-wide">Mark Paid</span>
             </button>
           )}
+          {/* More Options Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowOptionsMenu(!showOptionsMenu)}
+              className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
+            >
+              <MoreVertical size={20} className="text-ve-on-surface" />
+            </button>
+            {showOptionsMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowOptionsMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-ve-outline-variant/30 bg-white shadow-lg py-1">
+                  <button
+                    onClick={() => {
+                      setShowEditDialog(true);
+                      setShowOptionsMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-ve-on-surface hover:bg-ve-surface-container-low flex items-center gap-2"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit Member
+                  </button>
+                  <div className="border-t border-ve-outline-variant/20 my-1" />
+                  <button
+                    onClick={() => {
+                      setShowDeleteDialog(true);
+                      setShowOptionsMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-ve-error hover:bg-ve-error-container/20 flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Member
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -321,6 +386,8 @@ export function MemberProfileOverviewView({
         onClose={() => setMarkPaidOpen(false)}
         onConfirm={handleMarkPaidConfirm}
         memberName={member.name}
+        memberPhone={member.phone}
+        workspaceName={workspaceName}
         planName={planName}
         defaultAmount={amount ?? 0}
         dueDate={dueDate}
@@ -331,6 +398,7 @@ export function MemberProfileOverviewView({
           {toast}
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }

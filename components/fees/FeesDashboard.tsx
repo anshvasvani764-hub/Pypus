@@ -10,6 +10,7 @@ import { FeesPaymentsTable } from "@/components/fees/FeesPaymentsTable";
 interface FeesDashboardProps {
   workspaceSlug: string;
   workspaceId: string;
+  workspaceName: string;
   members: Member[];
   fees: FeeRecord[];
   monthlyRevenue: number;
@@ -20,6 +21,7 @@ interface FeesDashboardProps {
 export function FeesDashboard({
   workspaceSlug,
   workspaceId,
+  workspaceName,
   members,
   fees: initialFees,
   monthlyRevenue: initialRevenue,
@@ -122,6 +124,7 @@ export function FeesDashboard({
           summaries={summaries}
           workspaceSlug={workspaceSlug}
           workspaceId={workspaceId}
+          workspaceName={workspaceName}
           onPlanAssigned={handlePlanAssigned}
           onPaid={handlePaid}
         />

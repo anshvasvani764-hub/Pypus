@@ -20,3 +20,47 @@ export function formatISTDateTime(iso: string): string {
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
 }
+
+export function formatReceiptDate(isoDate: string): string {
+  // Returns: "05 Aug 2026, 5:44 PM" (IST)
+  const date = new Date(isoDate);
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
+  });
+}
+
+export function formatReceiptPeriod(dueDate: string, duration: 'monthly' | 'quarterly' | 'yearly' = 'monthly'): string {
+  // Calculate start date based on due date and duration
+  const due = new Date(dueDate);
+  const start = new Date(due);
+
+  // Calculate start date by going back one period
+  switch (duration) {
+    case 'monthly':
+      start.setMonth(start.getMonth() - 1);
+      break;
+    case 'quarterly':
+      start.setMonth(start.getMonth() - 3);
+      break;
+    case 'yearly':
+      start.setFullYear(start.getFullYear() - 1);
+      break;
+  }
+
+  const formatDate = (d: Date) => {
+    return d.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    });
+  };
+
+  return `${formatDate(start)} - ${formatDate(due)}`;
+}

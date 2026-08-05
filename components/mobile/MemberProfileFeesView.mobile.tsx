@@ -1,7 +1,7 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useState } from 'react'
 import { ArrowLeft, AlertTriangle, TrendingUp, CheckCircle2, XCircle, MoreVertical, ExternalLink } from 'lucide-react'
 import MemberAvatar from '@/components/shared/MemberAvatar'
 import type { Member, FeeRecord } from '@/lib/members/types'
@@ -9,6 +9,7 @@ import type { DerivedFeeStatus } from '@/lib/members/fee-status'
 import { MarkPaidModal, type PaymentMethod } from '@/components/fees/MarkPaidModal'
 import { PlanSelectorModal } from '@/components/members/PlanSelectorModal'
 import { assignPlanToMember, markFeeAsPaid } from '@/app/actions/member-plan'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   member: Member
@@ -55,6 +56,26 @@ export function MemberProfileFeesView({
   const [planModalOpen, setPlanModalOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [workspaceName, setWorkspaceName] = useState('')
+
+  useEffect(() => {
+    async function fetchWorkspaceName() {
+      try {
+        const supabase = createClient()
+        const { data: wsData } = await supabase
+          .from('workspaces')
+          .select('name')
+          .eq('id', workspaceId)
+          .single()
+        if (wsData) {
+          setWorkspaceName(wsData.name)
+        }
+      } catch (err) {
+        console.error('Failed to fetch workspace name:', err)
+      }
+    }
+    fetchWorkspaceName()
+  }, [workspaceId])
 
   function flashToast(message: string) {
     setToast(message)
@@ -70,7 +91,7 @@ export function MemberProfileFeesView({
   }
 
   async function handleMarkPaidConfirm(paidAmount: number, method: PaymentMethod) {
-    if (!payableFeeId || busy) return
+    if (!payableFeeId || busy) return { success: false, error: 'Invalid state' }
     setBusy(true)
     const result = await markFeeAsPaid({
       workspaceId,
@@ -87,6 +108,7 @@ export function MemberProfileFeesView({
     } else {
       flashToast(result.error || 'Failed to mark as paid')
     }
+    return result
   }
 
   async function handleAssignPlan(
@@ -342,6 +364,8 @@ export function MemberProfileFeesView({
         onClose={() => setMarkPaidOpen(false)}
         onConfirm={handleMarkPaidConfirm}
         memberName={member.name}
+        memberPhone={member.phone}
+        workspaceName={workspaceName}
         planName={planName}
         defaultAmount={amount ?? 0}
         dueDate={dueDate}

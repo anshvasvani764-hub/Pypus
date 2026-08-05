@@ -16,10 +16,11 @@ export default async function FeesPage({
   const supabase = createServiceClient();
   const { data: wsData } = await supabase
     .from("workspaces")
-    .select("id")
+    .select("id, name")
     .eq("slug", workspaceSlug)
     .single();
   const workspaceId = wsData?.id ?? "";
+  const workspaceName = wsData?.name ?? "Your Gym";
 
   const members = await getMembers(workspaceId);
   const fees = await getFeesForWorkspace(workspaceId);
@@ -62,6 +63,7 @@ export default async function FeesPage({
       <FeesDashboardView
         workspaceSlug={workspaceSlug}
         workspaceId={workspaceId}
+        workspaceName={workspaceName}
         rows={rows}
         monthlyCollection={monthlyRevenue}
         pendingDues={pendingDues}
@@ -75,6 +77,7 @@ export default async function FeesPage({
     <FeesDashboard
       workspaceSlug={workspaceSlug}
       workspaceId={workspaceId}
+      workspaceName={workspaceName}
       members={members}
       fees={fees}
       monthlyRevenue={monthlyRevenue}

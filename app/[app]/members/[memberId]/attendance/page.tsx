@@ -59,6 +59,7 @@ export default async function MemberAttendancePage({
         <MemberProfileHeader
           member={member}
           workspaceName={workspaceName}
+          workspaceSlug={workspaceSlug}
           feeStatus={summary.status}
           planName={summary.planName}
           payableFeeId={summary.payableFee?.id ?? null}
