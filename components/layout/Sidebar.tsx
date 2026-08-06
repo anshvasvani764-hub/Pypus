@@ -71,7 +71,11 @@ export default function Sidebar() {
       >
         {/* Brand */}
         <div className="flex items-center gap-3 px-5 py-6">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-emerald-400 shrink-0" />
+         <img
+  src="/logo.png"
+  alt="Pypus"
+  className="w-9 h-9 rounded-xl object-cover shrink-0"
+/>
           <div
             className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${
               isCollapsed ? 'max-w-0 opacity-0' : 'max-w-[160px] opacity-100'
