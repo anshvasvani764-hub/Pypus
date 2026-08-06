@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/onboarding/', '/invite/'],
     },
-    sitemap: 'https://pypus.in/sitemap.xml',
+    sitemap: 'https://www.pypus.in/sitemap.xml',
   }
 }
