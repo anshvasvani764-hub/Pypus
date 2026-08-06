@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Pypus — Where Your Business Runs Itself",
     description: "Buisness managment software. AI agents that act, not just store data.",
-    url: "https://pypus.in",
+    url: "https://www.pypus.in",
     siteName: "Pypus",
     type: "website",
   },
