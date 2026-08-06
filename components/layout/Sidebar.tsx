@@ -82,7 +82,6 @@ export default function Sidebar() {
             }`}
           >
             <p className="font-bold text-gray-900 leading-tight">Pypus</p>
-            <p className="text-xs text-gray-200 leading-tight">WHERE YOUR BUISNESS RUN ITSELF</p>
           </div>
         </div>
 
