@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Mission Feb",
-  description: "Pypus for SMBs",
+  title: "Pypus",
+  description: "Pypus — Where Your Business Runs Itself",
 };
 
 export const viewport = {
