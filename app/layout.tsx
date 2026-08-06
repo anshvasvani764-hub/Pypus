@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://pypus.in"),
+  metadataBase: new URL("https://www.pypus.in"),
   title: "Pypus — Where Your Business Runs Itself",
   description: "Pypus is an Managment software that automate daily operations. AI agents recover fees, enforce attendance, and onboard members automatically.",
   icons: {
