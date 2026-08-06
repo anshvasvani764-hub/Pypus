@@ -112,26 +112,42 @@ function MarkPaidDialog({
 
     const message = `Payment Receipt\nAmount: ₹${Number(amount).toLocaleString('en-IN')}\nReceipt #${receiptNumber}\n\nThank you for your payment!`;
 
-    // Mobile: Web Share API sends image directly into WhatsApp
-    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+    // Mobile: try Web Share API first (image directly into WhatsApp)
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile && typeof navigator !== 'undefined' && navigator.share) {
       try {
         const file = new File([receiptBlob], `receipt-${receiptNumber}.png`, { type: 'image/png' });
-        const shareData = { files: [file], title: 'Payment Receipt', text: message };
-        if (navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          handleClose();
-          return;
-        }
+        await navigator.share({ files: [file], title: 'Payment Receipt', text: message });
+        handleClose();
+        return;
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           handleClose();
           return;
         }
-        console.log('Native share failed, falling back to wa.me:', error);
+        console.log('Native share failed, trying whatsapp:// scheme:', error);
       }
     }
 
-    // Desktop / fallback: open WhatsApp chat via anchor (more reliable than window.open on mobile)
+    // Mobile fallback: open WhatsApp app directly via whatsapp:// scheme
+    if (isMobile) {
+      try {
+        const whatsappAppUrl = `whatsapp://send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+        window.location.href = whatsappAppUrl;
+
+        // Also download receipt as backup
+        setTimeout(() => {
+          downloadReceipt(receiptBlob, receiptNumber);
+        }, 500);
+
+        handleClose();
+        return;
+      } catch (error) {
+        console.log('whatsapp:// scheme failed, falling back to wa.me:', error);
+      }
+    }
+
+    // Desktop / final fallback: open WhatsApp Web via anchor tag
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     const link = document.createElement('a');
     link.href = whatsappUrl;
@@ -141,11 +157,11 @@ function MarkPaidDialog({
     link.click();
     document.body.removeChild(link);
 
-    // Download receipt as backup
+    // Download receipt
     try {
-      await shareReceiptViaWhatsApp(receiptBlob, receiptNumber, memberPhone, memberName, Number(amount));
+      downloadReceipt(receiptBlob, receiptNumber);
     } catch {
-      // ignore download errors
+      // ignore
     }
 
     handleClose();
