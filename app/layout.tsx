@@ -14,9 +14,13 @@ export const metadata: Metadata = {
   title: "Pypus — Where Your Business Runs Itself",
   description: "Pypus is a Management software that automates daily operations. AI agents recover fees, enforce attendance, and onboard members automatically.",
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
+icons: {
+  icon: [
+    { url: "/favicon.ico", sizes: "any" },
+    { url: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
+  ],
+  apple: "/apple-touch-icon.png",
+},
   openGraph: {
     title: "Pypus — Where Your Business Runs Itself",
     description: "Business management software. AI agents that act, not just store data.",
