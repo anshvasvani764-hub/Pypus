@@ -39,6 +39,7 @@ export default async function MemberAttendancePage({
       <MemberProfileAttendanceView
         member={member}
         workspaceSlug={workspaceSlug}
+        workspaceId={workspaceId}
         records={memberAttendance}
       />
     );
@@ -70,7 +71,7 @@ export default async function MemberAttendancePage({
         <MemberTabs basePath={basePath} />
       </div>
 
-      <MemberAttendanceView memberId={memberId} records={memberAttendance} />
+      <MemberAttendanceView memberId={memberId} records={memberAttendance} workspaceId={workspaceId} />
     </div>
   );
 }

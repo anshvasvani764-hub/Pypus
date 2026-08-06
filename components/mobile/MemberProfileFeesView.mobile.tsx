@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, TrendingUp, CheckCircle2, XCircle, MoreVertical, ExternalLink } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, TrendingUp, CheckCircle2, XCircle, MoreVertical, ExternalLink, Pencil } from 'lucide-react'
 import MemberAvatar from '@/components/shared/MemberAvatar'
 import type { Member, FeeRecord } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
@@ -10,6 +10,7 @@ import { MarkPaidModal, type PaymentMethod } from '@/components/fees/MarkPaidMod
 import { PlanSelectorModal } from '@/components/members/PlanSelectorModal'
 import { assignPlanToMember, markFeeAsPaid } from '@/app/actions/member-plan'
 import { createClient } from '@/lib/supabase/client'
+import { EditFeeModal } from '@/components/records/EditFeeModal'
 
 interface Props {
   member: Member
@@ -57,6 +58,7 @@ export function MemberProfileFeesView({
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [workspaceName, setWorkspaceName] = useState('')
+  const [editingFee, setEditingFee] = useState<FeeRecord | null>(null)
 
   useEffect(() => {
     async function fetchWorkspaceName() {
@@ -319,11 +321,19 @@ export function MemberProfileFeesView({
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-ve-on-surface">{fmt(fee.amount_snapshot)}</p>
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${statusChipClass[fee.status]}`}>
-                      {fee.status}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-ve-on-surface">{fmt(fee.amount_snapshot)}</p>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${statusChipClass[fee.status]}`}>
+                        {fee.status}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setEditingFee(fee)}
+                      className="h-9 w-9 rounded-full flex items-center justify-center text-ve-on-surface-variant hover:text-ve-primary hover:bg-ve-primary/5 transition-colors"
+                    >
+                      <Pencil size={16} />
+                    </button>
                   </div>
                 </div>
               ))
@@ -376,6 +386,18 @@ export function MemberProfileFeesView({
         onSubmit={handleAssignPlan}
         workspaceId={workspaceId}
         memberName={member.name}
+      />
+
+      <EditFeeModal
+        isOpen={editingFee !== null}
+        onClose={() => setEditingFee(null)}
+        record={editingFee}
+        workspaceId={workspaceId}
+        memberId={member.id}
+        onSaved={(updated) => {
+          mergeFee(updated)
+          flashToast('Fee record updated')
+        }}
       />
 
       {toast && (

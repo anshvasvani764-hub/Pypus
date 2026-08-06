@@ -1,12 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Dumbbell, Flame, CheckCircle2, XCircle, ArrowRight } from 'lucide-react'
+import { ArrowLeft, Dumbbell, Flame, CheckCircle2, XCircle, ArrowRight, Pencil } from 'lucide-react'
 import type { Member, AttendanceRecord } from '@/lib/members/types'
+import { EditAttendanceModal } from '@/components/records/EditAttendanceModal'
 
 interface Props {
   member: Member
   workspaceSlug: string
+  workspaceId: string
   records: AttendanceRecord[]
 }
 
@@ -36,12 +39,19 @@ function fmtDate(iso: string) {
 
 function fmtTime(iso: string | null) {
   if (!iso) return ''
-  return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
 }
 
 const SESSION_ICONS = [Dumbbell, Dumbbell, Dumbbell]
 
-export function MemberProfileAttendanceView({ member, workspaceSlug, records }: Props) {
+export function MemberProfileAttendanceView({ member, workspaceSlug, workspaceId, records }: Props) {
+  const [recordsState, setRecordsState] = useState<AttendanceRecord[]>(records)
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
   const basePath = `/${workspaceSlug}/members/${member.id}`
   const activeTab: Tab = 'Attendance'
 
@@ -51,19 +61,32 @@ export function MemberProfileAttendanceView({ member, workspaceSlug, records }: 
     Fees: `${basePath}/fees`,
   }
 
-  const total = records.length
-  const present = records.filter((r) => r.status === 'present').length
+  const total = recordsState.length
+  const present = recordsState.filter((r) => r.status === 'present').length
   const rate = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0'
-  const streak = computeStreak(records)
+  const streak = computeStreak(recordsState)
 
   const initials = member.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
-  const recentLogs = [...records]
+  const recentLogs = [...recordsState]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 8)
 
+  function handleSaved(updated: AttendanceRecord) {
+    setRecordsState((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+  }
+
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+      <EditAttendanceModal
+        isOpen={editingRecord !== null}
+        onClose={() => setEditingRecord(null)}
+        record={editingRecord}
+        workspaceId={workspaceId}
+        memberId={member.id}
+        onSaved={handleSaved}
+      />
+
       {/* Top Bar */}
       <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
         <div className="flex items-center gap-3">
@@ -209,14 +232,31 @@ export function MemberProfileAttendanceView({ member, workspaceSlug, records }: 
                       <p className="text-[11px] text-ve-on-surface-variant/60">{fmtDate(log.date)}</p>
                     </div>
                   </div>
-                  <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
-                    log.status === 'present'
-                      ? 'bg-ve-primary/10 text-ve-primary'
-                      : 'bg-ve-error-container text-ve-error'
-                  }`}>
-                    {log.status === 'present'
-                      ? <><CheckCircle2 size={12} fill="currentColor" /> Present</>
-                      : <><XCircle size={12} fill="currentColor" /> Absent</>}
+                  <div className="flex items-center gap-2">
+                    <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
+                      log.status === 'present'
+                        ? 'bg-ve-primary/10 text-ve-primary'
+                        : 'bg-ve-error-container text-ve-error'
+                    }`}>
+                      {log.status === 'present'
+                        ? <><CheckCircle2 size={12} fill="currentColor" /> Present</>
+                        : <><XCircle size={12} fill="currentColor" /> Absent</>}
+                    </div>
+                    {log.status === 'present' && log.check_in && (
+                      <span className="text-[11px] font-bold text-ve-on-surface">
+                        {fmtTime(log.check_in)}
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingRecord(log)
+                      }}
+                      className="h-9 w-9 rounded-full flex items-center justify-center text-ve-on-surface-variant hover:text-ve-primary hover:bg-ve-primary/5 transition-colors"
+                      title="Edit record"
+                    >
+                      <Pencil size={16} />
+                    </button>
                   </div>
                 </div>
               )

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard } from "lucide-react";
+import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard, Pencil } from "lucide-react";
 import MemberAvatar from "@/components/shared/MemberAvatar";
 import { createClient } from "@/lib/supabase/client";
 import type { FeeRecord, Member } from "@/lib/members/types";
@@ -10,6 +10,7 @@ import { PlanSelectorModal } from "@/components/members/PlanSelectorModal";
 import { MarkPaidModal, type PaymentMethod } from "@/components/fees/MarkPaidModal";
 import { assignPlanToMember, markFeeAsPaid } from "@/app/actions/member-plan";
 import { sendReminder } from "@/app/actions/member-reminders";
+import { EditFeeModal } from "@/components/records/EditFeeModal";
 
 interface MemberFeesViewProps {
   memberId: string;
@@ -70,6 +71,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
   const [showReminderMenu, setShowReminderMenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [editingFee, setEditingFee] = useState<FeeRecord | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -228,6 +230,18 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         planName={summary.planName}
         defaultAmount={summary.payableFee?.amount_snapshot ?? 0}
         dueDate={summary.dueDate}
+      />
+
+      <EditFeeModal
+        isOpen={editingFee !== null}
+        onClose={() => setEditingFee(null)}
+        record={editingFee}
+        workspaceId={workspaceId}
+        memberId={memberId}
+        onSaved={(updated) => {
+          setFees((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+          flashToast("Fee record updated");
+        }}
       />
 
       {/* Member header */}
@@ -419,6 +433,13 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
                     {formatCurrency(record.amount_snapshot)}
                   </span>
                   <PaymentStatusBadge status={record.status} />
+                  <button
+                    onClick={() => setEditingFee(record)}
+                    className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                    title="Edit record"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             ))}

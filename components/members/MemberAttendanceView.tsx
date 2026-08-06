@@ -1,10 +1,26 @@
-import { CalendarCheck, Flame, TrendingUp, Clock } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { CalendarCheck, Flame, TrendingUp, Clock, Pencil } from "lucide-react";
 import type { AttendanceRecord } from "@/lib/members/types";
 import { getISTDateString } from "@/lib/utils/date";
+import { EditAttendanceModal } from "@/components/records/EditAttendanceModal";
+
+function formatISTTime(iso: string | null): string {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return date.toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
 
 interface MemberAttendanceViewProps {
   memberId: string;
   records: AttendanceRecord[];
+  workspaceId: string;
 }
 
 interface StatCardProps {
@@ -51,15 +67,18 @@ function AttendanceBadge({ status }: { status: AttendanceRecord["status"] }) {
   );
 }
 
-export function MemberAttendanceView({ memberId, records }: MemberAttendanceViewProps) {
-  const sorted = [...records].sort(
+export function MemberAttendanceView({ memberId, records, workspaceId }: MemberAttendanceViewProps) {
+  const [recordsState, setRecordsState] = useState<AttendanceRecord[]>(records);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+
+  const sorted = [...recordsState].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  const total = records.length;
-  const present = records.filter((r) => r.status === "present").length;
+  const total = recordsState.length;
+  const present = recordsState.filter((r) => r.status === "present").length;
   const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
-  const streak = computeStreak(records);
+  const streak = computeStreak(recordsState);
 
   function computeStreak(recs: AttendanceRecord[]): number {
   const sorted = [...recs].sort(
@@ -80,8 +99,23 @@ export function MemberAttendanceView({ memberId, records }: MemberAttendanceView
   return streak;
 }
 
+  function handleSaved(updated: AttendanceRecord) {
+    setRecordsState((prev) =>
+      prev.map((r) => (r.id === updated.id ? updated : r))
+    );
+  }
+
   return (
     <div className="mt-5 space-y-5">
+      <EditAttendanceModal
+        isOpen={editingRecord !== null}
+        onClose={() => setEditingRecord(null)}
+        record={editingRecord}
+        workspaceId={workspaceId}
+        memberId={memberId}
+        onSaved={handleSaved}
+      />
+
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -162,12 +196,21 @@ export function MemberAttendanceView({ memberId, records }: MemberAttendanceView
 
                   <div className="flex items-center gap-4">
                     {record.status === "present" && (
-                      <span className="flex items-center gap-1 text-xs text-gray-400">
+                      <span className="flex items-center gap-1 text-xs font-semibold text-gray-700">
                         <Clock className="h-3 w-3" />
-                        {record.check_in} – {record.check_out}
+                        {formatISTTime(record.check_in)}
+                        <span className="text-gray-400">–</span>
+                        {formatISTTime(record.check_out)}
                       </span>
                     )}
                     <AttendanceBadge status={record.status} />
+                    <button
+                      onClick={() => setEditingRecord(record)}
+                      className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                      title="Edit record"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               );

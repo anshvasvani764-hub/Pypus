@@ -63,6 +63,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/m/${memberRow.workspace_id}/checkin`)
       }
 
+      // NEW: If logged-in user is not an owner or member, send them directly to onboarding
       return NextResponse.redirect(`${origin}/onboarding`)
     }
   }
