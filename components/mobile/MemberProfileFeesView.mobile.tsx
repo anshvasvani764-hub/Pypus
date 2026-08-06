@@ -101,7 +101,6 @@ export function MemberProfileFeesView({
       paymentMethod: method,
     })
     setBusy(false)
-    setMarkPaidOpen(false)
     if (result.success && result.fee) {
       mergeFee(result.fee)
       flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')

@@ -65,7 +65,6 @@ export function MemberProfileOverviewView({
       paymentMethod: method,
     })
     setBusy(false)
-    setMarkPaidOpen(false)
     if (result.success) {
       flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')
       router.refresh()

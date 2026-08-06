@@ -111,20 +111,41 @@ function MarkPaidDialog({
     }
 
     const message = `Payment Receipt\nAmount: ₹${Number(amount).toLocaleString('en-IN')}\nReceipt #${receiptNumber}\n\nThank you for your payment!`;
+
+    // Mobile: Web Share API sends image directly into WhatsApp
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+      try {
+        const file = new File([receiptBlob], `receipt-${receiptNumber}.png`, { type: 'image/png' });
+        const shareData = { files: [file], title: 'Payment Receipt', text: message };
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          handleClose();
+          return;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          handleClose();
+          return;
+        }
+        console.log('Native share failed, falling back to wa.me:', error);
+      }
+    }
+
+    // Desktop / fallback: open WhatsApp chat via anchor (more reliable than window.open on mobile)
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    const link = document.createElement('a');
+    link.href = whatsappUrl;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-
+    // Download receipt as backup
     try {
-      await shareReceiptViaWhatsApp(
-        receiptBlob,
-        receiptNumber,
-        memberPhone,
-        memberName,
-        Number(amount)
-      );
+      await shareReceiptViaWhatsApp(receiptBlob, receiptNumber, memberPhone, memberName, Number(amount));
     } catch {
-      // WhatsApp already opened above; ignore share errors
+      // ignore download errors
     }
 
     handleClose();
