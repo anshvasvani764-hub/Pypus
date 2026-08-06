@@ -10,11 +10,19 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Pypus",
-  description: "Pypus — Where Your Business Runs Itself",
+  metadataBase: new URL("https://pypus.in"),
+  title: "Pypus — Where Your Business Runs Itself",
+  description: "Pypus is an Managment software that automate daily operations. AI agents recover fees, enforce attendance, and onboard members automatically.",
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "Pypus — Where Your Business Runs Itself",
+    description: "Buisness managment software. AI agents that act, not just store data.",
+    url: "https://pypus.in",
+    siteName: "Pypus",
+    type: "website",
   },
 };
 
