@@ -37,6 +37,7 @@ export default async function HomePage({
       overview={overview}
       workspaceSlug={workspaceSlug}
       workspaceName={workspaceName}
+      workspaceId={workspaceId}
     />
   );
 }

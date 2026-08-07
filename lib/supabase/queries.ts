@@ -236,7 +236,7 @@ export async function getFeesForWorkspaceByMonth(
 ): Promise<FeeRecord[]> {
   const supabase = createServiceClient();
   const startDate = `${year}-${month.toString().padStart(2, "0")}-01`;
-  const endDate = new Date(year, month + 1, 0);
+  const endDate = new Date(year, month, 0);
   const endDateStr = endDate.toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("fees")

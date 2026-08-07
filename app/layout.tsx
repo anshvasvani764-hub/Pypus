@@ -14,8 +14,7 @@ export const metadata: Metadata = {
   title: "Pypus — Where Your Business Runs Itself",
   description: "Pypus is a Management software that automates daily operations. AI agents recover fees, enforce attendance, and onboard members automatically.",
   icons: {
-icons: {
-  icon: [
+    icon: [
     { url: "/favicon.ico", sizes: "any" },
     { url: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
   ],

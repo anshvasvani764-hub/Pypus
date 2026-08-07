@@ -65,10 +65,12 @@ export function HomeOverviewView({
   overview,
   workspaceSlug,
   workspaceName,
+  workspaceId,
 }: {
   overview: HomeOverview;
   workspaceSlug: string;
   workspaceName: string;
+  workspaceId: string;
 }) {
   const heroStats = [
     { label: "Active members", value: String(overview.activeMembers) },
@@ -77,8 +79,6 @@ export function HomeOverviewView({
       value: String(overview.presentToday),
       context: `${overview.presentTodayPct}%`,
     },
-    { label: "Collected this month", value: rupees(overview.collectedThisMonth) },
-    { label: "Pending dues", value: rupees(overview.pendingDues) },
   ];
 
   return (
@@ -108,6 +108,30 @@ export function HomeOverviewView({
             </p>
           </div>
         ))}
+
+        <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+          <p className="text-xs font-medium text-gray-500">Revenue</p>
+          <p className="mt-1.5 text-2xl font-semibold text-gray-900">
+            ₹{overview.revenue.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <div className="grid grid-cols-2">
+            <div className="px-5 py-4 border-r border-gray-100">
+              <p className="text-xs font-medium text-gray-500">Profit</p>
+              <p className={`mt-1.5 text-2xl font-semibold ${(overview.revenue - overview.expenses) < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                ₹{(overview.revenue - overview.expenses).toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-xs font-medium text-gray-500">Expenses</p>
+              <p className="mt-1.5 text-2xl font-semibold text-red-600">
+                ₹{overview.expenses.toLocaleString("en-IN")}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 2 — Needs attention */}

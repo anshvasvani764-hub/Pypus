@@ -82,6 +82,7 @@ export default async function MembersPage({
     <MemberRegistryView
       members={members}
       workspaceSlug={workspaceSlug}
+      workspaceId={workspaceId}
       attendanceMap={attendanceMap}
       feeStatusMap={feeStatusMap}
       planNameMap={planNameMap}

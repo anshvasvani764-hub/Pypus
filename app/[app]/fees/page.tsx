@@ -4,7 +4,7 @@ import { FeesDashboardView } from "@/components/mobile/FeesDashboardView.mobile"
 import { getMembers, getFeesForWorkspace, getFeesForWorkspaceByMonth, getMonthlyRevenue } from "@/lib/supabase/queries";
 import { getDevice } from "@/lib/device";
 import { deriveFeeSummary } from "@/lib/members/fee-status";
-import type { FeeRecord } from "@/lib/members/types";
+import { getISTDateString } from "@/lib/utils/date";
 
 export default async function FeesPage({
   params,
@@ -35,8 +35,9 @@ export default async function FeesPage({
   const currentYear = now.getFullYear();
   const monthFees = await getFeesForWorkspaceByMonth(workspaceId, currentMonth, currentYear);
   const expectedRevenue = monthFees.reduce((s, f) => s + (f.amount_snapshot ?? 0), 0);
+  const todayStr = getISTDateString();
   const pendingCollection = monthFees
-    .filter((f) => f.status !== "paid")
+    .filter((f) => f.status !== "paid" && f.due_date <= todayStr)
     .reduce((s, f) => s + ((f.amount_snapshot ?? 0) - (f.paid_amount ?? 0)), 0);
 
   if ((await getDevice()) === "mobile") {
@@ -54,7 +55,7 @@ export default async function FeesPage({
     });
 
     const pendingDues = monthFees
-      .filter((f) => f.status !== "paid")
+      .filter((f) => f.status !== "paid" && f.due_date <= todayStr)
       .reduce((s, f) => s + ((f.amount_snapshot ?? 0) - (f.paid_amount ?? 0)), 0);
 
     const overdueCount = monthFees.filter((f) => f.status === "overdue").length;

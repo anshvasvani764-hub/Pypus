@@ -94,20 +94,12 @@ export function HomeOverviewViewMobile({
       <div className="px-ve-margin">
         <div className="grid grid-cols-2 gap-ve-gutter">
           <StatCard
-            href={`${base}/fees`}
-            label="Collected"
-            value={rupees(overview.collectedThisMonth)}
-            sub="This month"
-            icon={CreditCard}
-            gradient="from-ve-primary to-ve-on-primary-container"
-          />
-          <StatCard
-            href={`${base}/fees`}
-            label="Pending dues"
-            value={rupees(overview.pendingDues)}
-            sub={`${overview.fees.pendingMembers} members`}
-            icon={Clock}
-            gradient="from-ve-secondary to-ve-on-secondary-fixed-variant"
+            href={`${base}/members`}
+            label="Active members"
+            value={String(overview.activeMembers)}
+            sub={`${overview.presentToday} present today`}
+            icon={Users}
+            gradient="from-ve-on-background to-ve-inverse-surface"
           />
           <StatCard
             href={`${base}/fees`}
@@ -117,14 +109,23 @@ export function HomeOverviewViewMobile({
             icon={TrendingUp}
             gradient="from-ve-tertiary to-ve-on-tertiary-container"
           />
-          <StatCard
-            href={`${base}/members`}
-            label="Active members"
-            value={String(overview.activeMembers)}
-            sub={`${overview.presentToday} present today`}
-            icon={Users}
-            gradient="from-ve-on-background to-ve-inverse-surface"
-          />
+        </div>
+
+        <div className="mt-ve-gutter rounded-ve-lg border border-ve-outline-variant/20 bg-white overflow-hidden">
+          <div className="grid grid-cols-2">
+            <div className="px-4 py-3 border-r border-ve-outline-variant/20">
+              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Profit</p>
+              <p className={`text-lg font-black mt-1 ${(overview.revenue - overview.expenses) < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                ₹{Math.abs(overview.revenue - overview.expenses).toLocaleString("en-IN")}
+              </p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Expenses</p>
+              <p className="text-lg font-black mt-1 text-red-600">
+                ₹{overview.expenses.toLocaleString("en-IN")}
+              </p>
+            </div>
+          </div>
         </div>
 
         <section className="mt-ve-xl">

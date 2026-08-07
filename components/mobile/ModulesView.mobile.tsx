@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Search, Users, CalendarCheck, CreditCard, MoreHorizontal, Sparkles, ArrowRight } from 'lucide-react'
+import { Search, Users, CalendarCheck, CreditCard, Wallet, MoreHorizontal, Sparkles, ArrowRight } from 'lucide-react'
 
 interface Props {
   workspaceSlug: string
@@ -19,8 +19,8 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
       icon: Users,
       title: 'Members',
       description: 'Manage your gym members',
-      accent: 'from-emerald-500 to-emerald-700',
-      shadow: 'shadow-[0_8px_24px_rgba(16,185,129,0.25)]',
+      accent: 'from-blue-500 to-blue-700',
+      shadow: 'shadow-[0_8px_24px_rgba(59,130,246,0.25)]',
     },
     {
       href: `/${workspaceSlug}/attendance`,
@@ -35,8 +35,16 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
       icon: CreditCard,
       title: 'Fees',
       description: 'Payments & billing',
-      accent: 'from-amber-500 to-orange-600',
-      shadow: 'shadow-[0_8px_24px_rgba(245,158,11,0.25)]',
+      accent: 'from-emerald-500 to-emerald-700',
+      shadow: 'shadow-[0_8px_24px_rgba(16,185,129,0.25)]',
+    },
+    {
+      href: `/${workspaceSlug}/expenses`,
+      icon: Wallet,
+      title: 'Expenses',
+      description: 'Track expenses',
+      accent: 'from-red-500 to-red-700',
+      shadow: 'shadow-[0_8px_24px_rgba(239,68,68,0.25)]',
     },
     {
       href: `/${workspaceSlug}/team`,

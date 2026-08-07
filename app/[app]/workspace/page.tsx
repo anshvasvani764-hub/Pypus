@@ -51,6 +51,15 @@ export default async function WorkspacePage({
             iconBg={m.iconBg}
             iconColor={m.iconColor}
             href={`/${workspaceSlug}/${m.slug}`}
+            accent={
+              m.slug === "expenses"
+                ? "red"
+                : m.slug === "fees"
+                ? "emerald"
+                : m.slug === "members" || m.slug === "attendance"
+                ? "blue"
+                : "emerald"
+            }
           />
         ))}
         <ModuleCard
@@ -60,6 +69,7 @@ export default async function WorkspacePage({
           iconBg="bg-purple-50"
           iconColor="text-purple-600"
           href={`/${workspaceSlug}/team`}
+          accent="purple"
         />
         <ModuleCard
           title={COMING_SOON_CARD.title}

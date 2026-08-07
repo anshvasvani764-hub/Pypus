@@ -1,6 +1,8 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { getISTDateString } from "@/lib/utils/date";
 import { deriveFeeSummary } from "@/lib/members/fee-status";
+import { getMonthlyRevenue } from "@/lib/supabase/queries";
+import { getExpensesForMonth } from "@/lib/expenses/queries";
 import type { Member, FeeRecord, AttendanceRecord } from "@/lib/members/types";
 
 export interface AttentionItem {
@@ -22,6 +24,13 @@ export interface HomeOverview {
   presentTodayPct: number;
   collectedThisMonth: number;
   pendingDues: number;
+  /** Revenue for the selected month (cash basis — sum of paid_amount for fees paid that month). */
+  revenue: number;
+  /** Expenses for the selected month (sum of amount for expenses where status = 'paid' and paid_date in that month). */
+  expenses: number;
+  /** Selected month/year the revenue/expenses were computed for. */
+  month: number;
+  year: number;
   attention: AttentionItem[];
   members: {
     totalActive: number;
@@ -50,12 +59,25 @@ function shiftDate(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function getHomeOverview(workspaceId: string): Promise<HomeOverview> {
+export async function getHomeOverview(
+  workspaceId: string,
+  month?: number,
+  year?: number
+): Promise<HomeOverview> {
   const supabase = createServiceClient();
   const today = getISTDateString();
   const monthStart = `${today.slice(0, 7)}-01`;
   const weekStart = shiftDate(today, -6);
   const thirtyDaysAgo = shiftDate(today, -30);
+
+  // Selected month for the Revenue vs Expenses card (defaults to current month).
+  const now = new Date();
+  const selectedMonth = month ?? now.getMonth() + 1;
+  const selectedYear = year ?? now.getFullYear();
+  const [revenue, expenses] = await Promise.all([
+    getMonthlyRevenue(workspaceId, selectedMonth, selectedYear),
+    getExpensesForMonth(workspaceId, selectedMonth, selectedYear),
+  ]);
 
   const [membersRes, feesRes, attendanceRes] = await Promise.all([
     supabase
@@ -226,6 +248,10 @@ export async function getHomeOverview(workspaceId: string): Promise<HomeOverview
     presentTodayPct,
     collectedThisMonth,
     pendingDues,
+    revenue,
+    expenses,
+    month: selectedMonth,
+    year: selectedYear,
     attention,
     members: { totalActive: activeMembers, newThisMonth, planBreakdown },
     fees: {

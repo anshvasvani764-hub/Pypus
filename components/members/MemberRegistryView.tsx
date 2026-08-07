@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Users, UserPlus } from "lucide-react";
 import { MemberSearchBar } from "./MemberSearchBar";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
+import { AddMemberModal } from "./AddMemberModal";
+import { createMember } from "@/app/actions/member-admin";
 import type { Member } from "@/lib/members/types";
 import type { DerivedFeeStatus } from "@/lib/members/fee-status";
 
 interface MemberRegistryViewProps {
   members: Member[];
   workspaceSlug: string;
+  workspaceId: string;
   attendanceMap: Record<string, { total: number; percentage: number }>;
   feeStatusMap: Record<string, DerivedFeeStatus>;
   planNameMap: Record<string, string | null>;
@@ -65,12 +69,15 @@ function filterMembers(
 export function MemberRegistryView({
   members,
   workspaceSlug,
+  workspaceId,
   attendanceMap,
   feeStatusMap,
   planNameMap,
 }: MemberRegistryViewProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const filtered = useMemo(
     () => filterMembers(members, activeFilter, query, attendanceMap, feeStatusMap),
@@ -87,6 +94,13 @@ export function MemberRegistryView({
             {members.length} member{members.length !== 1 ? "s" : ""} in your gym
           </p>
         </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <UserPlus className="h-4 w-4" />
+          Add Member
+        </button>
       </div>
 
       {/* Search + Filters */}
@@ -128,6 +142,18 @@ export function MemberRegistryView({
           Showing {filtered.length} of {members.length} members
         </p>
       )}
+
+      <AddMemberModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={async (data) => {
+          const result = await createMember(workspaceId, data);
+          if (result.success) {
+            router.refresh();
+          }
+          return result;
+        }}
+      />
     </div>
   );
 }

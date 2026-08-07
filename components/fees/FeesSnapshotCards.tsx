@@ -23,6 +23,14 @@ export function FeesSnapshotCards({
 }: FeesSnapshotCardsProps) {
   const cards = [
     {
+      label: "Expected Revenue",
+      value: formatCurrency(expectedRevenue),
+      context: "per month",
+      icon: TrendingUp,
+      iconColor: "text-emerald-600",
+      iconBg: "bg-emerald-50",
+    },
+    {
       label: "Fees Collected",
       value: formatCurrency(feesCollected),
       context: "this month",
@@ -36,14 +44,6 @@ export function FeesSnapshotCards({
       icon: Clock,
       iconColor: "text-amber-600",
       iconBg: "bg-amber-50",
-    },
-    {
-      label: "Expected Revenue",
-      value: formatCurrency(expectedRevenue),
-      context: "per month",
-      icon: TrendingUp,
-      iconColor: "text-emerald-600",
-      iconBg: "bg-emerald-50",
     },
   ];
 

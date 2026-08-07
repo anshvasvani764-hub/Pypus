@@ -23,9 +23,11 @@ const CYCLE_DAYS: Record<string, number> = {
   yearly: 365,
 };
 
+export { CYCLE_DAYS };
+
 /** Plan duration lives on `plans`, not on the fee row, so callers that know the
  *  member's plan pass it in; without it we assume a monthly cycle. */
-function toMonthlyValue(fee: FeeRecord | null, planDuration?: string): number {
+export function toMonthlyValue(fee: FeeRecord | null, planDuration?: string): number {
   if (!fee) return 0;
   const days = CYCLE_DAYS[planDuration ?? ""] ?? 30;
   return ((fee.amount_snapshot ?? 0) * 30) / days;

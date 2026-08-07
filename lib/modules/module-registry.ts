@@ -1,7 +1,7 @@
-import { Users, Clock, CreditCard, Sparkles } from "lucide-react";
+import { Users, Clock, CreditCard, Sparkles, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type ModuleSlug = "members" | "attendance" | "fees";
+export type ModuleSlug = "members" | "attendance" | "fees" | "expenses";
 
 export interface ModuleRegistryEntry {
   slug: ModuleSlug;
@@ -19,8 +19,8 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
     title: "Members",
     description: "Members, dues, memberships and history",
     icon: Users,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
     requiredPermission: "members.view",
   },
   {
@@ -28,8 +28,8 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
     title: "Attendance",
     description: "Daily check-ins for members and staff",
     icon: Clock,
-    iconBg: "bg-emerald-50",
-    iconColor: "text-emerald-600",
+    iconBg: "bg-blue-50",
+    iconColor: "text-blue-600",
     requiredPermission: "attendance.view",
   },
   {
@@ -40,6 +40,15 @@ export const MODULE_REGISTRY: ModuleRegistryEntry[] = [
     iconBg: "bg-emerald-50",
     iconColor: "text-emerald-600",
     requiredPermission: "fees.view",
+  },
+  {
+    slug: "expenses",
+    title: "Expenses",
+    description: "Track fixed, one-time and monthly expenses",
+    icon: Wallet,
+    iconBg: "bg-red-50",
+    iconColor: "text-red-600",
+    requiredPermission: "expenses.view",
   },
 ];
 
