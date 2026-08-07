@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Expense, ExpenseCategory } from "@/lib/expenses/types";
+import type { Expense, ExpenseCategory, ExpenseType, ExpenseStatus } from "@/lib/expenses/types";
 
 interface EditExpenseModalProps {
   isOpen: boolean;
@@ -11,8 +11,8 @@ interface EditExpenseModalProps {
     title: string;
     amount: number;
     categoryId: string;
-    type: "one_time" | "fixed" | "monthly_variable";
-    status: "paid" | "pending" | "overdue";
+    type: ExpenseType;
+    status: ExpenseStatus;
     dueDate: string;
     notes: string | null;
   }) => Promise<{ success: boolean; error?: string }>;
@@ -46,11 +46,11 @@ function ExpenseDialog({
   const [title, setTitle] = useState(expense?.title ?? "");
   const [amount, setAmount] = useState(String(expense?.amount ?? ""));
   const [categoryId, setCategoryId] = useState(expense?.category_id ?? "");
-  const [type, setType] = useState<"one_time" | "fixed" | "monthly_variable">(
-    (expense?.type as typeof type) ?? "one_time"
+  const [type, setType] = useState<ExpenseType>(
+    (expense?.type as ExpenseType) ?? "one_time"
   );
-  const [status, setStatus] = useState<"paid" | "pending" | "overdue">(
-    (defaultStatus as typeof status) ?? "pending"
+  const [status, setStatus] = useState<ExpenseStatus>(
+    (defaultStatus as ExpenseStatus) ?? "pending"
   );
   const [dueDate, setDueDate] = useState(expense?.due_date ?? "");
   const [notes, setNotes] = useState(expense?.notes ?? "");
@@ -141,7 +141,7 @@ function ExpenseDialog({
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as typeof type)}
+                onChange={(e) => setType(e.target.value as ExpenseType)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               >
                 <option value="one_time">One Time</option>
@@ -153,7 +153,7 @@ function ExpenseDialog({
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as typeof status)}
+                onChange={(e) => setStatus(e.target.value as ExpenseStatus)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               >
                 <option value="pending">Pending</option>
