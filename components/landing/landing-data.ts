@@ -83,33 +83,43 @@ export interface PricingPlan {
   featured?: boolean;
   ctaLabel: string;
   ctaHref: string;
+  blurred?: boolean;
+  blurLabel?: string;
 }
 
 export const PRICING_PLANS: PricingPlan[] = [
   {
     name: "Starter",
-    price: "₹999",
-    period: "Up to 100 members",
-    features: ["All 5 automations", "1 staff login", "Email support"],
+    price: "₹499",
+    period: "Coming soon",
+    features: ["All 5 automations", "Limited logins", "Basic support"],
     ctaLabel: "Start free trial",
     ctaHref: "/login",
+    blurred: true,
+    blurLabel: "Revealing Soon",
   },
   {
     name: "Growth",
-    price: "₹2,499",
-    period: "Up to 500 members",
-    features: ["All 5 automations", "5 staff logins", "WhatsApp fee reminders", "Priority support"],
+    price: "₹999",
+    period: "Access to every feature",
+    features: [
+      "Access to every feature",
+      "24/7 support",
+      "One branch / franchise allowed",
+    ],
     featured: true,
-    ctaLabel: "Start free trial",
+    ctaLabel: "Start 14-day free trial",
     ctaHref: "/login",
   },
   {
     name: "Scale",
-    price: "₹4,999",
-    period: "Unlimited members, multi-branch",
-    features: ["All 5 automations", "Unlimited staff logins", "Multi-branch reporting", "Dedicated onboarding"],
+    price: "₹3,999",
+    period: "Coming soon",
+    features: ["All 5 automations", "Unlimited branches", "Dedicated manager"],
     ctaLabel: "Talk to us",
     ctaHref: "/login",
+    blurred: true,
+    blurLabel: "Revealing Soon",
   },
 ];
 // TODO(Ansh): confirm final pricing before launch — these numbers came from

@@ -272,26 +272,34 @@ export default function LandingPage() {
             {PRICING_PLANS.map((plan) => (
               <Reveal
                 key={plan.name}
-                className={`${styles["price-card"]} ${plan.featured ? styles.featured : ""}`}
+                className={`${styles["price-card"]} ${plan.featured ? styles.featured : ""} ${plan.blurred ? styles.blurredCard : ""}`}
               >
-                {plan.featured && <span className={styles["price-badge"]}>MOST PICKED</span>}
-                <h3>{plan.name}</h3>
-                <div className={styles["price-amount"]}>
-                  {plan.price}<span style={{ fontSize: 16, fontWeight: 600 }}>/mo</span>
+                <div className={styles.cardContent}>
+                  {plan.featured && <span className={styles["price-badge"]}>MOST PICKED</span>}
+                  <h3>{plan.name}</h3>
+                  <div className={styles["price-amount"]}>
+                    {plan.price}<span style={{ fontSize: 16, fontWeight: 600 }}>/mo</span>
+                  </div>
+                  <div className={styles["price-period"]}>{plan.period}</div>
+                  <ul className={styles["price-features"]}>
+                    {plan.features.map((f) => (
+                      <li key={f}><span className={styles.check}>✓</span>{f}</li>
+                    ))}
+                  </ul>
+                  <a
+                    href={plan.ctaHref}
+                    className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
+                    style={{ width: "100%" }}
+                  >
+                    {plan.ctaLabel}
+                  </a>
                 </div>
-                <div className={styles["price-period"]}>{plan.period}</div>
-                <ul className={styles["price-features"]}>
-                  {plan.features.map((f) => (
-                    <li key={f}><span className={styles.check}>✓</span>{f}</li>
-                  ))}
-                </ul>
-                <a
-                  href={plan.ctaHref}
-                  className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
-                  style={{ width: "100%" }}
-                >
-                  {plan.ctaLabel}
-                </a>
+                {plan.blurred && (
+                  <div className={styles.blurOverlay}>
+                    <span className={styles.lockIcon}>🔒</span>
+                    <span className={styles.blurText}>{plan.blurLabel || "Coming Soon"}</span>
+                  </div>
+                )}
               </Reveal>
             ))}
           </div>
