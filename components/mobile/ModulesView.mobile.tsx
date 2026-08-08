@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Search, Users, CalendarCheck, CreditCard, Wallet, MoreHorizontal, Sparkles, ArrowRight } from 'lucide-react'
+import { Users, CalendarCheck, CreditCard, Wallet, MoreHorizontal, Sparkles, ArrowRight } from 'lucide-react'
 
 interface Props {
   workspaceSlug: string
@@ -67,9 +67,8 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-black text-ve-primary text-xl">Pypus</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-ve-primary/5 transition-colors active:scale-95">
-            <Search size={20} className="text-ve-primary" />
-          </button>
+          {/* placeholder to keep header layout balanced */}
+          <div className="w-10 h-10" />
         </div>
       </header>
 

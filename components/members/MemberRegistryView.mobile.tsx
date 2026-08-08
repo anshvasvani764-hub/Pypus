@@ -95,10 +95,12 @@ export function MemberRegistryViewMobile({
             className="absolute top-1/2 left-4 -translate-y-1/2 text-ve-on-surface-variant/60"
           />
           <input
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
             placeholder="Search by name, phone or email"
-            className="h-14 w-full rounded-ve border-2 border-ve-outline-variant/30 bg-ve-surface-container-lowest pr-4 pl-12 text-ve-body text-ve-on-surface outline-none focus:border-ve-primary"
+            className="h-14 w-full rounded-ve border-2 border-ve-outline-variant/30 bg-ve-surface-container-lowest pr-4 pl-12 text-ve-body text-ve-on-surface outline-none focus:border-ve-primary [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
 
