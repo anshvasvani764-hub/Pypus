@@ -195,7 +195,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- HOW IT WORKS ---------- */}
-      <section id="how" style={{ background: "var(--cream-2)" }}>
+      <section id="how" style={{ background: "rgba(21,20,15,0.78)" }}>
         <div className={styles.wrap}>
           <Reveal className={styles["section-head"]}>
             <span className={styles.eyebrow}>SETUP</span>
@@ -230,9 +230,18 @@ export default function LandingPage() {
               <Reveal key={i} className={styles["testi-card"]}>
                 <p className={styles["testi-quote"]}>&quot;{t.quote}&quot;</p>
                 <div className={styles["testi-person"]}>
-                  <div className={styles["testi-avatar"]}>
-                    {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
+                  {t.photo ? (
+                    <img
+                      src={t.photo}
+                      alt={`${t.name} logo`}
+                      className={styles["testi-avatar"]}
+                      style={{ objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div className={styles["testi-avatar"]}>
+                      {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <div className={styles["testi-name"]}>{t.name}</div>
                     <div className={styles["testi-role"]}>{t.role}</div>
@@ -245,7 +254,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------- PRICING ---------- */}
-      <section id="pricing" style={{ background: "var(--cream-2)", position: "relative", overflow: "hidden" }}>
+      <section id="pricing" style={{ background: "rgba(21,20,15,0.78)", position: "relative", overflow: "hidden" }}>
         <div
           className={styles["glow-orb"]}
           style={{ width: 420, height: 420, background: "radial-gradient(circle,rgba(16,185,129,0.16),transparent 70%)", bottom: -160, left: -100 }}

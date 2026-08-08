@@ -1,0 +1,1633 @@
+diff --git a/components/landing/LandingPage.tsx b/components/landing/LandingPage.tsx
+index df2eb94..b61de46 100644
+--- a/components/landing/LandingPage.tsx
++++ b/components/landing/LandingPage.tsx
+@@ -195,7 +195,7 @@ export default function LandingPage() {
+       </section>
+ 
+       {/* ---------- HOW IT WORKS ---------- */}
+-      <section id="how" style={{ background: "var(--cream-2)" }}>
++      <section id="how" style={{ background: "rgba(21,20,15,0.78)" }}>
+         <div className={styles.wrap}>
+           <Reveal className={styles["section-head"]}>
+             <span className={styles.eyebrow}>SETUP</span>
+@@ -230,9 +230,18 @@ export default function LandingPage() {
+               <Reveal key={i} className={styles["testi-card"]}>
+                 <p className={styles["testi-quote"]}>&quot;{t.quote}&quot;</p>
+                 <div className={styles["testi-person"]}>
+-                  <div className={styles["testi-avatar"]}>
+-                    {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+-                  </div>
++                  {t.photo ? (
++                    <img
++                      src={t.photo}
++                      alt={`${t.name} logo`}
++                      className={styles["testi-avatar"]}
++                      style={{ objectFit: "cover" }}
++                    />
++                  ) : (
++                    <div className={styles["testi-avatar"]}>
++                      {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
++                    </div>
++                  )}
+                   <div>
+                     <div className={styles["testi-name"]}>{t.name}</div>
+                     <div className={styles["testi-role"]}>{t.role}</div>
+@@ -245,7 +254,7 @@ export default function LandingPage() {
+       </section>
+ 
+       {/* ---------- PRICING ---------- */}
+-      <section id="pricing" style={{ background: "var(--cream-2)", position: "relative", overflow: "hidden" }}>
++      <section id="pricing" style={{ background: "rgba(21,20,15,0.78)", position: "relative", overflow: "hidden" }}>
+         <div
+           className={styles["glow-orb"]}
+           style={{ width: 420, height: 420, background: "radial-gradient(circle,rgba(16,185,129,0.16),transparent 70%)", bottom: -160, left: -100 }}
+diff --git a/components/landing/landing-data.ts b/components/landing/landing-data.ts
+index 7f527a9..f821ec5 100644
+--- a/components/landing/landing-data.ts
++++ b/components/landing/landing-data.ts
+@@ -5,23 +5,24 @@
+ // ─────────────────────────────────────────────────────────────────
+ 
+ export const STATS = [
+-  { count: 120, decimal: 0, suffix: "+", label: "Gyms & academies onboarded" },
+-  { count: 18000, decimal: 0, suffix: "+", label: "Members managed daily" },
+-  { count: 99.9, decimal: 1, suffix: "%", label: "Uptime this year" },
++  { count: 2, decimal: 0, suffix: "", label: "Gyms live on free trial" },
++  { count: 15, decimal: 0, suffix: "+", label: "Gyms visited across Gurugram" },
++  { count: 5, decimal: 0, suffix: "", label: "Modules — one connected system" },
+   { count: 24, decimal: 0, suffix: "hr", label: "Average setup time" },
+ ];
+-// TODO(Ansh): these numbers are placeholder demo numbers. Replace with your
+-// real current figures before this goes live — don't ship fake stats.
++// NOTE(Ansh): these are your real early numbers as of Aug 2026. Update
++// "Gyms live on free trial" as you close more — don't inflate this, small
++// honest numbers build more trust with gym owners than fake big ones.
+ 
+ export const PROOF_LOGOS = [
+-  "11F UNISEX GYM",
++  "MGL FITNESS STUDIO",
++  "POWERHOUSE GYM",
++  "11F FITNESS",
++  "ENERGY FITNESS",
+   "HR ACADEMY",
+-  "PULSE FITNESS",
+-  "IRONCORE STUDIO",
+-  "FLEXPOINT",
+ ];
+-// TODO(Ansh): replace with your actual paying/trial client names once you
+-// have permission to display them publicly.
++// Real trial gyms + HR Academy (Ansh's own venture) — updated Aug 2026.
++// Add new names here as more gyms come on trial.
+ 
+ export const MODULES = [
+   { code: "[MEM]", accent: "#3B82F6", title: "Members", desc: "Full profiles, plans, and join/renewal history in one searchable list." },
+@@ -45,23 +46,32 @@ export interface Testimonial {
+   photo?: string;
+ }
+ 
+-// ⚠️ PLACEHOLDER DATA — these are NOT real reviews. Ansh will replace every
+-// entry here with a real client quote (and ideally a real photo) before launch.
++// Real feedback from gyms on the Pypus trial — collected by Ansh during
++// in-person visits and WhatsApp check-ins.
+ export const TESTIMONIALS: Testimonial[] = [
+   {
+-    quote: "REPLACE ME — real client quote goes here.",
+-    name: "Client name",
+-    role: "Role, Gym name",
++    quote: "Since we started using Pypus, our day-to-day gym work gets done a lot faster.",
++    name: "MGL Fitness Studio",
++    role: "Gym on free trial",
++    photo: "/testimonials/mgl-fitness-studio.png",
+   },
+   {
+-    quote: "REPLACE ME — real client quote goes here.",
+-    name: "Client name",
+-    role: "Role, Gym name",
++    quote: "The tracking has genuinely helped us stay on top of dues and attendance.",
++    name: "Powerhouse Gym",
++    role: "Gym on free trial",
++    photo: "/testimonials/powerhouse-gym.png",
+   },
+   {
+-    quote: "REPLACE ME — real client quote goes here.",
+-    name: "Client name",
+-    role: "Role, Gym name",
++    quote: "The automation is really helpful — it saves us time every single day.",
++    name: "11F Fitness",
++    role: "Unisex gym, on free trial",
++    photo: "/testimonials/11f-fitness.png",
++  },
++  {
++    quote: "It's simple to use, and it makes running the gym a lot easier for our team.",
++    name: "Energy Fitness",
++    role: "Gym on free trial",
++    photo: "/testimonials/energy-fitness.png",
+   },
+ ];
+ 
+@@ -110,23 +120,43 @@ export interface FaqItem {
+   answer: string;
+ }
+ 
+-// ⚠️ PLACEHOLDER DATA — replace every question/answer with real FAQs you've
+-// actually gotten from prospects during door-to-door outreach.
++// Drafted from the questions gym owners actually ask during door-to-door
++// outreach. Ansh — tweak wording/pricing details if anything's changed, but
++// these are ready to ship, not placeholders.
+ export const FAQ_ITEMS: FaqItem[] = [
+   {
+-    question: "REPLACE ME — real question goes here?",
+-    answer: "REPLACE ME — real answer goes here.",
++    question: "How is this better than running my gym on a register or Excel?",
++    answer:
++      "It removes the manual work. Attendance logs itself when a member checks in, dues track themselves the moment a payment lands, and your monthly report is already built instead of something you piece together by hand.",
++  },
++  {
++    question: "Can I try it for free?",
++    answer:
++      "Yes — you get a 14-day trial that's completely free, no card required. You're treated exactly like a paying gym during the trial and get access to every feature, not a limited demo version.",
++  },
++  {
++    question: "Do I have to move all my member data in at once?",
++    answer:
++      "No. Upload your existing member list from Excel or a WhatsApp export and we map it into Pypus for you. You can also add members one by one as they walk in — there's no big-bang migration required.",
++  },
++  {
++    question: "What if my staff isn't comfortable with new software?",
++    answer:
++      "Pypus is built for a front desk, not a developer. Checking a member in is one tap. Most staff are comfortable within their first shift, and there's no training manual to read first.",
+   },
+   {
+-    question: "REPLACE ME — real question goes here?",
+-    answer: "REPLACE ME — real answer goes here.",
++    question: "Is my members' data safe and private?",
++    answer:
++      "Your data is stored on secure, access-controlled infrastructure and only your workspace can see it. Staff logins have role-based permissions, so front desk staff only see what they need to.",
+   },
+   {
+-    question: "REPLACE ME — real question goes here?",
+-    answer: "REPLACE ME — real answer goes here.",
++    question: "What happens if I want to cancel?",
++    answer:
++      "There's no lock-in contract. If you ever want to stop, you can export your member and payment data and cancel any time — no long-term commitment required.",
+   },
+   {
+-    question: "REPLACE ME — real question goes here?",
+-    answer: "REPLACE ME — real answer goes here.",
++    question: "Does it work if I have more than one branch?",
++    answer:
++      "Yes — the Scale plan supports unlimited staff logins and multi-branch reporting, so you can see attendance, payments and revenue across every branch from one dashboard.",
+   },
+ ];
+diff --git a/components/landing/landing.module.css b/components/landing/landing.module.css
+index cc1fdee..8810ef4 100644
+--- a/components/landing/landing.module.css
++++ b/components/landing/landing.module.css
+@@ -338,7 +338,7 @@
+   .mod-card .accent-bar{position:absolute;top:0;left:0;width:100%;height:3px;}
+ 
+   /* ---------- SHOWCASE (device mockup) ---------- */
+-  .showcase{position:relative;overflow:hidden;background:var(--cream-2);}
++  .showcase{position:relative;overflow:hidden;background:rgba(21,20,15,0.78);}
+   .showcase .glow-orb.s1{width:460px;height:460px;background:radial-gradient(circle,rgba(5,150,105,0.18),transparent 70%);top:-160px;left:-120px;animation:auroraDrift1 26s ease-in-out infinite;}
+   .showcase .glow-orb.s2{width:340px;height:340px;background:radial-gradient(circle,rgba(139,92,246,0.10),transparent 70%);bottom:-140px;right:-80px;animation:auroraDrift2 22s ease-in-out infinite reverse;}
+   .showcase-inner{position:relative;z-index:1;}
+diff --git a/components/layout/AnimatedStat.tsx b/components/layout/AnimatedStat.tsx
+deleted file mode 100644
+index 03379bb..0000000
+--- a/components/layout/AnimatedStat.tsx
++++ /dev/null
+@@ -1,56 +0,0 @@
+-"use client";
+-
+-import { useEffect, useRef, useState } from "react";
+-import styles from "./landing.module.css";
+-
+-export default function AnimatedStat({
+-  count,
+-  decimal = 0,
+-  suffix,
+-  label,
+-}: {
+-  count: number;
+-  decimal?: number;
+-  suffix: string;
+-  label: string;
+-}) {
+-  const ref = useRef<HTMLDivElement>(null);
+-  const [value, setValue] = useState(0);
+-
+-  useEffect(() => {
+-    const el = ref.current;
+-    if (!el) return;
+-    const io = new IntersectionObserver(
+-      (entries) => {
+-        entries.forEach((entry) => {
+-          if (!entry.isIntersecting) return;
+-          io.unobserve(entry.target);
+-          const duration = 1400;
+-          const start = performance.now();
+-          function tick(now: number) {
+-            const p = Math.min((now - start) / duration, 1);
+-            const eased = 1 - Math.pow(1 - p, 3);
+-            setValue(count * eased);
+-            if (p < 1) requestAnimationFrame(tick);
+-          }
+-          requestAnimationFrame(tick);
+-        });
+-      },
+-      { threshold: 0.4 }
+-    );
+-    io.observe(el);
+-    return () => io.disconnect();
+-  }, [count]);
+-
+-  const display = decimal ? value.toFixed(decimal) : Math.round(value).toLocaleString("en-IN");
+-
+-  return (
+-    <div>
+-      <div className={styles["stat-num"]} ref={ref}>
+-        {display}
+-        <span className={styles.suffix}>{suffix}</span>
+-      </div>
+-      <div className={styles["stat-label"]}>{label}</div>
+-    </div>
+-  );
+-}
+diff --git a/components/layout/AuroraBackground.tsx b/components/layout/AuroraBackground.tsx
+deleted file mode 100644
+index e3816ce..0000000
+--- a/components/layout/AuroraBackground.tsx
++++ /dev/null
+@@ -1,47 +0,0 @@
+-"use client";
+-
+-import { useEffect, useRef } from "react";
+-import styles from "./landing.module.css";
+-
+-/**
+- * Fixed, full-viewport animated gradient background.
+- * Reacts subtly to scroll position (hue-rotate + drift) via a CSS var.
+- * Respects prefers-reduced-motion automatically (handled in landing.module.css).
+- */
+-export default function AuroraBackground() {
+-  const shiftRef = useRef<HTMLDivElement>(null);
+-
+-  useEffect(() => {
+-    let ticking = false;
+-
+-    function update() {
+-      const doc = document.documentElement;
+-      const maxScroll = doc.scrollHeight - doc.clientHeight;
+-      const progress = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+-      shiftRef.current?.style.setProperty("--scrollP", progress.toFixed(4));
+-      ticking = false;
+-    }
+-
+-    function onScroll() {
+-      if (!ticking) {
+-        requestAnimationFrame(update);
+-        ticking = true;
+-      }
+-    }
+-
+-    update();
+-    window.addEventListener("scroll", onScroll, { passive: true });
+-    return () => window.removeEventListener("scroll", onScroll);
+-  }, []);
+-
+-  return (
+-    <div className={styles.aurora} aria-hidden="true">
+-      <div className={styles["aurora-shift"]} ref={shiftRef}>
+-        <div className={`${styles["aurora-blob"]} ${styles.a1}`} />
+-        <div className={`${styles["aurora-blob"]} ${styles.a2}`} />
+-        <div className={`${styles["aurora-blob"]} ${styles.a3}`} />
+-        <div className={`${styles["aurora-blob"]} ${styles.a4}`} />
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/components/layout/FaqAccordion.tsx b/components/layout/FaqAccordion.tsx
+deleted file mode 100644
+index f004601..0000000
+--- a/components/layout/FaqAccordion.tsx
++++ /dev/null
+@@ -1,33 +0,0 @@
+-"use client";
+-
+-import { useState } from "react";
+-import styles from "./landing.module.css";
+-import { FAQ_ITEMS } from "./landing-data";
+-
+-export default function FaqAccordion() {
+-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+-
+-  return (
+-    <div className={styles["faq-list"]}>
+-      {FAQ_ITEMS.map((item, i) => {
+-        const open = openIndex === i;
+-        return (
+-          <div
+-            key={i}
+-            className={`${styles["faq-item"]} ${open ? styles.open : ""}`}
+-          >
+-            <button
+-              className={styles["faq-q"]}
+-              onClick={() => setOpenIndex(open ? null : i)}
+-            >
+-              {item.question} <span className={styles.plus}>+</span>
+-            </button>
+-            <div className={styles["faq-a"]}>
+-              <p>{item.answer}</p>
+-            </div>
+-          </div>
+-        );
+-      })}
+-    </div>
+-  );
+-}
+diff --git a/components/layout/HeroAssembly.tsx b/components/layout/HeroAssembly.tsx
+deleted file mode 100644
+index a2b18e9..0000000
+--- a/components/layout/HeroAssembly.tsx
++++ /dev/null
+@@ -1,44 +0,0 @@
+-"use client";
+-
+-import { useEffect, useRef } from "react";
+-import styles from "./landing.module.css";
+-
+-const TILES = [
+-  { key: "t1", label: "Members", dotColor: "#3B82F6" },
+-  { key: "t2", label: "Attendance", dotColor: "#10B981" },
+-  { key: "t3", label: "Payments", dotColor: "#F59E0B" },
+-  { key: "t4", label: "Reports", dotColor: "#8B5CF6" },
+-  { key: "t5", label: "Expenses", dotColor: "#EC4899" },
+-];
+-
+-export default function HeroAssembly() {
+-  const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
+-
+-  useEffect(() => {
+-    tileRefs.current.forEach((tile) => {
+-      if (!tile) return;
+-      requestAnimationFrame(() => tile.classList.add(styles.landed));
+-      const onEnd = (e: TransitionEvent) => {
+-        if (e.propertyName === "transform") tile.classList.add(styles.settled);
+-      };
+-      tile.addEventListener("transitionend", onEnd);
+-    });
+-  }, []);
+-
+-  return (
+-    <div className={styles.assembly} aria-hidden="true">
+-      <div className={styles["assembly-frame"]}>
+-        {TILES.map((tile, i) => (
+-          <div
+-            key={tile.key}
+-            ref={(el) => { tileRefs.current[i] = el; }}
+-            className={`${styles["mod-tile"]} ${styles[tile.key]}`}
+-          >
+-            <span className={styles.dot} style={{ background: tile.dotColor }} />
+-            {tile.label}
+-          </div>
+-        ))}
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/components/layout/LandingHeader.tsx b/components/layout/LandingHeader.tsx
+deleted file mode 100644
+index 8cd6650..0000000
+--- a/components/layout/LandingHeader.tsx
++++ /dev/null
+@@ -1,66 +0,0 @@
+-"use client";
+-
+-import { useEffect, useState } from "react";
+-import styles from "./landing.module.css";
+-
+-export default function LandingHeader() {
+-  const [scrolled, setScrolled] = useState(false);
+-  const [menuOpen, setMenuOpen] = useState(false);
+-
+-  useEffect(() => {
+-    function onScroll() {
+-      setScrolled(window.scrollY > 12);
+-    }
+-    onScroll();
+-    window.addEventListener("scroll", onScroll, { passive: true });
+-    return () => window.removeEventListener("scroll", onScroll);
+-  }, []);
+-
+-  return (
+-    <header className={`${scrolled ? styles.scrolled : ""}`}>
+-      <nav>
+-        <a href="/" className={styles.logo}>
+-          <span className={styles["logo-mark"]}>P</span>Pypus
+-        </a>
+-
+-        <ul
+-          className={styles["nav-links"]}
+-          style={
+-            menuOpen
+-              ? {
+-                  display: "flex",
+-                  flexDirection: "column",
+-                  position: "fixed",
+-                  top: 64,
+-                  left: 0,
+-                  right: 0,
+-                  background: "#08080A",
+-                  padding: "20px 24px",
+-                  borderBottom: "1px solid var(--line)",
+-                  gap: 18,
+-                }
+-              : undefined
+-          }
+-        >
+-          <li><a href="#modules">Modules</a></li>
+-          <li><a href="#how">How it works</a></li>
+-          <li><a href="#pricing">Pricing</a></li>
+-          <li><a href="#faq">FAQ</a></li>
+-        </ul>
+-
+-        <div className={styles["nav-cta-group"]}>
+-          <a href="/login" className={styles.login}>Log in</a>
+-          <a href="/login" className={`${styles.btn} ${styles["btn-primary"]}`}>Start free</a>
+-        </div>
+-
+-        <button
+-          className={styles.hamburger}
+-          aria-label="Menu"
+-          onClick={() => setMenuOpen((o) => !o)}
+-        >
+-          <span />
+-        </button>
+-      </nav>
+-    </header>
+-  );
+-}
+diff --git a/components/layout/LandingPage.tsx b/components/layout/LandingPage.tsx
+deleted file mode 100644
+index c662ace..0000000
+--- a/components/layout/LandingPage.tsx
++++ /dev/null
+@@ -1,356 +0,0 @@
+-"use client";
+-
+-import { useEffect } from "react";
+-import styles from "./landing.module.css";
+-import AuroraBackground from "./AuroraBackground";
+-import LandingHeader from "./LandingHeader";
+-import HeroAssembly from "./HeroAssembly";
+-import Reveal from "./Reveal";
+-import AnimatedStat from "./AnimatedStat";
+-import FaqAccordion from "./FaqAccordion";
+-import { inter, jetbrainsMono } from "./fonts";
+-import {
+-  STATS,
+-  PROOF_LOGOS,
+-  MODULES,
+-  STEPS,
+-  TESTIMONIALS,
+-  PRICING_PLANS,
+-} from "./landing-data";
+-
+-export default function LandingPage() {
+-  // smooth-scroll only while this page is mounted, so it never leaks to
+-  // the rest of the app (dashboard / workstation etc.)
+-  useEffect(() => {
+-    const prev = document.documentElement.style.scrollBehavior;
+-    document.documentElement.style.scrollBehavior = "smooth";
+-    return () => {
+-      document.documentElement.style.scrollBehavior = prev;
+-    };
+-  }, []);
+-
+-  return (
+-    <div className={`${styles.landingRoot} ${inter.variable} ${jetbrainsMono.variable}`}>
+-      <AuroraBackground />
+-      <LandingHeader />
+-
+-      {/* ---------- HERO ---------- */}
+-      <section className={styles.hero}>
+-        <div className={`${styles["glow-orb"]} ${styles.g1}`} />
+-        <div className={`${styles["glow-orb"]} ${styles.g2}`} />
+-        <div className={styles["hero-inner"]}>
+-          <div>
+-            <span className={styles.eyebrow}>WHERE YOUR BUSINESS RUNS ITSELF</span>
+-            <h1>One dashboard where your <em>entire gym</em> comes to life.</h1>
+-            <p className={styles["hero-sub"]}>
+-              From the member who walks in this morning to the report you check before bed —
+-              members, attendance, payments and growth, all living in one calm, connected system.
+-            </p>
+-            <div className={styles["hero-ctas"]}>
+-              <a href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</a>
+-              <a href="#how" className={`${styles.btn} ${styles["btn-ghost"]}`}>Watch 2-min demo</a>
+-            </div>
+-            <p className={styles["hero-note"]}>Trusted by gym owners across Gurugram · Live in under 24 hours</p>
+-          </div>
+-          <HeroAssembly />
+-        </div>
+-      </section>
+-
+-      {/* ---------- SOCIAL PROOF MARQUEE ---------- */}
+-      <div className={styles.proof}>
+-        <p className={styles["proof-label"]}>Trusted by gyms and academies across NCR</p>
+-        <div className={styles.marquee}>
+-          {[...PROOF_LOGOS, ...PROOF_LOGOS].map((name, i) => (
+-            <span key={i}>{name}</span>
+-          ))}
+-        </div>
+-      </div>
+-
+-      {/* ---------- STATS ---------- */}
+-      <div className={`${styles.stats} ${styles.reveal} ${styles.in}`}>
+-        <div className={`${styles.wrap} ${styles["stats-grid"]}`}>
+-          {STATS.map((s, i) => (
+-            <AnimatedStat key={i} count={s.count} decimal={s.decimal} suffix={s.suffix} label={s.label} />
+-          ))}
+-        </div>
+-      </div>
+-
+-      {/* ---------- PROBLEM / SOLUTION ---------- */}
+-      <section>
+-        <div className={styles.wrap}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>THE SHIFT</span>
+-            <h2>The morning your gym starts running itself.</h2>
+-            <p>Three small moments, happening quietly, every single day.</p>
+-          </Reveal>
+-          <div className={styles["ps-grid"]}>
+-            <Reveal className={styles["ps-card"]}>
+-              <span className={styles["ps-tag"]}>MORNING CHECK-IN</span>
+-              <h3>Every member, welcomed in one tap</h3>
+-              <p>Your front desk taps a name, attendance logs itself, and streaks build automatically — a warm, effortless start to every member&apos;s day.</p>
+-              <div className={styles["ps-tagline"]}>Powered by the Attendance module</div>
+-            </Reveal>
+-            <Reveal className={styles["ps-card"]}>
+-              <span className={styles["ps-tag"]}>FEE DAY</span>
+-              <h3>Dues that quietly track themselves</h3>
+-              <p>The moment a payment lands, it&apos;s recorded. The moment one&apos;s coming due, you&apos;ll already know — calm and on time, every month.</p>
+-              <div className={styles["ps-tagline"]}>Powered by the Payments module</div>
+-            </Reveal>
+-            <Reveal className={styles["ps-card"]}>
+-              <span className={styles["ps-tag"]}>MONTH END</span>
+-              <h3>A report that&apos;s already waiting for you</h3>
+-              <p>Revenue, retention and attendance trends update live, so closing the month takes minutes — and reads like good news.</p>
+-              <div className={styles["ps-tagline"]}>Powered by the Reports module</div>
+-            </Reveal>
+-          </div>
+-        </div>
+-      </section>
+-
+-      {/* ---------- MODULES ---------- */}
+-      <section id="modules" style={{ position: "relative", overflow: "hidden" }}>
+-        <div
+-          className={styles["glow-orb"]}
+-          style={{ width: 380, height: 380, background: "radial-gradient(circle,rgba(139,92,246,0.14),transparent 70%)", top: -100, right: -120 }}
+-        />
+-        <div className={styles.wrap} style={{ position: "relative", zIndex: 1 }}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>THE SYSTEM</span>
+-            <h2>Five modules. One dashboard.</h2>
+-            <p>Each module works standalone, but they&apos;re built to snap together — so member data, payments and reports always stay in sync.</p>
+-          </Reveal>
+-          <div className={styles["mod-grid"]}>
+-            {MODULES.map((m) => (
+-              <Reveal key={m.code} className={styles["mod-card"]}>
+-                <div className={styles["accent-bar"]} style={{ background: m.accent }} />
+-                <span className={styles.code}>{m.code}</span>
+-                <h3>{m.title}</h3>
+-                <p>{m.desc}</p>
+-              </Reveal>
+-            ))}
+-            <Reveal
+-              className={styles["mod-card"]}
+-              style={{ display: "flex", flexDirection: "column", justifyContent: "center", background: "var(--emerald-tint)", border: "1px dashed var(--emerald)" }}
+-            >
+-              <span className={styles.code} style={{ borderColor: "var(--emerald)", color: "var(--emerald-dark)" }}>[NEW]</span>
+-              <h3 style={{ color: "var(--emerald-dark)" }}>More modules coming</h3>
+-              <p>Staff payroll and lead pipeline modules are next — same system, no migration.</p>
+-            </Reveal>
+-          </div>
+-        </div>
+-      </section>
+-
+-      {/* ---------- SHOWCASE (device mockup) ---------- */}
+-      <section className={styles.showcase}>
+-        <div className={`${styles["glow-orb"]} ${styles.s1}`} />
+-        <div className={`${styles["glow-orb"]} ${styles.s2}`} />
+-        <div className={`${styles.wrap} ${styles["showcase-inner"]}`}>
+-          <Reveal className={styles["section-head"]} style={{ margin: "0 auto 0", textAlign: "center", maxWidth: 640 }}>
+-            <span className={styles.eyebrow}>SEE IT COME TOGETHER</span>
+-            <h2>Everything your front desk needs, on every screen.</h2>
+-            <p>The same dashboard your team checks in members on today follows you to your phone tonight — nothing to sync, nothing to remember.</p>
+-          </Reveal>
+-          <Reveal as="div" className={styles["device-stage"]}>
+-            <div className={styles.laptop}>
+-              <div className={styles["laptop-screen"]}>
+-                <div className={styles["laptop-inner"]}>
+-                  <div className={styles["laptop-topbar"]}><span /><span /><span /></div>
+-                  <div className={styles["laptop-body"]}>
+-                    <div className={styles["laptop-sidebar"]}>
+-                      <div className={`${styles["side-item"]} ${styles.active}`} />
+-                      <div className={styles["side-item"]} />
+-                      <div className={styles["side-item"]} />
+-                      <div className={styles["side-item"]} />
+-                    </div>
+-                    <div className={styles["laptop-main"]}>
+-                      <div className={styles["laptop-cards"]}>
+-                        <div className={styles.card}><div className={styles.n} /><div className={styles.l} /></div>
+-                        <div className={styles.card}><div className={styles.n} /><div className={styles.l} /></div>
+-                        <div className={styles.card}><div className={styles.n} /><div className={styles.l} /></div>
+-                      </div>
+-                      <div className={styles["laptop-chart"]}>
+-                        {[40, 65, 50, 80, 55, 90, 70, 60].map((h, i) => (
+-                          <i key={i} style={{ height: `${h}%` }} />
+-                        ))}
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              </div>
+-              <div className={styles["laptop-base"]} />
+-            </div>
+-            <div className={styles.phone}>
+-              <div className={styles["phone-screen"]}>
+-                <div className={styles["phone-top"]}><div className={styles.n} /></div>
+-                <div className={styles["phone-list"]}>
+-                  <div className={`${styles["phone-row"]} ${styles.done}`}><div className={styles.avatar} /><div className={styles.bar} /></div>
+-                  <div className={`${styles["phone-row"]} ${styles.done}`}><div className={styles.avatar} /><div className={styles.bar} /></div>
+-                  <div className={styles["phone-row"]}><div className={styles.avatar} /><div className={styles.bar} /></div>
+-                  <div className={styles["phone-row"]}><div className={styles.avatar} /><div className={styles.bar} /></div>
+-                </div>
+-              </div>
+-            </div>
+-          </Reveal>
+-        </div>
+-      </section>
+-
+-      {/* ---------- HOW IT WORKS ---------- */}
+-      <section id="how" style={{ background: "rgba(21,20,15,0.78)" }}>
+-        <div className={styles.wrap}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>SETUP</span>
+-            <h2>Live in three steps.</h2>
+-          </Reveal>
+-          <div className={styles.steps}>
+-            {STEPS.map((s, i) => (
+-              <Reveal key={i} className={styles.step}>
+-                <span className={styles["step-num"]}>{s.num}</span>
+-                <h3>{s.title}</h3>
+-                <p>{s.desc}</p>
+-                {i < STEPS.length - 1 && <div className={styles["step-line"]} />}
+-              </Reveal>
+-            ))}
+-          </div>
+-        </div>
+-      </section>
+-
+-      {/* ---------- TESTIMONIALS ---------- */}
+-      <section style={{ position: "relative", overflow: "hidden" }}>
+-        <div
+-          className={styles["glow-orb"]}
+-          style={{ width: 340, height: 340, background: "radial-gradient(circle,rgba(245,158,11,0.10),transparent 70%)", top: -80, left: "50%", transform: "translateX(-50%)" }}
+-        />
+-        <div className={styles.wrap} style={{ position: "relative", zIndex: 1 }}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>FROM OWNERS</span>
+-            <h2>What gym owners actually say.</h2>
+-          </Reveal>
+-          <div className={styles["testi-grid"]}>
+-            {TESTIMONIALS.map((t, i) => (
+-              <Reveal key={i} className={styles["testi-card"]}>
+-                <p className={styles["testi-quote"]}>&quot;{t.quote}&quot;</p>
+-                <div className={styles["testi-person"]}>
+-                  {t.photo ? (
+-                    <img
+-                      src={t.photo}
+-                      alt={`${t.name} logo`}
+-                      className={styles["testi-avatar"]}
+-                      style={{ objectFit: "cover" }}
+-                    />
+-                  ) : (
+-                    <div className={styles["testi-avatar"]}>
+-                      {t.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+-                    </div>
+-                  )}
+-                  <div>
+-                    <div className={styles["testi-name"]}>{t.name}</div>
+-                    <div className={styles["testi-role"]}>{t.role}</div>
+-                  </div>
+-                </div>
+-              </Reveal>
+-            ))}
+-          </div>
+-        </div>
+-      </section>
+-
+-      {/* ---------- PRICING ---------- */}
+-      <section id="pricing" style={{ background: "rgba(21,20,15,0.78)", position: "relative", overflow: "hidden" }}>
+-        <div
+-          className={styles["glow-orb"]}
+-          style={{ width: 420, height: 420, background: "radial-gradient(circle,rgba(16,185,129,0.16),transparent 70%)", bottom: -160, left: -100 }}
+-        />
+-        <div className={styles.wrap} style={{ position: "relative", zIndex: 1 }}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>PRICING</span>
+-            <h2>Pay for what you switch on.</h2>
+-            <p>Every plan includes all five modules. The difference is scale and support.</p>
+-          </Reveal>
+-          <div className={styles["pricing-grid"]}>
+-            {PRICING_PLANS.map((plan) => (
+-              <Reveal
+-                key={plan.name}
+-                className={`${styles["price-card"]} ${plan.featured ? styles.featured : ""}`}
+-              >
+-                {plan.featured && <span className={styles["price-badge"]}>MOST PICKED</span>}
+-                <h3>{plan.name}</h3>
+-                <div className={styles["price-amount"]}>
+-                  {plan.price}<span style={{ fontSize: 16, fontWeight: 600 }}>/mo</span>
+-                </div>
+-                <div className={styles["price-period"]}>{plan.period}</div>
+-                <ul className={styles["price-features"]}>
+-                  {plan.features.map((f) => (
+-                    <li key={f}><span className={styles.check}>✓</span>{f}</li>
+-                  ))}
+-                </ul>
+-                <a
+-                  href={plan.ctaHref}
+-                  className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
+-                  style={{ width: "100%" }}
+-                >
+-                  {plan.ctaLabel}
+-                </a>
+-              </Reveal>
+-            ))}
+-          </div>
+-        </div>
+-      </section>
+-
+-      {/* ---------- FAQ ---------- */}
+-      <section id="faq">
+-        <div className={styles.wrap}>
+-          <Reveal className={styles["section-head"]}>
+-            <span className={styles.eyebrow}>QUESTIONS</span>
+-            <h2>Before you ask.</h2>
+-          </Reveal>
+-          <FaqAccordion />
+-        </div>
+-      </section>
+-
+-      {/* ---------- FINAL CTA ---------- */}
+-      <section>
+-        <div className={styles.wrap}>
+-          <Reveal className={styles["final-cta"]}>
+-            <h2>Your gym, finally running like one system.</h2>
+-            <p>Set up your first module in under 10 minutes, and watch your front desk, fees and reports fall quietly into place.</p>
+-            <div className={styles["hero-ctas"]}>
+-              <a href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</a>
+-              <a href="/login" className={`${styles.btn} ${styles["btn-ghost"]}`} style={{ borderColor: "rgba(245,244,239,0.3)", color: "#F5F4EF" }}>Talk to sales</a>
+-            </div>
+-          </Reveal>
+-        </div>
+-      </section>
+-
+-      {/* ---------- FOOTER ---------- */}
+-      <footer>
+-        <div className={styles.wrap}>
+-          <div className={styles["footer-grid"]}>
+-            <div className={styles["footer-brand"]}>
+-              <a href="/" className={styles.logo}><span className={styles["logo-mark"]}>P</span>Pypus</a>
+-              <p>Where your business runs itself. One quiet, connected system for gyms and service businesses.</p>
+-            </div>
+-            <div className={styles["footer-col"]}>
+-              <h4>PRODUCT</h4>
+-              <a href="#modules">Modules</a>
+-              <a href="#pricing">Pricing</a>
+-              <a href="#how">How it works</a>
+-            </div>
+-            <div className={styles["footer-col"]}>
+-              <h4>COMPANY</h4>
+-              <a href="/about">About</a>
+-              <a href="/contact">Contact</a>
+-              <a href="/careers">Careers</a>
+-            </div>
+-            <div className={styles["footer-col"]}>
+-              <h4>LEGAL</h4>
+-              <a href="/privacy-policy">Privacy Policy</a>
+-              <a href="/terms-conditions">Terms & Conditions</a>
+-            </div>
+-          </div>
+-          <div className={styles["footer-bottom"]}>
+-            <span>© {new Date().getFullYear()} Pypus. All rights reserved.</span>
+-            <span>Made in Gurugram</span>
+-          </div>
+-        </div>
+-      </footer>
+-    </div>
+-  );
+-}
+diff --git a/components/layout/Reveal.tsx b/components/layout/Reveal.tsx
+deleted file mode 100644
+index 8d83319..0000000
+--- a/components/layout/Reveal.tsx
++++ /dev/null
+@@ -1,47 +0,0 @@
+-"use client";
+-
+-import { useEffect, useRef, useState, type ReactNode, type ElementType } from "react";
+-import styles from "./landing.module.css";
+-
+-export default function Reveal({
+-  children,
+-  as: Tag = "div",
+-  className = "",
+-  style,
+-}: {
+-  children: ReactNode;
+-  as?: ElementType;
+-  className?: string;
+-  style?: React.CSSProperties;
+-}) {
+-  const ref = useRef<HTMLElement | null>(null);
+-  const [inView, setInView] = useState(false);
+-
+-  useEffect(() => {
+-    const el = ref.current;
+-    if (!el) return;
+-    const io = new IntersectionObserver(
+-      (entries) => {
+-        entries.forEach((entry) => {
+-          if (entry.isIntersecting) {
+-            setInView(true);
+-            io.unobserve(entry.target);
+-          }
+-        });
+-      },
+-      { threshold: 0.15 }
+-    );
+-    io.observe(el);
+-    return () => io.disconnect();
+-  }, []);
+-
+-  return (
+-    <Tag
+-      ref={ref}
+-      className={`${styles.reveal} ${inView ? styles.in : ""} ${className}`}
+-      style={style}
+-    >
+-      {children}
+-    </Tag>
+-  );
+-}
+diff --git a/components/layout/fonts.ts b/components/layout/fonts.ts
+deleted file mode 100644
+index 1fe620c..0000000
+--- a/components/layout/fonts.ts
++++ /dev/null
+@@ -1,15 +0,0 @@
+-import { Inter, JetBrains_Mono } from "next/font/google";
+-
+-export const inter = Inter({
+-  subsets: ["latin"],
+-  weight: ["400", "500", "600", "700", "800"],
+-  variable: "--font-inter",
+-  display: "swap",
+-});
+-
+-export const jetbrainsMono = JetBrains_Mono({
+-  subsets: ["latin"],
+-  weight: ["400", "500", "600"],
+-  variable: "--font-jetbrains-mono",
+-  display: "swap",
+-});
+diff --git a/components/layout/landing-data.ts b/components/layout/landing-data.ts
+deleted file mode 100644
+index f821ec5..0000000
+--- a/components/layout/landing-data.ts
++++ /dev/null
+@@ -1,162 +0,0 @@
+-// ─────────────────────────────────────────────────────────────────
+-// EDIT THIS FILE to update landing page content — no code changes needed
+-// elsewhere. TESTIMONIALS and FAQ_ITEMS below are PLACEHOLDERS — replace
+-// every single one with a real client review / real FAQ before launch.
+-// ─────────────────────────────────────────────────────────────────
+-
+-export const STATS = [
+-  { count: 2, decimal: 0, suffix: "", label: "Gyms live on free trial" },
+-  { count: 15, decimal: 0, suffix: "+", label: "Gyms visited across Gurugram" },
+-  { count: 5, decimal: 0, suffix: "", label: "Modules — one connected system" },
+-  { count: 24, decimal: 0, suffix: "hr", label: "Average setup time" },
+-];
+-// NOTE(Ansh): these are your real early numbers as of Aug 2026. Update
+-// "Gyms live on free trial" as you close more — don't inflate this, small
+-// honest numbers build more trust with gym owners than fake big ones.
+-
+-export const PROOF_LOGOS = [
+-  "MGL FITNESS STUDIO",
+-  "POWERHOUSE GYM",
+-  "11F FITNESS",
+-  "ENERGY FITNESS",
+-  "HR ACADEMY",
+-];
+-// Real trial gyms + HR Academy (Ansh's own venture) — updated Aug 2026.
+-// Add new names here as more gyms come on trial.
+-
+-export const MODULES = [
+-  { code: "[MEM]", accent: "#3B82F6", title: "Members", desc: "Full profiles, plans, and join/renewal history in one searchable list." },
+-  { code: "[ATT]", accent: "#10B981", title: "Attendance", desc: "One-tap check-ins with automatic streaks and no-show alerts." },
+-  { code: "[PAY]", accent: "#F59E0B", title: "Payments", desc: "Track dues, partial payments and fee status — clear, calm and always current." },
+-  { code: "[REP]", accent: "#8B5CF6", title: "Reports", desc: "Revenue, retention and attendance trends — updated live, exportable anytime." },
+-  { code: "[EXP]", accent: "#EC4899", title: "Expenses", desc: "Log rent, staff and equipment costs, and watch your real monthly profit take shape." },
+-];
+-
+-export const STEPS = [
+-  { num: "01 — Import", title: "Bring your existing data", desc: "Upload your member list from Excel or WhatsApp exports. We map it into the system for you." },
+-  { num: "02 — Configure", title: "Pick your modules", desc: "Turn on only what you need — Members and Payments today, add Reports next month." },
+-  { num: "03 — Go live", title: "Start checking members in", desc: "Your front desk starts using it the same day. No training manual required." },
+-];
+-
+-export interface Testimonial {
+-  quote: string;
+-  name: string;
+-  role: string;
+-  /** optional real photo path, e.g. "/testimonials/rohit-kapoor.jpg" — falls back to initials avatar if omitted */
+-  photo?: string;
+-}
+-
+-// Real feedback from gyms on the Pypus trial — collected by Ansh during
+-// in-person visits and WhatsApp check-ins.
+-export const TESTIMONIALS: Testimonial[] = [
+-  {
+-    quote: "Since we started using Pypus, our day-to-day gym work gets done a lot faster.",
+-    name: "MGL Fitness Studio",
+-    role: "Gym on free trial",
+-    photo: "/testimonials/mgl-fitness-studio.png",
+-  },
+-  {
+-    quote: "The tracking has genuinely helped us stay on top of dues and attendance.",
+-    name: "Powerhouse Gym",
+-    role: "Gym on free trial",
+-    photo: "/testimonials/powerhouse-gym.png",
+-  },
+-  {
+-    quote: "The automation is really helpful — it saves us time every single day.",
+-    name: "11F Fitness",
+-    role: "Unisex gym, on free trial",
+-    photo: "/testimonials/11f-fitness.png",
+-  },
+-  {
+-    quote: "It's simple to use, and it makes running the gym a lot easier for our team.",
+-    name: "Energy Fitness",
+-    role: "Gym on free trial",
+-    photo: "/testimonials/energy-fitness.png",
+-  },
+-];
+-
+-export interface PricingPlan {
+-  name: string;
+-  price: string;
+-  period: string;
+-  features: string[];
+-  featured?: boolean;
+-  ctaLabel: string;
+-  ctaHref: string;
+-}
+-
+-export const PRICING_PLANS: PricingPlan[] = [
+-  {
+-    name: "Starter",
+-    price: "₹999",
+-    period: "Up to 100 members",
+-    features: ["All 5 modules", "1 staff login", "Email support"],
+-    ctaLabel: "Start free trial",
+-    ctaHref: "/login",
+-  },
+-  {
+-    name: "Growth",
+-    price: "₹2,499",
+-    period: "Up to 500 members",
+-    features: ["All 5 modules", "5 staff logins", "WhatsApp fee reminders", "Priority support"],
+-    featured: true,
+-    ctaLabel: "Start free trial",
+-    ctaHref: "/login",
+-  },
+-  {
+-    name: "Scale",
+-    price: "₹4,999",
+-    period: "Unlimited members, multi-branch",
+-    features: ["All 5 modules", "Unlimited staff logins", "Multi-branch reporting", "Dedicated onboarding"],
+-    ctaLabel: "Talk to us",
+-    ctaHref: "/login",
+-  },
+-];
+-// TODO(Ansh): confirm final pricing before launch — these numbers came from
+-// the original design mock, not a locked pricing decision.
+-
+-export interface FaqItem {
+-  question: string;
+-  answer: string;
+-}
+-
+-// Drafted from the questions gym owners actually ask during door-to-door
+-// outreach. Ansh — tweak wording/pricing details if anything's changed, but
+-// these are ready to ship, not placeholders.
+-export const FAQ_ITEMS: FaqItem[] = [
+-  {
+-    question: "How is this better than running my gym on a register or Excel?",
+-    answer:
+-      "It removes the manual work. Attendance logs itself when a member checks in, dues track themselves the moment a payment lands, and your monthly report is already built instead of something you piece together by hand.",
+-  },
+-  {
+-    question: "Can I try it for free?",
+-    answer:
+-      "Yes — you get a 14-day trial that's completely free, no card required. You're treated exactly like a paying gym during the trial and get access to every feature, not a limited demo version.",
+-  },
+-  {
+-    question: "Do I have to move all my member data in at once?",
+-    answer:
+-      "No. Upload your existing member list from Excel or a WhatsApp export and we map it into Pypus for you. You can also add members one by one as they walk in — there's no big-bang migration required.",
+-  },
+-  {
+-    question: "What if my staff isn't comfortable with new software?",
+-    answer:
+-      "Pypus is built for a front desk, not a developer. Checking a member in is one tap. Most staff are comfortable within their first shift, and there's no training manual to read first.",
+-  },
+-  {
+-    question: "Is my members' data safe and private?",
+-    answer:
+-      "Your data is stored on secure, access-controlled infrastructure and only your workspace can see it. Staff logins have role-based permissions, so front desk staff only see what they need to.",
+-  },
+-  {
+-    question: "What happens if I want to cancel?",
+-    answer:
+-      "There's no lock-in contract. If you ever want to stop, you can export your member and payment data and cancel any time — no long-term commitment required.",
+-  },
+-  {
+-    question: "Does it work if I have more than one branch?",
+-    answer:
+-      "Yes — the Scale plan supports unlimited staff logins and multi-branch reporting, so you can see attendance, payments and revenue across every branch from one dashboard.",
+-  },
+-];
+diff --git a/components/layout/landing.module.css b/components/layout/landing.module.css
+deleted file mode 100644
+index 199f6a6..0000000
+--- a/components/layout/landing.module.css
++++ /dev/null
+@@ -1,552 +0,0 @@
+-:root{
+-    --cream:#0B0B08;
+-    --cream-2:#15140F;
+-    --ink:#F5F4EF;
+-    --ink-soft:#C4C3B9;
+-    --muted:#96968C;
+-    --emerald:#10B981;
+-    --emerald-dark:#059669;
+-    --emerald-tint:#0F2A21;
+-    --line:rgba(255,255,255,0.09);
+-    --line-strong:rgba(255,255,255,0.16);
+-    --radius:20px;
+-    --ease:cubic-bezier(.2,.7,.2,1);
+-  }
+-  .landingRoot, .landingRoot *{box-sizing:border-box;margin:0;padding:0;}
+-  
+-  .landingRoot{
+-    font-family:var(--font-inter),-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+-    background:#08080A;
+-    color:var(--ink);
+-    -webkit-font-smoothing:antialiased;
+-    overflow-x:clip;
+-    position:relative;
+-    isolation:isolate;
+-  }
+-  /* subtle film-grain texture over the whole page for a premium, non-flat feel */
+-  .landingRoot::before{
+-    content:'';position:fixed;inset:0;z-index:2147483000;pointer-events:none;
+-    opacity:0.045;mix-blend-mode:overlay;
+-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+-  }
+-  .mono{font-family:var(--font-jetbrains-mono),monospace;}
+-  .landingRoot a{color:inherit;text-decoration:none;}
+-  .landingRoot img{max-width:100%;display:block;}
+-  .landingRoot ul{list-style:none;}
+-  .landingRoot button{font-family:inherit;cursor:pointer;border:none;background:none;}
+-  .wrap{max-width:1160px;margin:0 auto;padding:0 24px;}
+-  .landingRoot :focus-visible{outline:2px solid var(--emerald);outline-offset:3px;border-radius:4px;}
+-
+-  @media (prefers-reduced-motion: reduce){
+-    *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important;}
+-  }
+-
+-  /* ---------- AURORA BACKGROUND (fixed, animated, scroll-reactive) ---------- */
+-  .aurora{
+-    position:fixed;inset:0;z-index:-1;overflow:hidden;
+-    background:#08080A;
+-  }
+-  .aurora::before{
+-    /* base faint grid so the black never reads as totally flat */
+-    content:'';position:absolute;inset:0;
+-    background-image:
+-      linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),
+-      linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);
+-    background-size:64px 64px;
+-    -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 90%);
+-    mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 90%);
+-  }
+-  .aurora-blob{
+-    position:absolute;border-radius:50%;
+-    filter:blur(90px);
+-    will-change:transform,opacity;
+-    mix-blend-mode:screen;
+-  }
+-  .aurora-blob.a1{
+-    width:60vw;height:60vw;max-width:820px;max-height:820px;
+-    top:-18vh;left:-10vw;
+-    background:radial-gradient(circle,rgba(16,185,129,0.34),transparent 68%);
+-    animation:auroraDrift1 22s ease-in-out infinite;
+-  }
+-  .aurora-blob.a2{
+-    width:52vw;height:52vw;max-width:720px;max-height:720px;
+-    top:10vh;right:-14vw;
+-    background:radial-gradient(circle,rgba(139,92,246,0.26),transparent 68%);
+-    animation:auroraDrift2 26s ease-in-out infinite;
+-  }
+-  .aurora-blob.a3{
+-    width:46vw;height:46vw;max-width:640px;max-height:640px;
+-    bottom:-14vh;left:12vw;
+-    background:radial-gradient(circle,rgba(59,130,246,0.2),transparent 68%);
+-    animation:auroraDrift3 30s ease-in-out infinite;
+-  }
+-  .aurora-blob.a4{
+-    width:38vw;height:38vw;max-width:520px;max-height:520px;
+-    bottom:-10vh;right:6vw;
+-    background:radial-gradient(circle,rgba(236,72,153,0.16),transparent 68%);
+-    animation:auroraDrift1 24s ease-in-out infinite reverse;
+-  }
+-  @keyframes auroraDrift1{
+-    0%,100%{transform:translate(0,0) scale(1);}
+-    33%{transform:translate(4vw,3vh) scale(1.08);}
+-    66%{transform:translate(-3vw,5vh) scale(0.96);}
+-  }
+-  @keyframes auroraDrift2{
+-    0%,100%{transform:translate(0,0) scale(1);}
+-    50%{transform:translate(-5vw,-4vh) scale(1.1);}
+-  }
+-  @keyframes auroraDrift3{
+-    0%,100%{transform:translate(0,0) scale(1);}
+-    40%{transform:translate(3vw,-3vh) scale(0.94);}
+-    70%{transform:translate(-4vw,2vh) scale(1.05);}
+-  }
+-  /* scroll-linked reactivity - JS sets --scrollP (0 to 1, scroll progress down the page)
+-     on .aurora-shift. This slowly rotates the hue and nudges position so the gradient
+-     visibly "moves" and shifts colour the further down the page you scroll. */
+-  .aurora-shift{
+-    position:absolute;inset:-10vh -10vw;
+-    transform:translate(
+-      calc(var(--scrollP,0) * -30px),
+-      calc(var(--scrollP,0) * -50px)
+-    );
+-    filter:hue-rotate(calc(var(--scrollP,0) * 45deg));
+-    transition:transform .3s linear,filter .3s linear;
+-  }
+-  @media (prefers-reduced-motion: reduce){
+-    .aurora-blob{animation:none !important;}
+-    .aurora-shift{transform:none !important;filter:none !important;}
+-  }
+-
+-  /* ---------- NAV ---------- */
+-  .landingRoot header{
+-    position:sticky;top:0;z-index:100;
+-    background:rgba(11,11,8,0.75);
+-    backdrop-filter:blur(12px);
+-    border-bottom:1px solid transparent;
+-    transition:all .35s var(--ease);
+-  }
+-  header.scrolled{
+-    border-bottom:1px solid var(--line);
+-    box-shadow:0 1px 0 rgba(0,0,0,0.02);
+-  }
+-  .landingRoot nav{
+-    display:flex;align-items:center;justify-content:space-between;
+-    padding:20px 24px; max-width:1160px; margin:0 auto;
+-    transition:padding .35s var(--ease);
+-  }
+-  header.scrolled nav{padding:14px 24px;}
+-  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:18px;letter-spacing:-0.01em;}
+-  .logo-mark{
+-    width:30px;height:30px;border-radius:8px;background:var(--ink);
+-    display:flex;align-items:center;justify-content:center;
+-    color:var(--cream);font-family:var(--font-jetbrains-mono),monospace;font-weight:600;font-size:12px;
+-    flex-shrink:0;
+-  }
+-  .nav-links{display:flex;gap:36px;align-items:center;}
+-  .nav-links a{font-size:14.5px;font-weight:500;color:var(--ink-soft);transition:color .2s;}
+-  .nav-links a:hover{color:var(--ink);}
+-  .nav-cta-group{display:flex;align-items:center;gap:18px;}
+-  .nav-cta-group .login{font-size:14.5px;font-weight:500;color:var(--ink-soft);}
+-  .btn{
+-    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+-    padding:11px 20px;border-radius:100px;font-weight:600;font-size:14.5px;
+-    transition:transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+-    min-height:44px;
+-  }
+-  .btn-primary{background:var(--ink);color:var(--cream);}
+-  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,23,15,0.18);}
+-  .btn-primary:active{transform:translateY(0);}
+-  .btn-emerald{background:var(--emerald);color:#fff;}
+-  .btn-emerald:hover{background:var(--emerald-dark);transform:translateY(-1px);box-shadow:0 8px 24px rgba(5,150,105,0.28);}
+-  .btn-ghost{background:transparent;border:1.5px solid var(--line-strong);color:var(--ink);}
+-  .btn-ghost:hover{border-color:var(--ink);background:rgba(245,244,239,0.06);}
+-  .hamburger{display:none;width:44px;height:44px;align-items:center;justify-content:center;}
+-  .hamburger span, .hamburger span::before, .hamburger span::after{
+-    content:'';display:block;width:20px;height:2px;background:var(--ink);position:relative;transition:.25s;
+-  }
+-  .hamburger span::before{position:absolute;top:-6px;}
+-  .hamburger span::after{position:absolute;top:6px;}
+-
+-  /* ---------- AMBIENT GLOW ---------- */
+-  .glow-orb{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;z-index:0;}
+-  .hero{position:relative;overflow:hidden;}
+-  .hero .glow-orb.g1{width:420px;height:420px;background:radial-gradient(circle,rgba(52,211,153,0.28),transparent 70%);top:-120px;right:-80px;animation:auroraDrift2 20s ease-in-out infinite;}
+-  .hero .glow-orb.g2{width:340px;height:340px;background:radial-gradient(circle,rgba(139,92,246,0.22),transparent 70%);bottom:-140px;left:-100px;animation:auroraDrift3 24s ease-in-out infinite;}
+-  .hero-inner{position:relative;z-index:1;}
+-
+-  .hero{padding:88px 0 60px;position:relative;background:linear-gradient(160deg,#14140F 0%,#1C1A26 48%,#14140F 100%);}
+-  .hero::after{
+-    content:'';position:absolute;left:0;right:0;bottom:0;height:70px;
+-    background:linear-gradient(to bottom,transparent,var(--cream));pointer-events:none;z-index:0;
+-  }
+-  .hero .eyebrow{background:rgba(246,245,241,0.1);color:#6EE7B7;border:1px solid rgba(110,231,183,0.25);}
+-  .hero .eyebrow::before{background:#6EE7B7;}
+-  .hero h1{color:#F5F4EF;}
+-  .hero h1 em{color:#34D399;}
+-  .hero .hero-sub{color:rgba(246,245,241,0.68);}
+-  .hero .hero-note{color:rgba(246,245,241,0.45);}
+-  .hero .btn-ghost{border-color:rgba(246,245,241,0.28);color:#F5F4EF;}
+-  .hero .btn-ghost:hover{border-color:#F5F4EF;background:rgba(246,245,241,0.08);}
+-  .hero-inner{max-width:1160px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:1fr;gap:56px;}
+-  .eyebrow{
+-    display:inline-flex;align-items:center;gap:8px;
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:12px;font-weight:600;letter-spacing:0.08em;
+-    color:var(--emerald-dark);background:var(--emerald-tint);
+-    padding:7px 14px;border-radius:100px;margin-bottom:22px;
+-    opacity:0;transform:translateY(10px);animation:riseIn .6s var(--ease) forwards;
+-  }
+-  .eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--emerald);}
+-  .landingRoot h1{
+-    font-size:clamp(34px,5.4vw,60px);
+-    font-weight:800;letter-spacing:-0.03em;line-height:1.06;
+-    max-width:780px;
+-    opacity:0;transform:translateY(14px);animation:riseIn .7s .08s var(--ease) forwards;
+-  }
+-  .landingRoot h1 em{
+-    font-style:normal;color:var(--emerald);position:relative;
+-  }
+-  .hero-sub{
+-    margin-top:22px;font-size:18px;line-height:1.6;color:var(--ink-soft);max-width:560px;
+-    opacity:0;transform:translateY(14px);animation:riseIn .7s .16s var(--ease) forwards;
+-  }
+-  .hero-ctas{
+-    margin-top:32px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+-    opacity:0;transform:translateY(14px);animation:riseIn .7s .24s var(--ease) forwards;
+-  }
+-  .hero-note{margin-top:16px;font-size:13.5px;color:var(--muted);
+-    opacity:0;animation:riseIn .7s .3s var(--ease) forwards;}
+-  @keyframes riseIn{to{opacity:1;transform:translateY(0);}}
+-
+-  /* module assembly visual */
+-  .assembly{
+-    position:relative;height:400px;
+-    display:flex;align-items:center;justify-content:center;
+-  }
+-  .assembly-frame{
+-    width:260px;height:260px;border-radius:28px;
+-    border:1.5px dashed rgba(246,245,241,0.18);
+-    display:flex;align-items:center;justify-content:center;
+-    position:relative;
+-  }
+-  .assembly-frame::after{
+-    content:'PYP';font-family:var(--font-jetbrains-mono),monospace;font-size:13px;font-weight:600;
+-    color:rgba(246,245,241,0.4);letter-spacing:0.1em;
+-    opacity:0;animation:showCore 0.5s 1.9s var(--ease) forwards;
+-  }
+-  .mod-tile{
+-    position:absolute;
+-    width:112px;padding:14px 16px;
+-    background:#fff;border:1px solid var(--line);border-radius:14px;
+-    box-shadow:0 16px 40px rgba(0,0,0,0.45);
+-    font-size:12.5px;font-weight:600;color:#17170F;
+-    display:flex;align-items:center;gap:8px;
+-    opacity:0;
+-    transform:translate(var(--tx),var(--ty)) scale(.7);
+-    transition:opacity .7s var(--ease),transform .7s var(--ease);
+-    z-index:2;
+-  }
+-  .mod-tile.landed{
+-    opacity:1;
+-    transform:translate(calc(var(--tx)*0.14),calc(var(--ty)*0.14)) scale(1);
+-  }
+-  .mod-tile .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+-  .mod-tile.t1{--tx:-190px;--ty:-160px;background:#fff;transition-delay:.4s;}
+-  .mod-tile.t2{--tx:190px;--ty:-140px;transition-delay:.6s;}
+-  .mod-tile.t3{--tx:-210px;--ty:60px;transition-delay:.8s;}
+-  .mod-tile.t4{--tx:200px;--ty:80px;transition-delay:1.0s;}
+-  .mod-tile.t5{--tx:0px;--ty:-210px;transition-delay:1.2s;}
+-  @keyframes showCore{to{opacity:1;}}
+-  .mod-tile.t1 .dot{background:#3B82F6;}
+-  .mod-tile.t2 .dot{background:var(--emerald);}
+-  .mod-tile.t3 .dot{background:#F59E0B;}
+-  .mod-tile.t4 .dot{background:#8B5CF6;}
+-  .mod-tile.t5 .dot{background:#EC4899;}
+-  .mod-tile{will-change:transform;}
+-  /* gentle continuous float once tiles have landed */
+-  .mod-tile.t1.settled{animation:hoverFloat1 4.2s ease-in-out infinite;}
+-  .mod-tile.t2.settled{animation:hoverFloat2 3.6s ease-in-out infinite .2s;}
+-  .mod-tile.t3.settled{animation:hoverFloat3 4.8s ease-in-out infinite .1s;}
+-  .mod-tile.t4.settled{animation:hoverFloat4 3.9s ease-in-out infinite .3s;}
+-  .mod-tile.t5.settled{animation:hoverFloat5 4.4s ease-in-out infinite .15s;}
+-  @keyframes hoverFloat1{0%,100%{transform:translate(-26.6px,-22.4px) translateY(0);}50%{transform:translate(-26.6px,-22.4px) translateY(-9px);}}
+-  @keyframes hoverFloat2{0%,100%{transform:translate(26.6px,-19.6px) translateY(0);}50%{transform:translate(26.6px,-19.6px) translateY(-8px);}}
+-  @keyframes hoverFloat3{0%,100%{transform:translate(-29.4px,8.4px) translateY(0);}50%{transform:translate(-29.4px,8.4px) translateY(-7px);}}
+-  @keyframes hoverFloat4{0%,100%{transform:translate(28px,11.2px) translateY(0);}50%{transform:translate(28px,11.2px) translateY(-9px);}}
+-  @keyframes hoverFloat5{0%,100%{transform:translate(0,-29.4px) translateY(0);}50%{transform:translate(0,-29.4px) translateY(-8px);}}
+-
+-  /* ---------- STATS ---------- */
+-  .stats{padding:56px 0;border-bottom:1px solid var(--line);}
+-  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center;}
+-  .stat-num{
+-    font-family:var(--font-jetbrains-mono),monospace;font-weight:700;
+-    font-size:clamp(28px,4vw,42px);color:var(--ink);letter-spacing:-0.02em;
+-    display:flex;align-items:baseline;justify-content:center;gap:2px;
+-  }
+-  .stat-num .suffix{color:var(--emerald);}
+-  .stat-label{margin-top:8px;font-size:13.5px;color:var(--muted);font-weight:500;}
+-
+-  /* ---------- SOCIAL PROOF ---------- */
+-  .proof{padding:34px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden;}
+-  .proof-label{text-align:center;font-size:13px;color:var(--muted);margin-bottom:22px;font-weight:500;}
+-  .marquee{display:flex;width:max-content;animation:scroll 26s linear infinite;gap:64px;}
+-  @keyframes scroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+-  .marquee span{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:15px;color:var(--muted);
+-    white-space:nowrap;font-weight:500;
+-  }
+-
+-  /* ---------- SECTION SHARED ---------- */
+-  .landingRoot section{padding:100px 0;}
+-  .section-head{max-width:600px;margin-bottom:56px;}
+-  .section-head .eyebrow{margin-bottom:16px;animation:none;opacity:1;transform:none;}
+-  .section-head h2{font-size:clamp(28px,3.6vw,40px);font-weight:800;letter-spacing:-0.025em;line-height:1.15;}
+-  .section-head p{margin-top:14px;font-size:16.5px;color:var(--ink-soft);line-height:1.6;}
+-  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease),transform .7s var(--ease);}
+-  .reveal.in{opacity:1;transform:translateY(0);}
+-
+-  /* ---------- PROBLEM/SOLUTION ---------- */
+-  .ps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+-  .ps-card{
+-    background:var(--cream-2);border:1px solid var(--line);border-radius:var(--radius);
+-    padding:28px;transition:transform .25s var(--ease),box-shadow .25s var(--ease),border-color .25s;
+-  }
+-  .ps-card:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.35);border-color:var(--line-strong);}
+-  .ps-tag{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:11px;font-weight:600;letter-spacing:0.06em;
+-    color:var(--emerald-dark);background:var(--emerald-tint);display:inline-block;padding:4px 10px;border-radius:100px;margin-bottom:16px;
+-  }
+-  .ps-card h3{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-0.01em;}
+-  .ps-card p{font-size:14.5px;color:var(--ink-soft);line-height:1.55;}
+-  .ps-tagline{margin-top:16px;font-size:13px;color:var(--emerald-dark);font-weight:600;display:flex;align-items:center;gap:6px;}
+-
+-  /* ---------- FEATURES (modules) ---------- */
+-  .mod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+-  .mod-card{
+-    background:var(--cream-2);border:1px solid var(--line);border-radius:var(--radius);
+-    padding:26px;position:relative;overflow:hidden;
+-    transition:transform .25s var(--ease),box-shadow .25s var(--ease);
+-  }
+-  .mod-card:hover{transform:translateY(-4px);box-shadow:0 18px 44px rgba(0,0,0,0.35);border-color:var(--line-strong);}
+-  .mod-card .code{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:11.5px;font-weight:600;color:var(--muted);
+-    letter-spacing:0.05em;margin-bottom:18px;display:inline-block;
+-    border:1px solid var(--line-strong);padding:3px 9px;border-radius:6px;
+-  }
+-  .mod-card h3{font-size:18px;font-weight:700;margin-bottom:8px;letter-spacing:-0.01em;}
+-  .mod-card p{font-size:14.5px;color:var(--ink-soft);line-height:1.55;}
+-  .mod-card .accent-bar{position:absolute;top:0;left:0;width:100%;height:3px;}
+-
+-  /* ---------- SHOWCASE (device mockup) ---------- */
+-  .showcase{position:relative;overflow:hidden;background:rgba(21,20,15,0.78);}
+-  .showcase .glow-orb.s1{width:460px;height:460px;background:radial-gradient(circle,rgba(5,150,105,0.18),transparent 70%);top:-160px;left:-120px;animation:auroraDrift1 26s ease-in-out infinite;}
+-  .showcase .glow-orb.s2{width:340px;height:340px;background:radial-gradient(circle,rgba(139,92,246,0.10),transparent 70%);bottom:-140px;right:-80px;animation:auroraDrift2 22s ease-in-out infinite reverse;}
+-  .showcase-inner{position:relative;z-index:1;}
+-  .device-stage{
+-    position:relative;max-width:760px;margin:64px auto 0;
+-    display:flex;align-items:flex-end;justify-content:center;
+-  }
+-  .laptop{width:100%;max-width:680px;}
+-  .laptop-screen{
+-    background:#0F1310;border-radius:14px 14px 0 0;padding:10px 10px 0;
+-    box-shadow:0 30px 70px rgba(23,23,15,0.22);
+-  }
+-  .laptop-inner{
+-    background:var(--cream);border-radius:8px 8px 0 0;overflow:hidden;
+-    aspect-ratio:16/10;display:flex;flex-direction:column;
+-  }
+-  .laptop-topbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line);}
+-  .laptop-topbar span{width:8px;height:8px;border-radius:50%;background:var(--line-strong);}
+-  .laptop-body{flex:1;display:flex;}
+-  .laptop-sidebar{width:26%;border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:8px;}
+-  .laptop-sidebar .side-item{height:9px;border-radius:4px;background:var(--line);}
+-  .laptop-sidebar .side-item.active{background:var(--emerald);width:70%;}
+-  .laptop-main{flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;}
+-  .laptop-cards{display:flex;gap:8px;}
+-  .laptop-cards .card{flex:1;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;}
+-  .laptop-cards .card .n{height:10px;width:60%;background:var(--ink);opacity:0.7;border-radius:3px;margin-bottom:6px;}
+-  .laptop-cards .card .l{height:6px;width:80%;background:var(--line-strong);border-radius:3px;}
+-  .laptop-chart{flex:1;background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;align-items:flex-end;gap:5px;}
+-  .laptop-chart i{flex:1;background:var(--emerald);border-radius:3px 3px 0 0;opacity:0.85;}
+-  .laptop-base{height:12px;background:linear-gradient(180deg,#2A2A24,#17170F);border-radius:0 0 10px 10px;position:relative;}
+-  .laptop-base::after{content:'';position:absolute;left:50%;top:0;transform:translateX(-50%);width:14%;height:100%;background:#3A3A32;border-radius:0 0 4px 4px;}
+-
+-  .phone{
+-    width:150px;flex-shrink:0;margin-left:-46px;margin-bottom:-18px;
+-    background:#0F1310;border-radius:22px;padding:7px;
+-    box-shadow:0 24px 50px rgba(23,23,15,0.24);
+-    transform:rotate(3deg);
+-  }
+-  .phone-screen{background:var(--cream);border-radius:16px;aspect-ratio:9/18;overflow:hidden;display:flex;flex-direction:column;}
+-  .phone-top{padding:14px 12px 8px;border-bottom:1px solid var(--line);}
+-  .phone-top .n{height:8px;width:50%;background:var(--ink);opacity:.7;border-radius:3px;}
+-  .phone-list{padding:10px;display:flex;flex-direction:column;gap:8px;}
+-  .phone-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 8px;}
+-  .phone-row .avatar{width:16px;height:16px;border-radius:50%;background:var(--emerald-tint);flex-shrink:0;}
+-  .phone-row .bar{flex:1;height:6px;background:var(--line);border-radius:3px;}
+-  .phone-row.done .avatar{background:var(--emerald);}
+-  .phone-row.done .bar{background:var(--line-strong);width:70%;}
+-
+-  /* ---------- HOW IT WORKS ---------- */
+-  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;position:relative;}
+-  .step{padding:0 28px;position:relative;}
+-  .step:first-child{padding-left:0;}
+-  .step:last-child{padding-right:0;}
+-  .step-num{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:13px;font-weight:600;color:var(--emerald-dark);
+-    margin-bottom:14px;display:block;
+-  }
+-  .step h3{font-size:19px;font-weight:700;margin-bottom:10px;letter-spacing:-0.01em;}
+-  .step p{font-size:14.5px;color:var(--ink-soft);line-height:1.6;}
+-  .step-line{
+-    position:absolute;top:9px;left:100%;width:56px;height:1.5px;background:var(--line-strong);
+-    display:flex;align-items:center;justify-content:center;
+-    overflow:hidden;
+-  }
+-  .step-line::before{
+-    content:'';position:absolute;left:0;top:0;height:100%;width:100%;background:var(--emerald);
+-    transform:scaleX(0);transform-origin:left;transition:transform .8s .3s var(--ease);
+-  }
+-  .reveal.in .step-line::before{transform:scaleX(1);}
+-  .step-line::after{content:'';width:5px;height:5px;border-radius:50%;background:var(--emerald);position:relative;z-index:1;}
+-
+-  /* ---------- TESTIMONIALS ---------- */
+-  .testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+-  .testi-card{
+-    background:var(--cream-2);border-radius:var(--radius);padding:28px;
+-    display:flex;flex-direction:column;gap:20px;
+-  }
+-  .testi-quote{font-size:15.5px;line-height:1.65;color:var(--ink);}
+-  .testi-person{display:flex;align-items:center;gap:12px;}
+-  .testi-avatar{
+-    width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--cream);
+-    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-family:var(--font-jetbrains-mono),monospace;
+-    flex-shrink:0;
+-  }
+-  .testi-name{font-size:14px;font-weight:600;}
+-  .testi-role{font-size:12.5px;color:var(--muted);}
+-
+-  /* ---------- PRICING ---------- */
+-  .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch;}
+-  .price-card{
+-    background:var(--cream-2);border:1px solid var(--line);border-radius:var(--radius);
+-    padding:32px 26px;display:flex;flex-direction:column;position:relative;
+-    transition:transform .25s var(--ease),box-shadow .25s var(--ease),border-color .25s var(--ease);
+-  }
+-  .price-card::before{
+-    content:'';position:absolute;inset:-1px;border-radius:var(--radius);padding:1px;
+-    background:linear-gradient(135deg,var(--emerald),transparent 40%,transparent 60%,var(--emerald));
+-    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+-    -webkit-mask-composite:xor;mask-composite:exclude;
+-    opacity:0;transition:opacity .3s var(--ease);pointer-events:none;
+-  }
+-  .price-card:hover::before{opacity:1;}
+-  .price-card:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(5,150,105,0.14);}
+-  .price-card.featured{
+-    background:linear-gradient(160deg,#0F2A21,#0B0B08 130%);
+-    border-color:rgba(16,185,129,0.4);
+-    box-shadow:0 0 0 1px rgba(16,185,129,0.15),0 20px 60px rgba(16,185,129,0.18);
+-    transform:scale(1.03);
+-  }
+-  .price-card.featured:hover{transform:scale(1.03) translateY(-6px);box-shadow:0 0 0 1px rgba(16,185,129,0.4),0 24px 60px rgba(16,185,129,0.32);}
+-  .price-badge{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:11px;font-weight:600;letter-spacing:0.05em;
+-    background:var(--emerald);color:#fff;padding:4px 10px;border-radius:100px;display:inline-block;
+-    margin-bottom:16px;width:fit-content;
+-  }
+-  .price-card h3{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--muted);}
+-  .price-card.featured h3{color:rgba(246,245,241,0.6);}
+-  .price-amount{font-size:38px;font-weight:800;letter-spacing:-0.02em;margin-bottom:4px;}
+-  .price-period{font-size:13.5px;color:var(--muted);margin-bottom:24px;}
+-  .price-card.featured .price-period{color:rgba(246,245,241,0.55);}
+-  .price-features{margin-bottom:28px;flex-grow:1;}
+-  .price-features li{
+-    font-size:14px;padding:9px 0;border-top:1px solid var(--line);
+-    display:flex;align-items:center;gap:10px;
+-  }
+-  .price-card.featured .price-features li{border-top:1px solid rgba(246,245,241,0.12);}
+-  .price-features li:first-child{border-top:none;}
+-  .check{color:var(--emerald);font-weight:700;flex-shrink:0;}
+-  .price-card.featured .check{color:#6EE7B7;}
+-
+-  /* ---------- FAQ ---------- */
+-  .faq-list{max-width:720px;}
+-  .faq-item{border-bottom:1px solid var(--line);}
+-  .faq-q{
+-    width:100%;text-align:left;padding:22px 0;display:flex;justify-content:space-between;align-items:center;
+-    font-size:16px;font-weight:600;gap:20px;
+-  }
+-  .faq-q .plus{
+-    font-family:var(--font-jetbrains-mono),monospace;font-size:18px;color:var(--muted);flex-shrink:0;
+-    transition:transform .3s var(--ease);width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+-  }
+-  .faq-item.open .faq-q .plus{transform:rotate(45deg);color:var(--emerald);}
+-  .faq-a{
+-    max-height:0;overflow:hidden;transition:max-height .35s var(--ease);
+-  }
+-  .faq-a p{font-size:14.5px;color:var(--ink-soft);line-height:1.65;padding-bottom:22px;max-width:600px;}
+-  .faq-item.open .faq-a{max-height:200px;}
+-
+-  /* ---------- FINAL CTA ---------- */
+-  .final-cta{
+-    background:linear-gradient(135deg,#0B3B2C,#1B1030 70%,#0B0B08);
+-    color:#F5F4EF;border-radius:28px;
+-    border:1px solid rgba(16,185,129,0.25);
+-    padding:64px 40px;text-align:center;max-width:1160px;margin:0 auto;
+-    position:relative;overflow:hidden;
+-  }
+-  .final-cta::before{
+-    content:'';position:absolute;top:-40%;right:-10%;width:400px;height:400px;border-radius:50%;
+-    background:radial-gradient(circle,rgba(16,185,129,0.45),transparent 70%);
+-  }
+-  .final-cta::after{
+-    content:'';position:absolute;bottom:-45%;left:-10%;width:360px;height:360px;border-radius:50%;
+-    background:radial-gradient(circle,rgba(139,92,246,0.3),transparent 70%);
+-  }
+-  .final-cta h2{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-0.025em;margin-bottom:14px;position:relative;color:#F5F4EF;}
+-  .final-cta p{font-size:16px;color:rgba(245,244,239,0.72);margin-bottom:30px;position:relative;}
+-  .final-cta .hero-ctas{justify-content:center;animation:none;opacity:1;transform:none;position:relative;}
+-
+-  /* ---------- FOOTER ---------- */
+-  .landingRoot footer{padding:64px 0 32px;border-top:1px solid var(--line);margin-top:40px;}
+-  .footer-grid{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:40px;margin-bottom:48px;}
+-  .footer-brand p{font-size:14px;color:var(--muted);margin-top:14px;line-height:1.6;max-width:260px;}
+-  .footer-col h4{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:16px;letter-spacing:0.02em;}
+-  .footer-col a{display:block;font-size:14.5px;color:var(--ink-soft);padding:6px 0;transition:color .2s;}
+-  .footer-col a:hover{color:var(--ink);}
+-  .footer-bottom{
+-    display:flex;justify-content:space-between;align-items:center;padding-top:24px;
+-    border-top:1px solid var(--line);font-size:13px;color:var(--muted);flex-wrap:wrap;gap:12px;
+-  }
+-
+-  /* ---------- RESPONSIVE ---------- */
+-  @media (min-width:860px){
+-    .hero-inner{grid-template-columns:1.1fr 1fr;align-items:center;}
+-  }
+-  @media (max-width:859px){
+-    .nav-links{display:none;}
+-    .nav-cta-group .login{display:none;}
+-    .hamburger{display:flex;}
+-    .assembly{height:300px;}
+-    .assembly-frame{width:190px;height:190px;}
+-    .mod-tile{width:96px;padding:11px 12px;font-size:11.5px;}
+-    .mod-tile.t1{--tx:-120px;--ty:-120px;}
+-    .mod-tile.t2{--tx:120px;--ty:-100px;}
+-    .mod-tile.t3{--tx:-130px;--ty:60px;}
+-    .mod-tile.t4{--tx:130px;--ty:70px;}
+-    .mod-tile.t5{--tx:0px;--ty:-155px;}
+-    .ps-grid,.mod-grid,.testi-grid,.pricing-grid{grid-template-columns:1fr;}
+-    .stats-grid{grid-template-columns:1fr 1fr;gap:28px 16px;}
+-    .steps{grid-template-columns:1fr;gap:32px;}
+-    .step{padding:0;}
+-    .step-line{display:none;}
+-    .price-card.featured{transform:none;}
+-    .price-card.featured:hover{transform:translateY(-4px);}
+-    .footer-grid{grid-template-columns:1fr 1fr;gap:32px;}
+-    .landingRoot section{padding:64px 0;}
+-    .hero{padding:44px 0 40px;}
+-    .final-cta{padding:44px 24px;border-radius:20px;}
+-  }
+-  @media (max-width:520px){
+-    .footer-grid{grid-template-columns:1fr 1fr;}
+-    .wrap{padding:0 18px;}
+-  }
