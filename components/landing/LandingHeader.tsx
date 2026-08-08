@@ -21,7 +21,7 @@ export default function LandingHeader() {
     <header className={`${scrolled ? styles.scrolled : ""}`}>
       <nav>
         <Link href="/" className={styles.logo}>
-          <span className={styles["logo-mark"]}>P</span>Pypus
+          <img src="/logo.png" alt="Pypus logo" className={styles["logo-mark"]} />Pypus
         </Link>
 
         <ul
@@ -43,7 +43,7 @@ export default function LandingHeader() {
               : undefined
           }
         >
-          <li><Link href="#modules">Modules</Link></li>
+          <li><Link href="#features">Features</Link></li>
           <li><Link href="#how">How it works</Link></li>
           <li><Link href="#pricing">Pricing</Link></li>
           <li><Link href="#faq">FAQ</Link></li>

@@ -5,14 +5,14 @@
 // ─────────────────────────────────────────────────────────────────
 
 export const STATS = [
-  { count: 2, decimal: 0, suffix: "", label: "Gyms live on free trial" },
-  { count: 15, decimal: 0, suffix: "+", label: "Gyms visited across Gurugram" },
-  { count: 5, decimal: 0, suffix: "", label: "Modules — one connected system" },
-  { count: 24, decimal: 0, suffix: "hr", label: "Average setup time" },
+  { count: 8, decimal: 0, suffix: "+", label: "Gyms growing with us" },
+  { count: 24, decimal: 0, suffix: "/7", label: "Support, always on" },
+  { count: 10, decimal: 0, suffix: "+", label: "Automations & modules to scale your business" },
 ];
-// NOTE(Ansh): these are your real early numbers as of Aug 2026. Update
-// "Gyms live on free trial" as you close more — don't inflate this, small
-// honest numbers build more trust with gym owners than fake big ones.
+// NOTE(Ansh): updated to the 3 numbers you asked for on Aug 8 — "8+ gyms
+// growing with us", "24/7 support", "10+ automations & modules". Bump the
+// gym count as you close more trials; keep it honest, it's what builds
+// trust with gym owners.
 
 export const PROOF_LOGOS = [
   "MGL FITNESS STUDIO",
@@ -25,16 +25,16 @@ export const PROOF_LOGOS = [
 // Add new names here as more gyms come on trial.
 
 export const MODULES = [
-  { code: "[MEM]", accent: "#3B82F6", title: "Members", desc: "Full profiles, plans, and join/renewal history in one searchable list." },
-  { code: "[ATT]", accent: "#10B981", title: "Attendance", desc: "One-tap check-ins with automatic streaks and no-show alerts." },
-  { code: "[PAY]", accent: "#F59E0B", title: "Payments", desc: "Track dues, partial payments and fee status — clear, calm and always current." },
-  { code: "[REP]", accent: "#8B5CF6", title: "Reports", desc: "Revenue, retention and attendance trends — updated live, exportable anytime." },
-  { code: "[EXP]", accent: "#EC4899", title: "Expenses", desc: "Log rent, staff and equipment costs, and watch your real monthly profit take shape." },
+  { code: "[MEM]", accent: "#3B82F6", title: "Members", desc: "Every member's profile, plan and renewal history lives in one searchable list — nobody is ever 'that one guy we lost track of' again." },
+  { code: "[ATT]", accent: "#10B981", title: "Attendance", desc: "Front desk taps a name, the streak builds itself — and the moment someone's about to fall off, a WhatsApp nudge goes out on its own." },
+  { code: "[PAY]", accent: "#F59E0B", title: "Payments", desc: "The fee reminder sends itself on WhatsApp before it's even due. The receipt generates itself the second the payment lands. You remember neither." },
+  { code: "[REP]", accent: "#8B5CF6", title: "Reports", desc: "Revenue, retention and attendance trends update live in the background — so your month-end report is basically already written." },
+  { code: "[EXP]", accent: "#EC4899", title: "Expenses", desc: "Log rent, staff and equipment costs once, and watch your real monthly profit take shape automatically." },
 ];
 
 export const STEPS = [
-  { num: "01 — Import", title: "Bring your existing data", desc: "Upload your member list from Excel or WhatsApp exports. We map it into the system for you." },
-  { num: "02 — Configure", title: "Pick your modules", desc: "Turn on only what you need — Members and Payments today, add Reports next month." },
+  { num: "01 — Setup", title: "Create your workspace and start managing", desc: "Bring your member list in from Excel, then switch on what actually saves you time: WhatsApp fee reminders, auto-generated receipts, and attendance that tracks itself." },
+  { num: "02 — Configure", title: "Pick your automations", desc: "Turn on only what you need — WhatsApp reminders and payments today, reports and expenses next month." },
   { num: "03 — Go live", title: "Start checking members in", desc: "Your front desk starts using it the same day. No training manual required." },
 ];
 
@@ -90,7 +90,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     name: "Starter",
     price: "₹999",
     period: "Up to 100 members",
-    features: ["All 5 modules", "1 staff login", "Email support"],
+    features: ["All 5 automations", "1 staff login", "Email support"],
     ctaLabel: "Start free trial",
     ctaHref: "/login",
   },
@@ -98,7 +98,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     name: "Growth",
     price: "₹2,499",
     period: "Up to 500 members",
-    features: ["All 5 modules", "5 staff logins", "WhatsApp fee reminders", "Priority support"],
+    features: ["All 5 automations", "5 staff logins", "WhatsApp fee reminders", "Priority support"],
     featured: true,
     ctaLabel: "Start free trial",
     ctaHref: "/login",
@@ -107,7 +107,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     name: "Scale",
     price: "₹4,999",
     period: "Unlimited members, multi-branch",
-    features: ["All 5 modules", "Unlimited staff logins", "Multi-branch reporting", "Dedicated onboarding"],
+    features: ["All 5 automations", "Unlimited staff logins", "Multi-branch reporting", "Dedicated onboarding"],
     ctaLabel: "Talk to us",
     ctaHref: "/login",
   },

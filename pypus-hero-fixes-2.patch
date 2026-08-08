@@ -1,0 +1,243 @@
+diff --git a/components/landing/HeroAssembly.tsx b/components/landing/HeroAssembly.tsx
+deleted file mode 100644
+index a2b18e9..0000000
+--- a/components/landing/HeroAssembly.tsx
++++ /dev/null
+@@ -1,44 +0,0 @@
+-"use client";
+-
+-import { useEffect, useRef } from "react";
+-import styles from "./landing.module.css";
+-
+-const TILES = [
+-  { key: "t1", label: "Members", dotColor: "#3B82F6" },
+-  { key: "t2", label: "Attendance", dotColor: "#10B981" },
+-  { key: "t3", label: "Payments", dotColor: "#F59E0B" },
+-  { key: "t4", label: "Reports", dotColor: "#8B5CF6" },
+-  { key: "t5", label: "Expenses", dotColor: "#EC4899" },
+-];
+-
+-export default function HeroAssembly() {
+-  const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
+-
+-  useEffect(() => {
+-    tileRefs.current.forEach((tile) => {
+-      if (!tile) return;
+-      requestAnimationFrame(() => tile.classList.add(styles.landed));
+-      const onEnd = (e: TransitionEvent) => {
+-        if (e.propertyName === "transform") tile.classList.add(styles.settled);
+-      };
+-      tile.addEventListener("transitionend", onEnd);
+-    });
+-  }, []);
+-
+-  return (
+-    <div className={styles.assembly} aria-hidden="true">
+-      <div className={styles["assembly-frame"]}>
+-        {TILES.map((tile, i) => (
+-          <div
+-            key={tile.key}
+-            ref={(el) => { tileRefs.current[i] = el; }}
+-            className={`${styles["mod-tile"]} ${styles[tile.key]}`}
+-          >
+-            <span className={styles.dot} style={{ background: tile.dotColor }} />
+-            {tile.label}
+-          </div>
+-        ))}
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/components/landing/HeroAutomationFeed.tsx b/components/landing/HeroAutomationFeed.tsx
+new file mode 100644
+index 0000000..47c2bdd
+--- /dev/null
++++ b/components/landing/HeroAutomationFeed.tsx
+@@ -0,0 +1,36 @@
++"use client";
++
++import styles from "./landing.module.css";
++
++const FEED = [
++  { label: "Fee reminder sent", meta: "WhatsApp · 9:02 AM" },
++  { label: "Receipt generated", meta: "₹2,499 · 9:03 AM" },
++  { label: "Attendance logged", meta: "41 check-ins today" },
++  { label: "Report updated", meta: "Just now" },
++];
++
++export default function HeroAutomationFeed() {
++  return (
++    <div className={styles["auto-feed"]} aria-hidden="true">
++      <div className={styles["auto-feed-card"]}>
++        <div className={styles["auto-feed-head"]}>
++          <span className={styles["auto-feed-dot"]} />
++          Today, automatically
++        </div>
++        {FEED.map((item, i) => (
++          <div
++            key={item.label}
++            className={styles["auto-feed-row"]}
++            style={{ animationDelay: `${0.5 + i * 0.15}s` }}
++          >
++            <span className={styles["auto-feed-check"]}>✓</span>
++            <div>
++              <div className={styles["auto-feed-label"]}>{item.label}</div>
++              <div className={styles["auto-feed-meta"]}>{item.meta}</div>
++            </div>
++          </div>
++        ))}
++      </div>
++    </div>
++  );
++}
+diff --git a/components/landing/LandingPage.tsx b/components/landing/LandingPage.tsx
+index 3abb20b..a4328ea 100644
+--- a/components/landing/LandingPage.tsx
++++ b/components/landing/LandingPage.tsx
+@@ -5,7 +5,7 @@ import Link from "next/link";
+ import styles from "./landing.module.css";
+ import AuroraBackground from "./AuroraBackground";
+ import LandingHeader from "./LandingHeader";
+-import HeroAssembly from "./HeroAssembly";
++import HeroAutomationFeed from "./HeroAutomationFeed";
+ import Reveal from "./Reveal";
+ import AnimatedStat from "./AnimatedStat";
+ import FaqAccordion from "./FaqAccordion";
+@@ -54,7 +54,7 @@ export default function LandingPage() {
+             </div>
+             <p className={styles["hero-note"]}>Trusted by gym owners across Gurugram · Live in under 24 hours</p>
+           </div>
+-          <HeroAssembly />
++          <HeroAutomationFeed />
+         </div>
+       </section>
+ 
+diff --git a/components/landing/landing.module.css b/components/landing/landing.module.css
+index 96bc050..556df54 100644
+--- a/components/landing/landing.module.css
++++ b/components/landing/landing.module.css
+@@ -152,13 +152,13 @@
+     transition:transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+     min-height:44px;
+   }
+-  .btn-primary{background:var(--ink);color:var(--cream);}
+-  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,23,15,0.18);}
+-  .btn-primary:active{transform:translateY(0);}
+-  .btn-emerald{background:var(--emerald);color:#fff;}
+-  .btn-emerald:hover{background:var(--emerald-dark);transform:translateY(-1px);box-shadow:0 8px 24px rgba(5,150,105,0.28);}
+-  .btn-ghost{background:transparent;border:1.5px solid var(--line-strong);color:var(--ink);}
+-  .btn-ghost:hover{border-color:var(--ink);background:rgba(245,244,239,0.06);}
++  .btn.btn-primary{background:var(--ink);color:var(--cream);}
++  .btn.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,23,15,0.18);}
++  .btn.btn-primary:active{transform:translateY(0);}
++  .btn.btn-emerald{background:var(--emerald);color:#fff;}
++  .btn.btn-emerald:hover{background:var(--emerald-dark);transform:translateY(-1px);box-shadow:0 8px 24px rgba(5,150,105,0.28);}
++  .btn.btn-ghost{background:transparent;border:1.5px solid var(--line-strong);color:var(--ink);}
++  .btn.btn-ghost:hover{border-color:var(--ink);background:rgba(245,244,239,0.06);}
+   .hamburger{display:none;width:44px;height:44px;align-items:center;justify-content:center;}
+   .hamburger span, .hamburger span::before, .hamburger span::after{
+     content:'';display:block;width:20px;height:2px;background:var(--ink);position:relative;transition:.25s;
+@@ -216,62 +216,34 @@
+     opacity:0;animation:riseIn .7s .3s var(--ease) forwards;}
+   @keyframes riseIn{to{opacity:1;transform:translateY(0);}}
+ 
+-  /* module assembly visual */
+-  .assembly{
++  /* automation feed visual */
++  .auto-feed{
+     position:relative;height:400px;
+     display:flex;align-items:center;justify-content:center;
+   }
+-  .assembly-frame{
+-    width:260px;height:260px;border-radius:28px;
+-    border:1.5px dashed rgba(246,245,241,0.18);
+-    display:flex;align-items:center;justify-content:center;
+-    position:relative;
+-  }
+-  .assembly-frame::after{
+-    content:'PYP';font-family:var(--font-jetbrains-mono),monospace;font-size:13px;font-weight:600;
+-    color:rgba(246,245,241,0.4);letter-spacing:0.1em;
+-    opacity:0;animation:showCore 0.5s 1.9s var(--ease) forwards;
+-  }
+-  .mod-tile{
+-    position:absolute;
+-    width:112px;padding:14px 16px;
+-    background:#fff;border:1px solid var(--line);border-radius:14px;
+-    box-shadow:0 16px 40px rgba(0,0,0,0.45);
+-    font-size:12.5px;font-weight:600;color:#17170F;
+-    display:flex;align-items:center;gap:8px;
+-    opacity:0;
+-    transform:translate(var(--tx),var(--ty)) scale(.7);
+-    transition:opacity .7s var(--ease),transform .7s var(--ease);
+-    z-index:2;
+-  }
+-  .mod-tile.landed{
+-    opacity:1;
+-    transform:translate(calc(var(--tx)*0.2),calc(var(--ty)*0.2)) scale(1);
+-  }
+-  .mod-tile .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+-  .mod-tile.t1{--tx:-190px;--ty:-160px;background:#fff;transition-delay:.4s;}
+-  .mod-tile.t2{--tx:190px;--ty:-140px;transition-delay:.6s;}
+-  .mod-tile.t3{--tx:-210px;--ty:60px;transition-delay:.8s;}
+-  .mod-tile.t4{--tx:200px;--ty:80px;transition-delay:1.0s;}
+-  .mod-tile.t5{--tx:0px;--ty:-210px;transition-delay:1.2s;}
+-  @keyframes showCore{to{opacity:1;}}
+-  .mod-tile.t1 .dot{background:#3B82F6;}
+-  .mod-tile.t2 .dot{background:var(--emerald);}
+-  .mod-tile.t3 .dot{background:#F59E0B;}
+-  .mod-tile.t4 .dot{background:#8B5CF6;}
+-  .mod-tile.t5 .dot{background:#EC4899;}
+-  .mod-tile{will-change:transform;}
+-  /* gentle continuous float once tiles have landed */
+-  .mod-tile.t1.settled{animation:hoverFloat1 4.2s ease-in-out infinite;}
+-  .mod-tile.t2.settled{animation:hoverFloat2 3.6s ease-in-out infinite .2s;}
+-  .mod-tile.t3.settled{animation:hoverFloat3 4.8s ease-in-out infinite .1s;}
+-  .mod-tile.t4.settled{animation:hoverFloat4 3.9s ease-in-out infinite .3s;}
+-  .mod-tile.t5.settled{animation:hoverFloat5 4.4s ease-in-out infinite .15s;}
+-  @keyframes hoverFloat1{0%,100%{transform:translate(-38px,-32px) translateY(0);}50%{transform:translate(-38px,-32px) translateY(-9px);}}
+-  @keyframes hoverFloat2{0%,100%{transform:translate(38px,-28px) translateY(0);}50%{transform:translate(38px,-28px) translateY(-8px);}}
+-  @keyframes hoverFloat3{0%,100%{transform:translate(-42px,12px) translateY(0);}50%{transform:translate(-42px,12px) translateY(-7px);}}
+-  @keyframes hoverFloat4{0%,100%{transform:translate(40px,16px) translateY(0);}50%{transform:translate(40px,16px) translateY(-9px);}}
+-  @keyframes hoverFloat5{0%,100%{transform:translate(0,-42px) translateY(0);}50%{transform:translate(0,-42px) translateY(-8px);}}
++  .auto-feed-card{
++    width:100%;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:20px;
++    padding:22px 20px;box-shadow:0 24px 60px rgba(0,0,0,0.45);
++    opacity:0;transform:translateY(16px);animation:riseIn .7s .3s var(--ease) forwards;
++  }
++  .auto-feed-head{
++    display:flex;align-items:center;gap:8px;font-family:var(--font-jetbrains-mono),monospace;
++    font-size:12px;font-weight:600;letter-spacing:0.04em;color:#6B7280;text-transform:uppercase;
++    margin-bottom:18px;
++  }
++  .auto-feed-dot{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 0 3px rgba(16,185,129,0.18);}
++  .auto-feed-row{
++    display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-top:1px solid #F0F0EC;
++    opacity:0;transform:translateX(-10px);animation:feedRowIn .5s var(--ease) forwards;
++  }
++  .auto-feed-row:first-of-type{border-top:none;}
++  .auto-feed-check{
++    width:19px;height:19px;border-radius:50%;background:var(--emerald-tint);color:var(--emerald-dark);
++    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;
++  }
++  .auto-feed-label{font-size:14px;font-weight:600;color:#17170F;}
++  .auto-feed-meta{font-size:12px;color:#8A897E;margin-top:2px;}
++  @keyframes feedRowIn{to{opacity:1;transform:translateX(0);}}
+ 
+   /* ---------- STATS ---------- */
+   .stats{padding:56px 0;border-bottom:1px solid var(--line);}
+@@ -537,14 +509,7 @@
+     .nav-links{display:none;}
+     .nav-cta-group .login{display:none;}
+     .hamburger{display:flex;}
+-    .assembly{height:300px;}
+-    .assembly-frame{width:190px;height:190px;}
+-    .mod-tile{width:96px;padding:11px 12px;font-size:11.5px;}
+-    .mod-tile.t1{--tx:-120px;--ty:-120px;}
+-    .mod-tile.t2{--tx:120px;--ty:-100px;}
+-    .mod-tile.t3{--tx:-130px;--ty:60px;}
+-    .mod-tile.t4{--tx:130px;--ty:70px;}
+-    .mod-tile.t5{--tx:0px;--ty:-155px;}
++    .auto-feed{height:auto;padding:20px 0;}
+     .ps-grid,.mod-grid,.pricing-grid{grid-template-columns:1fr;}
+     .steps{grid-template-columns:1fr;gap:32px;}
+     .step{padding:0;}

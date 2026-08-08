@@ -5,7 +5,7 @@ import Link from "next/link";
 import styles from "./landing.module.css";
 import AuroraBackground from "./AuroraBackground";
 import LandingHeader from "./LandingHeader";
-import HeroAssembly from "./HeroAssembly";
+import HeroAutomationFeed from "./HeroAutomationFeed";
 import Reveal from "./Reveal";
 import AnimatedStat from "./AnimatedStat";
 import FaqAccordion from "./FaqAccordion";
@@ -41,11 +41,12 @@ export default function LandingPage() {
         <div className={`${styles["glow-orb"]} ${styles.g2}`} />
         <div className={styles["hero-inner"]}>
           <div>
-            <span className={styles.eyebrow}>WHERE YOUR BUSINESS RUNS ITSELF</span>
-            <h1>One dashboard where your <em>entire gym</em> comes to life.</h1>
+            <span className={styles.eyebrow}>WHERE YOUR GYM RUNS ITSELF</span>
+            <h1>Your gym runs itself. You just focus on <em>growth</em>.</h1>
             <p className={styles["hero-sub"]}>
-              From the member who walks in this morning to the report you check before bed —
-              members, attendance, payments and growth, all living in one calm, connected system.
+              Fee reminders that send themselves on WhatsApp. Receipts that generate on their own.
+              Attendance that tracks without anyone typing a thing. Pypus automates the busywork —
+              so nothing falls through the cracks, and you spend your day growing the gym, not managing it.
             </p>
             <div className={styles["hero-ctas"]}>
               <Link href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</Link>
@@ -53,7 +54,7 @@ export default function LandingPage() {
             </div>
             <p className={styles["hero-note"]}>Trusted by gym owners across Gurugram · Live in under 24 hours</p>
           </div>
-          <HeroAssembly />
+          <HeroAutomationFeed />
         </div>
       </section>
 
@@ -89,35 +90,35 @@ export default function LandingPage() {
               <span className={styles["ps-tag"]}>MORNING CHECK-IN</span>
               <h3>Every member, welcomed in one tap</h3>
               <p>Your front desk taps a name, attendance logs itself, and streaks build automatically — a warm, effortless start to every member&apos;s day.</p>
-              <div className={styles["ps-tagline"]}>Powered by the Attendance module</div>
+              <div className={styles["ps-tagline"]}>Powered by the Attendance automation</div>
             </Reveal>
             <Reveal className={styles["ps-card"]}>
               <span className={styles["ps-tag"]}>FEE DAY</span>
               <h3>Dues that quietly track themselves</h3>
               <p>The moment a payment lands, it&apos;s recorded. The moment one&apos;s coming due, you&apos;ll already know — calm and on time, every month.</p>
-              <div className={styles["ps-tagline"]}>Powered by the Payments module</div>
+              <div className={styles["ps-tagline"]}>Powered by the Payments automation</div>
             </Reveal>
             <Reveal className={styles["ps-card"]}>
               <span className={styles["ps-tag"]}>MONTH END</span>
               <h3>A report that&apos;s already waiting for you</h3>
               <p>Revenue, retention and attendance trends update live, so closing the month takes minutes — and reads like good news.</p>
-              <div className={styles["ps-tagline"]}>Powered by the Reports module</div>
+              <div className={styles["ps-tagline"]}>Powered by the Reports automation</div>
             </Reveal>
           </div>
         </div>
       </section>
 
-      {/* ---------- MODULES ---------- */}
-      <section id="modules" style={{ position: "relative", overflow: "hidden" }}>
+      {/* ---------- FEATURES / AUTOMATIONS ---------- */}
+      <section id="features" style={{ position: "relative", overflow: "hidden" }}>
         <div
           className={styles["glow-orb"]}
-          style={{ width: 380, height: 380, background: "radial-gradient(circle,rgba(139,92,246,0.14),transparent 70%)", top: -100, right: -120 }}
+          style={{ width: 380, height: 380, background: "radial-gradient(circle,rgba(20,184,166,0.14),transparent 70%)", top: -100, right: -120 }}
         />
         <div className={styles.wrap} style={{ position: "relative", zIndex: 1 }}>
           <Reveal className={styles["section-head"]}>
-            <span className={styles.eyebrow}>THE SYSTEM</span>
-            <h2>Five modules. One dashboard.</h2>
-            <p>Each module works standalone, but they&apos;re built to snap together — so member data, payments and reports always stay in sync.</p>
+            <span className={styles.eyebrow}>THE AUTOMATIONS</span>
+            <h2>Five automations that quietly run your gym.</h2>
+            <p>You don&apos;t send fee reminders. You don&apos;t write receipts by hand. You don&apos;t chase attendance. Pypus already did it — on WhatsApp, in the background — while you focus on growth.</p>
           </Reveal>
           <div className={styles["mod-grid"]}>
             {MODULES.map((m) => (
@@ -133,8 +134,8 @@ export default function LandingPage() {
               style={{ display: "flex", flexDirection: "column", justifyContent: "center", background: "var(--emerald-tint)", border: "1px dashed var(--emerald)" }}
             >
               <span className={styles.code} style={{ borderColor: "var(--emerald)", color: "var(--emerald-dark)" }}>[NEW]</span>
-              <h3 style={{ color: "var(--emerald-dark)" }}>More modules coming</h3>
-              <p>Staff payroll and lead pipeline modules are next — same system, no migration.</p>
+              <h3 style={{ color: "var(--emerald-dark)" }}>More automations coming</h3>
+              <p>Staff payroll and lead pipeline automations are next — same system, no migration.</p>
             </Reveal>
           </div>
         </div>
@@ -218,16 +219,18 @@ export default function LandingPage() {
       <section style={{ position: "relative", overflow: "hidden" }}>
         <div
           className={styles["glow-orb"]}
-          style={{ width: 340, height: 340, background: "radial-gradient(circle,rgba(245,158,11,0.10),transparent 70%)", top: -80, left: "50%", transform: "translateX(-50%)" }}
+          style={{ width: 340, height: 340, background: "radial-gradient(circle,rgba(16,185,129,0.10),transparent 70%)", top: -80, left: "50%", transform: "translateX(-50%)" }}
         />
         <div className={styles.wrap} style={{ position: "relative", zIndex: 1 }}>
           <Reveal className={styles["section-head"]}>
             <span className={styles.eyebrow}>FROM OWNERS</span>
             <h2>What gym owners actually say.</h2>
           </Reveal>
-          <div className={styles["testi-grid"]}>
-            {TESTIMONIALS.map((t, i) => (
-              <Reveal key={i} className={styles["testi-card"]}>
+        </div>
+        <div className={styles["testi-marquee-wrap"]}>
+          <div className={styles["testi-track"]}>
+            {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
+              <div key={i} className={styles["testi-card"]}>
                 <p className={styles["testi-quote"]}>&quot;{t.quote}&quot;</p>
                 <div className={styles["testi-person"]}>
                   {t.photo ? (
@@ -247,7 +250,7 @@ export default function LandingPage() {
                     <div className={styles["testi-role"]}>{t.role}</div>
                   </div>
                 </div>
-              </Reveal>
+              </div>
             ))}
           </div>
         </div>
@@ -263,7 +266,7 @@ export default function LandingPage() {
           <Reveal className={styles["section-head"]}>
             <span className={styles.eyebrow}>PRICING</span>
             <h2>Pay for what you switch on.</h2>
-            <p>Every plan includes all five modules. The difference is scale and support.</p>
+            <p>Every plan includes all five automations. The difference is scale and support.</p>
           </Reveal>
           <div className={styles["pricing-grid"]}>
             {PRICING_PLANS.map((plan) => (
@@ -311,7 +314,7 @@ export default function LandingPage() {
         <div className={styles.wrap}>
           <Reveal className={styles["final-cta"]}>
             <h2>Your gym, finally running like one system.</h2>
-            <p>Set up your first module in under 10 minutes, and watch your front desk, fees and reports fall quietly into place.</p>
+            <p>Set up your first automation in under 10 minutes, and watch your front desk, fees and reports fall quietly into place.</p>
             <div className={styles["hero-ctas"]}>
               <Link href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</Link>
               <Link href="/login" className={`${styles.btn} ${styles["btn-ghost"]}`} style={{ borderColor: "rgba(245,244,239,0.3)", color: "#F5F4EF" }}>Talk to sales</Link>
@@ -325,12 +328,12 @@ export default function LandingPage() {
         <div className={styles.wrap}>
           <div className={styles["footer-grid"]}>
             <div className={styles["footer-brand"]}>
-              <Link href="/" className={styles.logo}><span className={styles["logo-mark"]}>P</span>Pypus</Link>
+              <Link href="/" className={styles.logo}><img src="/logo.png" alt="Pypus logo" className={styles["logo-mark"]} />Pypus</Link>
               <p>Where your business runs itself. One quiet, connected system for gyms and service businesses.</p>
             </div>
             <div className={styles["footer-col"]}>
               <h4>PRODUCT</h4>
-              <Link href="#modules">Modules</Link>
+              <Link href="#features">Features</Link>
               <Link href="#pricing">Pricing</Link>
               <Link href="#how">How it works</Link>
             </div>
