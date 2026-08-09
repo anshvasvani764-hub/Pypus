@@ -129,3 +129,185 @@ body {
 @utility tabular-nums-lining {
   font-variant-numeric: tabular-nums lining-nums;
 }
+
+/* ── Onboarding — dark aurora theme (desktop redesign) ──
+   Scoped under .onb-* so it never leaks into the rest of the app. */
+.onb-root {
+  --onb-cream: #0b0b08;
+  --onb-cream-2: #15140f;
+  --onb-ink: #f5f4ef;
+  --onb-ink-soft: #c4c3b9;
+  --onb-muted: #96968c;
+  --onb-emerald: #10b981;
+  --onb-emerald-dark: #059669;
+  --onb-emerald-tint: #0f2a21;
+  --onb-line: rgba(255, 255, 255, 0.09);
+  --onb-line-strong: rgba(255, 255, 255, 0.16);
+  background: #08080a;
+  color: var(--onb-ink);
+}
+
+.onb-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #08080a;
+  pointer-events: none;
+}
+.onb-aurora::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 90%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 90%);
+}
+.onb-aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  mix-blend-mode: screen;
+}
+.onb-a1 {
+  width: 60vw;
+  height: 60vw;
+  max-width: 820px;
+  max-height: 820px;
+  top: -18vh;
+  left: -10vw;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.34), transparent 68%);
+  animation: onb-drift1 22s ease-in-out infinite;
+}
+.onb-a2 {
+  width: 52vw;
+  height: 52vw;
+  max-width: 720px;
+  max-height: 720px;
+  top: 10vh;
+  right: -14vw;
+  background: radial-gradient(circle, rgba(20, 184, 166, 0.26), transparent 68%);
+  animation: onb-drift2 26s ease-in-out infinite;
+}
+.onb-a3 {
+  width: 46vw;
+  height: 46vw;
+  max-width: 640px;
+  max-height: 640px;
+  bottom: -14vh;
+  left: 12vw;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.2), transparent 68%);
+  animation: onb-drift3 30s ease-in-out infinite;
+}
+@keyframes onb-drift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(4vw, 3vh) scale(1.08); }
+  66% { transform: translate(-3vw, 5vh) scale(0.96); }
+}
+@keyframes onb-drift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5vw, -4vh) scale(1.1); }
+}
+@keyframes onb-drift3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(3vw, -3vh) scale(0.94); }
+  70% { transform: translate(-4vw, 2vh) scale(1.05); }
+}
+
+.onb-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-geist-mono), 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--onb-emerald-dark);
+  background: var(--onb-emerald-tint);
+  padding: 7px 14px;
+  border-radius: 100px;
+}
+.onb-eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--onb-emerald);
+}
+
+.onb-card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--onb-line-strong);
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.onb-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--onb-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: var(--onb-ink);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.onb-input::placeholder {
+  color: var(--onb-muted);
+}
+.onb-input:focus {
+  border-color: var(--onb-emerald);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.onb-btn-primary {
+  width: 100%;
+  background: var(--onb-emerald);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 15px 20px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.2s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.2, 0.7, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.onb-btn-primary:hover:not(:disabled) {
+  background: var(--onb-emerald-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.28);
+}
+.onb-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.onb-btn-outline {
+  width: 100%;
+  background: transparent;
+  border: 1.5px solid var(--onb-line-strong);
+  color: var(--onb-ink);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 15px 20px;
+  border-radius: 100px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.onb-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--onb-emerald);
+}

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Loader2,
   LucideIcon,
+  ArrowRight,
 } from 'lucide-react'
 import { SelectedTemplate } from '@/lib/supabase/createWorkspace'
 
@@ -99,94 +100,113 @@ export default function StepIndustry() {
   ]
 
   return (
-    <div className="flex-grow flex flex-col justify-between px-4 py-8 max-w-2xl mx-auto w-full">
-      <div className="space-y-6">
-        {/* Hero Section */}
-        <div className="space-y-2">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#191c1e]">
-            Let's get started
-          </h2>
-          <p className="text-base text-[#434656]">Tell us about your business.</p>
-        </div>
-
-        {/* Industry Selection Header */}
-        <div className="space-y-4 pt-2">
-          <h3 className="text-lg font-semibold text-[#191c1e]">Select Industry</h3>
-
-          {loading ? (
-            <div className="flex items-center justify-center p-8 bg-white rounded-2xl border border-[#c3c5d9]/40 shadow-sm">
-              <Loader2 className="w-6 h-6 animate-spin text-[#003ec7] mr-2" />
-              <span className="text-sm font-medium text-[#434656]">Loading industries...</span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Dynamic Active Templates */}
-              {templates.map((tmpl) => {
-                const IconComponent =
-                  TMPL_ICON_MAP[(tmpl as any).icon || ''] || DEFAULT_TMPL_ICON
-                const isSelected = selectedTemplate?.id === tmpl.id
-
-                return (
-                  <button
-                    key={tmpl.id}
-                    onClick={() => setSelectedTemplate(tmpl)}
-                    className={`relative flex items-center p-4 rounded-2xl border-2 text-left transition-all duration-200 active:scale-[0.98] ${
-                      isSelected
-                        ? 'bg-white border-[#0052ff] shadow-md'
-                        : 'bg-white border-[#c3c5d9]/40 hover:border-[#003ec7]/40 shadow-sm'
-                    }`}
-                  >
-                    <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-[#0052ff] text-white mr-4 shadow-sm">
-                      <IconComponent className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-base text-[#003ec7]">{tmpl.name}</p>
-                      <p className="text-xs text-[#434656]">Fitness & Wellness Centers</p>
-                    </div>
-                    {isSelected && (
-                      <div className="absolute top-4 right-4">
-                        <CheckCircle2 className="w-5 h-5 text-[#003ec7]" />
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-
-              {/* Static Disabled Coming Soon Cards matching Stitch Mockup */}
-              {staticComingSoonCards.map((card, idx) => {
-                const IconComp = card.icon
-                return (
-                  <div
-                    key={idx}
-                    className="relative flex items-center p-4 rounded-2xl bg-[#f2f4f6] border border-[#c3c5d9]/40 opacity-60 cursor-not-allowed select-none"
-                  >
-                    <div className="w-12 h-12 flex items-center justify-center rounded-xl bg-[#e0e3e5] text-[#737688] mr-4">
-                      <IconComp className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-base text-[#737688]">{card.title}</p>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#e0e3e5] text-[#434656] uppercase tracking-tighter mt-1">
-                        Coming Soon
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Sticky / Floating Footer Action */}
-      <div className="pt-8">
-        <button
-          onClick={nextStep}
-          disabled={!selectedTemplate}
-          className="w-full bg-[#003ec7] hover:bg-[#0052ff] text-white font-semibold py-4 rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+    <div className="flex flex-col gap-8 w-full">
+      <div>
+        <span className="onb-eyebrow mb-4">
+          <span />
+          GET STARTED
+        </span>
+        <h2
+          className="text-3xl font-extrabold tracking-tight mt-4 mb-2"
+          style={{ letterSpacing: '-0.02em', color: 'var(--onb-ink)' }}
         >
-          Continue
-        </button>
+          Let's get started
+        </h2>
+        <p className="text-base" style={{ color: 'var(--onb-ink-soft)' }}>
+          Tell us about your business.
+        </p>
       </div>
+
+      <div className="space-y-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--onb-muted)' }}>
+          Select Industry
+        </h3>
+
+        {loading ? (
+          <div className="onb-card flex items-center justify-center p-8">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" style={{ color: 'var(--onb-emerald)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--onb-ink-soft)' }}>
+              Loading industries...
+            </span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Dynamic Active Templates */}
+            {templates.map((tmpl) => {
+              const IconComponent = TMPL_ICON_MAP[(tmpl as any).icon || ''] || DEFAULT_TMPL_ICON
+              const isSelected = selectedTemplate?.id === tmpl.id
+
+              return (
+                <button
+                  key={tmpl.id}
+                  onClick={() => setSelectedTemplate(tmpl)}
+                  className="onb-card relative flex items-center p-4 text-left transition-all duration-200 active:scale-[0.98]"
+                  style={
+                    isSelected
+                      ? { borderColor: 'var(--onb-emerald)', boxShadow: '0 0 0 1px rgba(16,185,129,0.25), 0 20px 50px rgba(0,0,0,0.35)' }
+                      : undefined
+                  }
+                >
+                  <div
+                    className="w-12 h-12 flex items-center justify-center rounded-xl mr-4"
+                    style={{ background: 'var(--onb-emerald)', color: '#08080a' }}
+                  >
+                    <IconComponent className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-base" style={{ color: 'var(--onb-ink)' }}>
+                      {tmpl.name}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--onb-ink-soft)' }}>
+                      Fitness & Wellness Centers
+                    </p>
+                  </div>
+                  {isSelected && (
+                    <div className="absolute top-4 right-4">
+                      <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--onb-emerald)' }} />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+
+            {/* Static Disabled Coming Soon Cards */}
+            {staticComingSoonCards.map((card, idx) => {
+              const IconComp = card.icon
+              return (
+                <div
+                  key={idx}
+                  className="relative flex items-center p-4 rounded-2xl opacity-50 cursor-not-allowed select-none"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--onb-line)' }}
+                >
+                  <div
+                    className="w-12 h-12 flex items-center justify-center rounded-xl mr-4"
+                    style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--onb-muted)' }}
+                  >
+                    <IconComp className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-base" style={{ color: 'var(--onb-muted)' }}>
+                      {card.title}
+                    </p>
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter mt-1"
+                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--onb-ink-soft)' }}
+                    >
+                      Coming Soon
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <button onClick={nextStep} disabled={!selectedTemplate} className="onb-btn-primary">
+        Continue
+        <ArrowRight className="w-4 h-4" />
+      </button>
     </div>
   )
 }

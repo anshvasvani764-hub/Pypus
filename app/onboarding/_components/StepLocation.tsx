@@ -75,140 +75,165 @@ export default function StepLocation() {
   const entityTitle = selectedTemplate?.name ? selectedTemplate.name.toLowerCase() : 'business'
 
   return (
-    <div className="flex-grow flex flex-col justify-between px-4 py-8 max-w-xl mx-auto w-full">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Headline Section */}
-        <div className="space-y-2">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[#191c1e]">
-            Where is your {entityTitle}?
-          </h2>
-          <p className="text-sm md:text-base text-[#434656]">
-            Help us locate your business to optimize local scheduling and settings.
-          </p>
-        </div>
-
-        {/* Form Inputs Container */}
-        <div className="space-y-4">
-          {/* State & District Inputs */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#434656] uppercase tracking-wider mb-1.5 ml-1">
-                State
-              </label>
-              <input
-                type="text"
-                value={stateName}
-                onChange={(e) => setStateName(e.target.value)}
-                placeholder="e.g. Maharashtra"
-                className="w-full bg-white border border-[#c3c5d9] focus:border-[#003ec7] focus:ring-1 focus:ring-[#003ec7] rounded-xl py-3 px-4 text-sm text-[#191c1e] outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#434656] uppercase tracking-wider mb-1.5 ml-1">
-                District / City
-              </label>
-              <input
-                type="text"
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                placeholder="e.g. Mumbai"
-                className="w-full bg-white border border-[#c3c5d9] focus:border-[#003ec7] focus:ring-1 focus:ring-[#003ec7] rounded-xl py-3 px-4 text-sm text-[#191c1e] outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Premium Full Address Search Input */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-[#434656] uppercase tracking-wider ml-1">
-                Full Address
-              </label>
-              {/* Auto Detect Button */}
-              <button
-                type="button"
-                onClick={handleDetectLocation}
-                disabled={isDetecting}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#003ec7] hover:text-[#0052ff] transition-colors py-1 px-2.5 rounded-lg hover:bg-[#0052ff]/10 disabled:opacity-50"
-              >
-                {isDetecting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Detecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-3.5 h-3.5" />
-                    <span>Use my current location</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#003ec7]">
-                <MapPin className="w-5 h-5" />
-              </div>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value)
-                  if (error) setError(null)
-                }}
-                placeholder="Search or enter your full address"
-                className="w-full bg-white border border-[#c3c5d9] focus:border-[#003ec7] focus:ring-2 focus:ring-[#003ec7]/20 rounded-xl py-4 pl-12 pr-4 shadow-sm text-sm text-[#191c1e] outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-xs font-medium text-[#ba1a1a] bg-[#ffdad6] p-3 rounded-lg border border-[#ba1a1a]/20">
-              {error}
-            </p>
-          )}
-
-          {/* Selected Address Feedback Chip */}
-          {location.trim() && (
-            <div className="bg-[#0052ff]/10 border border-[#0052ff]/30 rounded-xl p-4 flex items-center justify-between animate-in fade-in duration-300">
-              <div className="flex items-center gap-3">
-                <div className="bg-[#0052ff] p-2 rounded-lg text-white">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-[#003ec7] uppercase tracking-wider">
-                    Selected Address
-                  </p>
-                  <p className="text-sm font-semibold text-[#191c1e] line-clamp-1">
-                    {location}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Visual Map Stylized Preview Card */}
-          <div className="rounded-xl overflow-hidden border border-[#c3c5d9]/60 relative h-36 bg-[#eceef0] flex items-center justify-center">
-            <div className="absolute inset-0 opacity-40 bg-[radial-gradient(#003ec7_1px,transparent_1px)] [background-size:16px_16px]" />
-            <div className="relative z-10 flex flex-col items-center gap-1.5 text-center px-4">
-              <div className="w-8 h-8 rounded-full bg-[#003ec7] text-white flex items-center justify-center shadow-md animate-bounce">
-                <MapPin className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-bold text-[#191c1e]">Location Pin Verified</span>
-            </div>
-          </div>
-        </div>
-      </form>
-
-      {/* Footer Action */}
-      <div className="pt-8">
-        <button
-          onClick={handleSubmit}
-          className="w-full bg-[#003ec7] hover:bg-[#0052ff] text-white font-semibold py-4 rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+    <form onSubmit={handleSubmit} className="flex flex-col gap-8 w-full">
+      <div>
+        <span className="onb-eyebrow mb-4">
+          <span />
+          LOCATION
+        </span>
+        <h2
+          className="text-3xl font-extrabold tracking-tight mt-4 mb-2"
+          style={{ letterSpacing: '-0.02em', color: 'var(--onb-ink)' }}
         >
-          <span>Continue</span>
-          <ArrowRight className="w-5 h-5" />
-        </button>
+          Where is your {entityTitle}?
+        </h2>
+        <p className="text-base" style={{ color: 'var(--onb-ink-soft)' }}>
+          We'll use this for local scheduling and receipts.
+        </p>
       </div>
-    </div>
+
+      <div className="onb-card p-6 space-y-4">
+        {/* State & District Inputs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label
+              className="text-xs font-semibold uppercase tracking-wider block"
+              style={{ color: 'var(--onb-muted)' }}
+            >
+              State
+            </label>
+            <input
+              type="text"
+              value={stateName}
+              onChange={(e) => setStateName(e.target.value)}
+              placeholder="e.g. Haryana"
+              className="onb-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              className="text-xs font-semibold uppercase tracking-wider block"
+              style={{ color: 'var(--onb-muted)' }}
+            >
+              City
+            </label>
+            <input
+              type="text"
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+              placeholder="e.g. Gurugram"
+              className="onb-input"
+            />
+          </div>
+        </div>
+
+        {/* Full Address Search Input */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--onb-muted)' }}
+            >
+              Full Address
+            </label>
+            <button
+              type="button"
+              onClick={handleDetectLocation}
+              disabled={isDetecting}
+              className="inline-flex items-center gap-1.5 text-xs font-bold transition-colors py-1 px-2.5 rounded-lg disabled:opacity-50 hover:bg-white/5"
+              style={{ color: 'var(--onb-emerald)' }}
+            >
+              {isDetecting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Detecting...</span>
+                </>
+              ) : (
+                <>
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Use my current location</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--onb-emerald)' }}>
+              <MapPin className="w-5 h-5" />
+            </div>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => {
+                setLocation(e.target.value)
+                if (error) setError(null)
+              }}
+              placeholder="Search or enter your full address"
+              className="onb-input"
+              style={{ paddingLeft: 48 }}
+            />
+          </div>
+        </div>
+
+        {error && (
+          <p
+            className="text-xs font-medium p-3 rounded-lg"
+            style={{ color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)' }}
+          >
+            {error}
+          </p>
+        )}
+
+        {/* Selected Address Feedback Chip */}
+        {location.trim() && (
+          <div
+            className="rounded-xl p-4 flex items-center gap-3 animate-in fade-in duration-300"
+            style={{ background: 'var(--onb-emerald-tint)', border: '1px solid rgba(16,185,129,0.3)' }}
+          >
+            <div className="p-2 rounded-lg" style={{ background: 'var(--onb-emerald)', color: '#08080a' }}>
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--onb-emerald)' }}>
+                Selected Address
+              </p>
+              <p className="text-sm font-semibold line-clamp-1" style={{ color: 'var(--onb-ink)' }}>
+                {location}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Visual Map Stylized Preview Card */}
+        <div
+          className="rounded-xl overflow-hidden relative h-36 flex items-center justify-center"
+          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--onb-line)' }}
+        >
+          <div
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)',
+              backgroundSize: '16px 16px',
+            }}
+          />
+          <div className="relative z-10 flex flex-col items-center gap-1.5 text-center px-4">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center shadow-md animate-bounce"
+              style={{ background: 'var(--onb-emerald)', color: '#08080a' }}
+            >
+              <MapPin className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold" style={{ color: 'var(--onb-ink)' }}>
+              Location Pin Verified
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <button onClick={handleSubmit} type="submit" className="onb-btn-primary">
+        Continue
+        <ArrowRight className="w-4 h-4" />
+      </button>
+    </form>
   )
 }

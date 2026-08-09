@@ -29,7 +29,7 @@ export function OnboardingPageDesktop() {
   }
 
   return (
-    <div className="flex-1 flex flex-col w-full max-w-4xl mx-auto">
+    <div className="flex-1 flex flex-col w-full max-w-2xl mx-auto px-4 pb-10" style={{ paddingTop: 32 }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={step}

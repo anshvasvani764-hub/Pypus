@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./landing.module.css";
+import { signInWithGoogle } from "@/lib/auth/signInWithGoogle";
 
 export default function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     function onScroll() {
@@ -16,6 +18,17 @@ export default function LandingHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  async function handleGoogleAuth() {
+    if (authLoading) return;
+    setAuthLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch {
+      // Fall back to the /login page so the user sees a clear error state
+      window.location.href = "/login?error=auth_failed";
+    }
+  }
 
   return (
     <header className={`${scrolled ? styles.scrolled : ""}`}>
@@ -50,8 +63,12 @@ export default function LandingHeader() {
         </ul>
 
         <div className={styles["nav-cta-group"]}>
-          <Link href="/login" className={styles.login}>Log in</Link>
-          <Link href="/login" className={`${styles.btn} ${styles["btn-primary"]}`}>Start free</Link>
+          <button type="button" onClick={handleGoogleAuth} disabled={authLoading} className={styles.login}>
+            {authLoading ? "Opening Google…" : "Log in"}
+          </button>
+          <button type="button" onClick={handleGoogleAuth} disabled={authLoading} className={`${styles.btn} ${styles["btn-primary"]}`}>
+            {authLoading ? "Opening Google…" : "Start free"}
+          </button>
         </div>
 
         <button

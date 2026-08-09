@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { OnboardingAurora } from '@/components/onboarding/OnboardingAurora'
 
 export function LoginPageDesktop() {
   const [isLoading, setIsLoading] = useState(false)
@@ -34,44 +35,52 @@ export function LoginPageDesktop() {
   }
 
   return (
-    <div className="bg-[#f7f9fb] text-[#191c1e] min-h-screen flex flex-col items-center justify-center px-4 font-sans relative selection:bg-[#0052ff] selection:text-white">
-      {/* Decorative Gradient Bar */}
-      <div className="h-1 bg-gradient-to-r from-[#003ec7]/10 via-[#003ec7] to-[#003ec7]/10 w-full fixed top-0 left-0" />
+    <div className="onb-root min-h-screen flex flex-col items-center justify-center px-4 font-sans relative selection:bg-emerald-500/30 selection:text-white">
+      <OnboardingAurora />
 
-      {/* Main Login Card */}
-      <main className="w-full max-w-[440px] flex flex-col items-center text-center z-10 py-12 px-6 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.04)] border border-[#c3c5d9]/40 transition-all">
-        {/* Logo Section */}
-        <div className="mb-6 p-4 bg-[#f2f4f6] rounded-2xl shadow-sm text-[#003ec7] flex items-center justify-center">
-          <Building2 className="w-10 h-10 stroke-[2]" />
+      <main className="onb-card relative z-10 w-full max-w-[440px] flex flex-col items-center text-center py-12 px-8">
+        {/* Logo */}
+        <div className="mb-8 flex items-center gap-2.5">
+          <img src="/logo.png" alt="Pypus logo" className="w-9 h-9 rounded-lg" />
+          <span className="font-bold text-xl tracking-tight" style={{ color: 'var(--onb-ink)' }}>
+            Pypus
+          </span>
         </div>
+
+        <span className="onb-eyebrow mb-5">
+          <span />
+          WELCOME BACK
+        </span>
 
         {/* Header Text */}
         <div className="space-y-3 mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#191c1e]">
-            Manage your business with ease.
+          <h1
+            className="text-2xl md:text-3xl font-extrabold tracking-tight"
+            style={{ letterSpacing: '-0.02em', color: 'var(--onb-ink)' }}
+          >
+            Run your gym like a system, not a scramble.
           </h1>
-          <p className="text-sm md:text-base text-[#434656] max-w-[320px] mx-auto leading-relaxed">
-            A powerful management tool for gym owners and service professionals.
+          <p className="text-sm md:text-base max-w-[320px] mx-auto leading-relaxed" style={{ color: 'var(--onb-ink-soft)' }}>
+            Attendance, fee reminders and receipts that handle themselves — sign in to pick up where you left off.
           </p>
         </div>
 
         {/* Error Alert */}
         {errorMsg && (
-          <div className="w-full mb-6 p-3 rounded-xl bg-[#ffdad6] text-[#93000a] text-xs font-semibold text-left border border-[#ba1a1a]/20">
+          <div
+            className="w-full mb-6 p-3 rounded-xl text-xs font-semibold text-left"
+            style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}
+          >
             {errorMsg}
           </div>
         )}
 
         {/* Action Button */}
         <div className="w-full space-y-4">
-          <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="group relative w-full flex items-center justify-center gap-3 bg-[#003ec7] hover:bg-[#0052ff] text-white py-4 px-6 rounded-xl font-semibold text-base transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
-          >
+          <button onClick={handleGoogleLogin} disabled={isLoading} className="onb-btn-primary">
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin text-white" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Redirecting to Google...</span>
               </>
             ) : (
@@ -100,16 +109,22 @@ export function LoginPageDesktop() {
           </button>
         </div>
 
+        {/* Trust strip */}
+        <div
+          className="flex items-center justify-center gap-2 mt-8 py-2.5 px-3 rounded-xl text-xs font-medium w-full"
+          style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--onb-ink-soft)' }}
+        >
+          <span style={{ color: 'var(--onb-emerald)' }}>●</span>
+          <span>Trusted by gym owners across Gurugram — live in under 24 hours</span>
+        </div>
+
         {/* Microcopy Terms */}
-        <p className="mt-8 text-xs text-[#737688] max-w-[280px]">
+        <p className="mt-6 text-xs max-w-[280px]" style={{ color: 'var(--onb-muted)' }}>
           By continuing, you agree to our{' '}
-          <span className="underline hover:text-[#003ec7] cursor-pointer">Terms of Service</span> and{' '}
-          <span className="underline hover:text-[#003ec7] cursor-pointer">Privacy Policy</span>.
+          <span className="underline cursor-pointer hover:text-[var(--onb-emerald)]">Terms of Service</span> and{' '}
+          <span className="underline cursor-pointer hover:text-[var(--onb-emerald)]">Privacy Policy</span>.
         </p>
       </main>
-
-      {/* Decorative Bottom Bar */}
-      <div className="h-1 bg-gradient-to-r from-[#003ec7]/10 via-[#003ec7] to-[#003ec7]/10 w-full fixed bottom-0 left-0" />
     </div>
   )
 }

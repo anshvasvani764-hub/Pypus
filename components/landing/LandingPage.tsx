@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./landing.module.css";
+import { signInWithGoogle } from "@/lib/auth/signInWithGoogle";
 import AuroraBackground from "./AuroraBackground";
 import LandingHeader from "./LandingHeader";
 import HeroAutomationFeed from "./HeroAutomationFeed";
@@ -20,6 +21,8 @@ import {
 } from "./landing-data";
 
 export default function LandingPage() {
+  const [authLoading, setAuthLoading] = useState(false);
+
   // smooth-scroll only while this page is mounted, so it never leaks to
   // the rest of the app (dashboard / workstation etc.)
   useEffect(() => {
@@ -29,6 +32,17 @@ export default function LandingPage() {
       document.documentElement.style.scrollBehavior = prev;
     };
   }, []);
+
+  async function handleGoogleAuth() {
+    if (authLoading) return;
+    setAuthLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch {
+      // Fall back to the /login page so the user sees a clear error state
+      window.location.href = "/login?error=auth_failed";
+    }
+  }
 
   return (
     <div className={`${styles.landingRoot} ${inter.variable} ${jetbrainsMono.variable}`}>
@@ -49,7 +63,9 @@ export default function LandingPage() {
               so nothing falls through the cracks, and you spend your day growing the gym, not managing it.
             </p>
             <div className={styles["hero-ctas"]}>
-              <Link href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</Link>
+              <button type="button" onClick={handleGoogleAuth} disabled={authLoading} className={`${styles.btn} ${styles["btn-emerald"]}`}>
+                {authLoading ? "Opening Google…" : "Start free trial"}
+              </button>
               <Link href="#how" className={`${styles.btn} ${styles["btn-ghost"]}`}>Watch 2-min demo</Link>
             </div>
             <p className={styles["hero-note"]}>Trusted by gym owners across Gurugram · Live in under 24 hours</p>
@@ -286,13 +302,25 @@ export default function LandingPage() {
                       <li key={f}><span className={styles.check}>✓</span>{f}</li>
                     ))}
                   </ul>
-                  <a
-                    href={plan.ctaHref}
-                    className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
-                    style={{ width: "100%" }}
-                  >
-                    {plan.ctaLabel}
-                  </a>
+                  {plan.blurred ? (
+                    <a
+                      href={plan.ctaHref}
+                      className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
+                      style={{ width: "100%" }}
+                    >
+                      {plan.ctaLabel}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGoogleAuth}
+                      disabled={authLoading}
+                      className={`${styles.btn} ${plan.featured ? styles["btn-emerald"] : styles["btn-ghost"]}`}
+                      style={{ width: "100%", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                    >
+                      {authLoading ? "Opening Google…" : plan.ctaLabel}
+                    </button>
+                  )}
                 </div>
                 {plan.blurred && (
                   <div className={styles.blurOverlay}>
@@ -324,7 +352,9 @@ export default function LandingPage() {
             <h2>Your gym, finally running like one system.</h2>
             <p>Set up your first automation in under 10 minutes, and watch your front desk, fees and reports fall quietly into place.</p>
             <div className={styles["hero-ctas"]}>
-              <Link href="/login" className={`${styles.btn} ${styles["btn-emerald"]}`}>Start free trial</Link>
+              <button type="button" onClick={handleGoogleAuth} disabled={authLoading} className={`${styles.btn} ${styles["btn-emerald"]}`}>
+                {authLoading ? "Opening Google…" : "Start free trial"}
+              </button>
               <Link href="/login" className={`${styles.btn} ${styles["btn-ghost"]}`} style={{ borderColor: "rgba(245,244,239,0.3)", color: "#F5F4EF" }}>Talk to sales</Link>
             </div>
           </Reveal>

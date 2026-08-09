@@ -19,7 +19,7 @@ interface Particle {
   duration: number
 }
 
-const CONFETTI_COLORS = ['#003ec7', '#0052ff', '#22C55E', '#FBBC05', '#EA4335', '#9333EA']
+const CONFETTI_COLORS = ['#10B981', '#059669', '#6EE7B7', '#14B8A6', '#34D399', '#A7F3D0']
 
 export default function StepLoadingSuccess() {
   const router = useRouter()
@@ -210,17 +210,19 @@ export default function StepLoadingSuccess() {
   if (phase === 'error' || (creationError && phase === 'phase4_success')) {
     return (
       <div className="flex-grow flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-        <div className="w-16 h-16 rounded-full bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center mb-4">
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+          style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171' }}
+        >
           <AlertCircle className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-bold text-[#191c1e] mb-2">Setup Failed</h3>
-        <p className="text-sm text-[#434656] mb-6">
+        <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--onb-ink)' }}>
+          Setup Failed
+        </h3>
+        <p className="text-sm mb-6" style={{ color: 'var(--onb-ink-soft)' }}>
           {creationError || 'An error occurred while creating your workspace. Please try again.'}
         </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="bg-[#003ec7] hover:bg-[#0052ff] text-white px-6 py-3 rounded-xl font-semibold text-sm shadow-md"
-        >
+        <button onClick={() => window.location.reload()} className="onb-btn-primary" style={{ width: 'auto', paddingLeft: 24, paddingRight: 24 }}>
           Try Again
         </button>
       </div>
@@ -249,10 +251,10 @@ export default function StepLoadingSuccess() {
               transition={{ duration: 0.4 }}
               className="space-y-2"
             >
-              <h2 className="text-2xl font-bold text-[#191c1e]">
+              <h2 className="text-2xl font-bold" style={{ color: 'var(--onb-ink)' }}>
                 Creating your workspace…
               </h2>
-              <p className="text-sm text-[#434656]">
+              <p className="text-sm" style={{ color: 'var(--onb-ink-soft)' }}>
                 Setting up modules for {selectedTemplate?.name || 'Gym'}
               </p>
             </motion.div>
@@ -266,25 +268,26 @@ export default function StepLoadingSuccess() {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
-                    className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
+                    className="flex items-center justify-between p-4 rounded-xl transition-all duration-300"
+                    style={
                       mod.status === 'done'
-                        ? 'bg-[#22C55E]/10 border-[#22C55E]/40 text-[#191c1e]'
+                        ? { background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.4)', color: 'var(--onb-ink)' }
                         : mod.status === 'doing'
-                        ? 'bg-[#0052ff]/10 border-[#0052ff] text-[#003ec7]'
-                        : 'bg-white border-[#c3c5d9]/40 text-[#737688]'
-                    }`}
+                        ? { background: 'rgba(16,185,129,0.06)', border: '1px solid var(--onb-emerald)', color: 'var(--onb-emerald)' }
+                        : { background: 'rgba(255,255,255,0.02)', border: '1px solid var(--onb-line)', color: 'var(--onb-muted)' }
+                    }
                   >
                     <span className="text-sm font-semibold">{mod.name}</span>
 
                     <div>
                       {mod.status === 'doing' && (
-                        <Loader2 className="w-5 h-5 animate-spin text-[#003ec7]" />
+                        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--onb-emerald)' }} />
                       )}
                       {mod.status === 'done' && (
-                        <CheckCircle2 className="w-5 h-5 text-[#22C55E]" />
+                        <CheckCircle2 className="w-5 h-5" style={{ color: 'var(--onb-emerald)' }} />
                       )}
                       {mod.status === 'neutral' && (
-                        <div className="w-4 h-4 rounded-full border-2 border-[#c3c5d9]" />
+                        <div className="w-4 h-4 rounded-full" style={{ border: '2px solid var(--onb-line-strong)' }} />
                       )}
                     </div>
                   </motion.div>
@@ -335,25 +338,29 @@ export default function StepLoadingSuccess() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
-              className="w-20 h-20 bg-[#22C55E] text-white rounded-full flex items-center justify-center shadow-lg shadow-[#22C55E]/30"
+              className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
+              style={{ background: 'var(--onb-emerald)', color: '#08080a', boxShadow: '0 10px 30px rgba(16,185,129,0.3)' }}
             >
               <CheckCircle2 className="w-12 h-12 stroke-[2.5]" />
             </motion.div>
 
             {/* Success Heading */}
             <div className="space-y-2">
-              <h2 className="text-3xl font-extrabold text-[#191c1e]">You're all set!</h2>
-              <p className="text-base text-[#434656] max-w-[300px] mx-auto">
-                Your <span className="font-semibold text-[#003ec7]">{bizName || selectedTemplate?.name || 'Workspace'}</span> workspace is ready. Let's get started.
+              <h2 className="text-3xl font-extrabold" style={{ color: 'var(--onb-ink)' }}>
+                You're all set!
+              </h2>
+              <p className="text-base max-w-[300px] mx-auto" style={{ color: 'var(--onb-ink-soft)' }}>
+                Your{' '}
+                <span className="font-semibold" style={{ color: 'var(--onb-emerald)' }}>
+                  {bizName || selectedTemplate?.name || 'Workspace'}
+                </span>{' '}
+                workspace is ready. Let's get started.
               </p>
             </div>
 
             {/* Go to Dashboard Action */}
             <div className="w-full pt-4 space-y-3">
-              <button
-                onClick={handleGoToDashboard}
-                className="w-full bg-[#003ec7] hover:bg-[#0052ff] text-white font-semibold py-4 rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
-              >
+              <button onClick={handleGoToDashboard} className="onb-btn-primary">
                 {isNavigating ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />

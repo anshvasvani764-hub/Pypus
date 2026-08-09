@@ -145,13 +145,15 @@
   .nav-links a{font-size:14.5px;font-weight:500;color:var(--ink-soft);transition:color .2s;}
   .nav-links a:hover{color:var(--ink);}
   .nav-cta-group{display:flex;align-items:center;gap:18px;}
-  .nav-cta-group .login{font-size:14.5px;font-weight:500;color:var(--ink-soft);}
+  .nav-cta-group .login{font-size:14.5px;font-weight:500;color:var(--ink-soft);background:none;border:none;cursor:pointer;font-family:inherit;}
+  .nav-cta-group .login:disabled{opacity:.7;cursor:not-allowed;}
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     padding:11px 20px;border-radius:100px;font-weight:600;font-size:14.5px;
     transition:transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
-    min-height:44px;
+    min-height:44px;border:none;cursor:pointer;font-family:inherit;
   }
+  .btn:disabled{opacity:.7;cursor:not-allowed;transform:none;}
   .btn.btn-primary{background:var(--ink);color:var(--cream);}
   .btn.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(23,23,15,0.18);}
   .btn.btn-primary:active{transform:translateY(0);}

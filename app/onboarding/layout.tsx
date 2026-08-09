@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { OnboardingProvider, useOnboarding } from '@/context/OnboardingContext'
+import { OnboardingAurora } from '@/components/onboarding/OnboardingAurora'
 import { ArrowLeft as ArrowLeftIcon } from 'lucide-react'
 
 function OnboardingHeader() {
@@ -11,12 +12,18 @@ function OnboardingHeader() {
   const progressPercent = Math.min((step / 4) * 100, 100)
 
   return (
-    <header className="sticky top-0 z-50 bg-[#f7f9fb]/90 backdrop-blur-md border-b border-[#c3c5d9]/30">
+    <header
+      className="sticky top-0 z-50"
+      style={{
+        background: 'linear-gradient(to bottom, rgba(8,8,10,0.95) 65%, rgba(8,8,10,0) 100%)',
+        paddingBottom: 14,
+      }}
+    >
       {/* Top progress bar */}
-      <div className="w-full bg-[#e0e3e5] h-1">
+      <div className="w-full h-1" style={{ background: 'var(--onb-line)' }}>
         <div
-          className="bg-[#003ec7] h-1 transition-all duration-500 ease-out"
-          style={{ width: `${progressPercent}%` }}
+          className="h-1 transition-all duration-500 ease-out"
+          style={{ background: 'var(--onb-emerald)', width: `${progressPercent}%` }}
         />
       </div>
 
@@ -25,16 +32,22 @@ function OnboardingHeader() {
           onClick={prevStep}
           disabled={step <= 1 || step >= 5}
           aria-label="Go back"
-          className={`p-2 rounded-full text-[#003ec7] hover:bg-[#f2f4f6] transition-all active:scale-95 flex items-center justify-center ${
+          className={`p-2 rounded-full transition-all active:scale-95 flex items-center justify-center hover:bg-white/5 ${
             step <= 1 || step >= 5 ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}
+          style={{ color: 'var(--onb-emerald)' }}
         >
           <ArrowLeftIcon className="w-5 h-5" />
         </button>
 
-        <h1 className="font-bold text-lg text-[#003ec7] tracking-tight">Management App</h1>
+        <h1 className="font-bold text-base tracking-tight" style={{ color: 'var(--onb-ink)' }}>
+          Pypus
+        </h1>
 
-        <div className="text-xs font-semibold uppercase tracking-wider text-[#434656] w-20 text-right">
+        <div
+          className="text-xs font-semibold uppercase tracking-wider w-20 text-right"
+          style={{ color: 'var(--onb-muted)' }}
+        >
           {step < 5 ? `Step ${step} of 4` : ''}
         </div>
       </nav>
@@ -45,9 +58,12 @@ function OnboardingHeader() {
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
     <OnboardingProvider>
-      <div className="bg-[#f7f9fb] text-[#191c1e] min-h-screen flex flex-col font-sans selection:bg-[#0052ff] selection:text-white">
-        <OnboardingHeader />
-        <main className="flex-1 flex flex-col">{children}</main>
+      <div className="onb-root min-h-screen flex flex-col font-sans relative selection:bg-emerald-500/30 selection:text-white">
+        <OnboardingAurora />
+        <div className="relative z-10 flex flex-col flex-1">
+          <OnboardingHeader />
+          <main className="flex-1 flex flex-col">{children}</main>
+        </div>
       </div>
     </OnboardingProvider>
   )
