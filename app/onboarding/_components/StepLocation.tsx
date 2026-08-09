@@ -1,13 +1,23 @@
 'use client'
 
-import { useState } from 'react'
 import { useOnboarding } from '@/context/OnboardingContext'
-import { MapPin, Navigation, CheckCircle2, Loader2, ArrowRight } from 'lucide-react'
+import { MapPin, Navigation, Loader2, ArrowRight } from 'lucide-react'
+import { useState } from 'react'
 
 export default function StepLocation() {
-  const { location, setLocation, selectedTemplate, nextStep } = useOnboarding()
-  const [stateName, setStateName] = useState('')
-  const [district, setDistrict] = useState('')
+  const {
+    addressLine1,
+    setAddressLine1,
+    state,
+    setState,
+    city,
+    setCity,
+    pincode,
+    setPincode,
+    setLocation,
+    selectedTemplate,
+    nextStep,
+  } = useOnboarding()
   const [isDetecting, setIsDetecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,17 +40,11 @@ export default function StepLocation() {
           )
           const data = await res.json()
 
-          const detectedCity = data.city || data.locality || data.principalSubdivision || ''
+          const detectedCity = data.city || data.locality || ''
           const detectedState = data.principalSubdivision || ''
-          const detectedCountry = data.countryName || 'India'
 
-          const fullDetectedAddress = [detectedCity, detectedState, detectedCountry]
-            .filter(Boolean)
-            .join(', ')
-
-          setLocation(fullDetectedAddress || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-          if (detectedState) setStateName(detectedState)
-          if (detectedCity) setDistrict(detectedCity)
+          if (detectedCity) setCity(detectedCity)
+          if (detectedState) setState(detectedState)
         } catch (err) {
           setError('Could not reverse geocode location. Please type your address manually.')
         } finally {
@@ -63,12 +67,13 @@ export default function StepLocation() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = location.trim()
-    if (!trimmed) {
-      setError('Please enter or detect your address to continue.')
+    if (!addressLine1.trim() || !state.trim() || !city.trim() || !pincode.trim()) {
+      setError('Please fill in all address fields to continue.')
       return
     }
     setError(null)
+    // Keep the combined `location` string in sync for anything still reading it
+    setLocation([addressLine1, city, state, pincode].filter(Boolean).join(', '))
     nextStep()
   }
 
@@ -93,7 +98,55 @@ export default function StepLocation() {
       </div>
 
       <div className="onb-card p-6 space-y-4">
-        {/* State & District Inputs */}
+        <div className="flex items-center justify-end -mb-1">
+          <button
+            type="button"
+            onClick={handleDetectLocation}
+            disabled={isDetecting}
+            className="inline-flex items-center gap-1.5 text-xs font-bold transition-colors py-1 px-2.5 rounded-lg disabled:opacity-50 hover:bg-white/5"
+            style={{ color: 'var(--onb-emerald)' }}
+          >
+            {isDetecting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Detecting...</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="w-3.5 h-3.5" />
+                <span>Use my current location</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Address Line 1 */}
+        <div className="space-y-2">
+          <label
+            className="text-xs font-semibold uppercase tracking-wider block"
+            style={{ color: 'var(--onb-muted)' }}
+          >
+            Address Line 1
+          </label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--onb-emerald)' }}>
+              <MapPin className="w-5 h-5" />
+            </div>
+            <input
+              type="text"
+              value={addressLine1}
+              onChange={(e) => {
+                setAddressLine1(e.target.value)
+                if (error) setError(null)
+              }}
+              placeholder="e.g. Shop 12, Sector 14 Market"
+              className="onb-input"
+              style={{ paddingLeft: 48 }}
+            />
+          </div>
+        </div>
+
+        {/* State & City */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-2">
             <label
@@ -104,8 +157,11 @@ export default function StepLocation() {
             </label>
             <input
               type="text"
-              value={stateName}
-              onChange={(e) => setStateName(e.target.value)}
+              value={state}
+              onChange={(e) => {
+                setState(e.target.value)
+                if (error) setError(null)
+              }}
               placeholder="e.g. Haryana"
               className="onb-input"
             />
@@ -119,60 +175,37 @@ export default function StepLocation() {
             </label>
             <input
               type="text"
-              value={district}
-              onChange={(e) => setDistrict(e.target.value)}
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value)
+                if (error) setError(null)
+              }}
               placeholder="e.g. Gurugram"
               className="onb-input"
             />
           </div>
         </div>
 
-        {/* Full Address Search Input */}
+        {/* Pincode */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label
-              className="text-xs font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--onb-muted)' }}
-            >
-              Full Address
-            </label>
-            <button
-              type="button"
-              onClick={handleDetectLocation}
-              disabled={isDetecting}
-              className="inline-flex items-center gap-1.5 text-xs font-bold transition-colors py-1 px-2.5 rounded-lg disabled:opacity-50 hover:bg-white/5"
-              style={{ color: 'var(--onb-emerald)' }}
-            >
-              {isDetecting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Detecting...</span>
-                </>
-              ) : (
-                <>
-                  <Navigation className="w-3.5 h-3.5" />
-                  <span>Use my current location</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="relative">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--onb-emerald)' }}>
-              <MapPin className="w-5 h-5" />
-            </div>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value)
-                if (error) setError(null)
-              }}
-              placeholder="Search or enter your full address"
-              className="onb-input"
-              style={{ paddingLeft: 48 }}
-            />
-          </div>
+          <label
+            className="text-xs font-semibold uppercase tracking-wider block"
+            style={{ color: 'var(--onb-muted)' }}
+          >
+            Pincode
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={pincode}
+            onChange={(e) => {
+              setPincode(e.target.value)
+              if (error) setError(null)
+            }}
+            placeholder="e.g. 122001"
+            className="onb-input"
+            style={{ maxWidth: 200 }}
+          />
         </div>
 
         {error && (
@@ -183,51 +216,6 @@ export default function StepLocation() {
             {error}
           </p>
         )}
-
-        {/* Selected Address Feedback Chip */}
-        {location.trim() && (
-          <div
-            className="rounded-xl p-4 flex items-center gap-3 animate-in fade-in duration-300"
-            style={{ background: 'var(--onb-emerald-tint)', border: '1px solid rgba(16,185,129,0.3)' }}
-          >
-            <div className="p-2 rounded-lg" style={{ background: 'var(--onb-emerald)', color: '#08080a' }}>
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--onb-emerald)' }}>
-                Selected Address
-              </p>
-              <p className="text-sm font-semibold line-clamp-1" style={{ color: 'var(--onb-ink)' }}>
-                {location}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Visual Map Stylized Preview Card */}
-        <div
-          className="rounded-xl overflow-hidden relative h-36 flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--onb-line)' }}
-        >
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)',
-              backgroundSize: '16px 16px',
-            }}
-          />
-          <div className="relative z-10 flex flex-col items-center gap-1.5 text-center px-4">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center shadow-md animate-bounce"
-              style={{ background: 'var(--onb-emerald)', color: '#08080a' }}
-            >
-              <MapPin className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-bold" style={{ color: 'var(--onb-ink)' }}>
-              Location Pin Verified
-            </span>
-          </div>
-        </div>
       </div>
 
       <button onClick={handleSubmit} type="submit" className="onb-btn-primary">

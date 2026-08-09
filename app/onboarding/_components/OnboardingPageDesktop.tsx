@@ -1,10 +1,10 @@
 'use client'
 
 import { useOnboarding } from '@/context/OnboardingContext'
-import StepIndustry from '../_components/StepIndustry'
-import StepBusinessName from '../_components/StepBusinessName'
+import StepBusinessDetails from '../_components/StepBusinessDetails'
 import StepPhone from '../_components/StepPhone'
 import StepLocation from '../_components/StepLocation'
+import StepPlanSelect from '../_components/StepPlanSelect'
 import StepLoadingSuccess from '../_components/StepLoadingSuccess'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -14,17 +14,17 @@ export function OnboardingPageDesktop() {
   const renderStepComponent = () => {
     switch (step) {
       case 1:
-        return <StepIndustry />
+        return <StepBusinessDetails />
       case 2:
-        return <StepBusinessName />
-      case 3:
         return <StepPhone />
-      case 4:
+      case 3:
         return <StepLocation />
+      case 4:
+        return <StepPlanSelect />
       case 5:
         return <StepLoadingSuccess />
       default:
-        return <StepIndustry />
+        return <StepBusinessDetails />
     }
   }
 

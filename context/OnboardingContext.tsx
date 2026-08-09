@@ -11,6 +11,9 @@ interface OnboardingState {
   phone: string
   location: string
   state: string
+  addressLine1: string
+  city: string
+  pincode: string
   memberCount: string
   trainerCount: string
   createdWorkspaceId: string | null
@@ -21,6 +24,9 @@ interface OnboardingState {
   setPhone: (phone: string) => void
   setLocation: (loc: string) => void
   setState: (state: string) => void
+  setAddressLine1: (val: string) => void
+  setCity: (val: string) => void
+  setPincode: (val: string) => void
   setMemberCount: (count: string) => void
   setTrainerCount: (count: string) => void
   setCreatedWorkspaceId: (id: string | null) => void
@@ -41,12 +47,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [phone, setPhone] = useState<string>('')
   const [location, setLocation] = useState<string>('')
   const [state, setState] = useState<string>('')
+  const [addressLine1, setAddressLine1] = useState<string>('')
+  const [city, setCity] = useState<string>('')
+  const [pincode, setPincode] = useState<string>('')
   const [memberCount, setMemberCount] = useState<string>('51–150')
   const [trainerCount, setTrainerCount] = useState<string>('No trainer — I manage myself')
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [creationError, setCreationError] = useState<string | null>(null)
 
+  // 5 steps: Business + Industry -> Phone -> Location -> Plan Select -> Loading/Success
   const nextStep = () => setStep((prev) => Math.min(prev + 1, 5))
   const prevStep = () => setStep((prev) => Math.max(prev - 1, 1))
 
@@ -70,12 +80,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         modules: [],
       }
 
+      const combinedAddress =
+        [addressLine1, city, state, pincode].filter(Boolean).join(', ') || location
+
       const wsId = await performWorkspaceCreation(
         supabase,
         templateToUse,
         bizName || 'My Gym Workspace',
         phone || '0000000000',
-        location || 'Local',
+        combinedAddress || 'Local',
         user.id
       )
 
@@ -96,6 +109,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         phone,
         location,
         state,
+        addressLine1,
+        city,
+        pincode,
         memberCount,
         trainerCount,
         createdWorkspaceId,
@@ -106,6 +122,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         setPhone,
         setLocation,
         setState,
+        setAddressLine1,
+        setCity,
+        setPincode,
         setMemberCount,
         setTrainerCount,
         setCreatedWorkspaceId,
