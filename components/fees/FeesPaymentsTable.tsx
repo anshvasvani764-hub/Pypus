@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Member, FeeRecord } from "@/lib/members/types";
 import type { MemberFeeSummary, DerivedFeeStatus } from "@/lib/members/fee-status";
-import { MemberSearchBar } from "@/components/members/MemberSearchBar";
+import { useSearch } from "@/context/SearchContext";
 import { PlanSelectorModal } from "@/components/members/PlanSelectorModal";
 import { MarkPaidModal, type PaymentMethod } from "@/components/fees/MarkPaidModal";
 import { assignPlanToMember, markFeeAsPaid } from "@/app/actions/member-plan";
@@ -97,7 +97,7 @@ export function FeesPaymentsTable({
   onPlanAssigned,
   onPaid,
 }: FeesPaymentsTableProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery } = useSearch();
   const [activeFilter, setActiveFilter] = useState<PaymentFilter>("all");
   const [assignTarget, setAssignTarget] = useState<Member | null>(null);
   const [paidTarget, setPaidTarget] = useState<Member | null>(null);
@@ -211,11 +211,6 @@ export function FeesPaymentsTable({
       />
 
       <div className="px-5 pt-5 pb-3 space-y-3">
-        <MemberSearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Search by member name..."
-        />
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {FILTER_OPTIONS.map((opt) => (
             <button

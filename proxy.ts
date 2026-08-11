@@ -51,8 +51,17 @@ export async function proxy(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname
 
+    const isPublicRoute =
+      pathname === '/' ||
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/auth') ||
+      pathname.startsWith('/invite') ||
+      pathname.startsWith('/m/')
+
+    const isProtectedRoute = pathname.startsWith('/onboarding') || !isPublicRoute
+
     // 1. Unauthenticated users trying to access protected routes -> redirect to /login
-    if (!user && (pathname.startsWith('/onboarding') || pathname.startsWith('/dashboard'))) {
+    if (!user && isProtectedRoute) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)

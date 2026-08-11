@@ -1,0 +1,104 @@
+From 85a8b3e19e1fb4f1c267e1878fa2bc8ddd0df66b Mon Sep 17 00:00:00 2001
+From: Claude <claude@pypus.in>
+Date: Mon, 10 Aug 2026 19:51:06 +0000
+Subject: [PATCH] Fix workspace/members/attendance pages showing false 'not
+ found'
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Root cause: the initial 'find workspace by slug' lookup on these pages used
+the RLS-bound Supabase client (createClient()) instead of the service-role
+client (createServiceClient()) that every other module page already uses.
+
+- lib/auth/get-current-workspace-context.ts (only used by the Workspace page)
+  called notFound() whenever that query errored — including RLS errors on a
+  workspace that actually exists, not just a genuinely missing slug. This is
+  why /{slug}/workspace specifically was showing 'not found'.
+- app/[app]/members/page.tsx and app/[app]/attendance/page.tsx had the same
+  RLS-bound lookup, but silently fell back to an empty workspaceId instead of
+  a hard 404 — so they'd render but with no data if the query got blocked.
+
+All three now resolve the workspace by slug with the service client, same
+pattern already used in fees/page.tsx, expenses/page.tsx, team/page.tsx and
+settings/page.tsx. Team/Settings were already correct (service client for
+the workspace lookup, RLS client only for auth.getUser()).
+---
+ app/[app]/attendance/page.tsx             |  4 ++--
+ app/[app]/members/page.tsx                |  4 ++--
+ lib/auth/get-current-workspace-context.ts | 10 ++++++++--
+ 3 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/app/[app]/attendance/page.tsx b/app/[app]/attendance/page.tsx
+index 9a75cea..9fa26e9 100644
+--- a/app/[app]/attendance/page.tsx
++++ b/app/[app]/attendance/page.tsx
+@@ -1,4 +1,4 @@
+-import { createClient } from "@/lib/supabase/server";
++import { createServiceClient } from "@/lib/supabase/service";
+ import {
+   getMembers,
+   getAttendanceForToday,
+@@ -17,7 +17,7 @@ export default async function AttendancePage({
+ }) {
+   const { app: workspaceSlug } = await params;
+ 
+-  const supabase = await createClient();
++  const supabase = createServiceClient();
+   const { data: wsData } = await supabase
+     .from("workspaces")
+     .select("id, name")
+diff --git a/app/[app]/members/page.tsx b/app/[app]/members/page.tsx
+index 7089cb1..dac6d2c 100644
+--- a/app/[app]/members/page.tsx
++++ b/app/[app]/members/page.tsx
+@@ -2,7 +2,7 @@ import { MemberRegistryView } from "@/components/members/MemberRegistryView";
+ import { MemberRegistryViewMobile } from "@/components/members/MemberRegistryView.mobile";
+ import { getDevice } from "@/lib/device";
+ import { getMembers, getAttendanceForToday } from "@/lib/supabase/queries";
+-import { createClient } from "@/lib/supabase/server";
++import { createServiceClient } from "@/lib/supabase/service";
+ import { deriveFeeSummary, type DerivedFeeStatus } from "@/lib/members/fee-status";
+ import type { FeeRecord } from "@/lib/members/types";
+ 
+@@ -13,7 +13,7 @@ export default async function MembersPage({
+ }) {
+   const { app: workspaceSlug } = await params;
+ 
+-  const supabase = await createClient();
++  const supabase = createServiceClient();
+   const { data: wsData } = await supabase
+     .from("workspaces")
+     .select("id")
+diff --git a/lib/auth/get-current-workspace-context.ts b/lib/auth/get-current-workspace-context.ts
+index ae2ce6e..b8c69fe 100644
+--- a/lib/auth/get-current-workspace-context.ts
++++ b/lib/auth/get-current-workspace-context.ts
+@@ -1,4 +1,4 @@
+-import { createClient } from "@/lib/supabase/server";
++import { createServiceClient } from "@/lib/supabase/service";
+ import { notFound } from "next/navigation";
+ 
+ export interface WorkspaceContext {
+@@ -10,11 +10,17 @@ export interface WorkspaceContext {
+  * ⚠️ TEMP: Auth hata diya hai testing ke liye.
+  * Jab real login/OAuth aayega, isme user session check wapas add karna hoga
+  * aur workspace_members se permissions bhi nikalni hongi.
++ *
++ * Uses the service-role client (bypasses RLS) for the slug lookup, same as
++ * every other module page (members/fees/attendance). Previously this used
++ * the RLS-bound client, so any RLS error on `workspaces` (not just a truly
++ * missing workspace) fell into the same `if (error) notFound()` branch —
++ * that's what was showing "not found" on the Workspace page specifically.
+  */
+ export async function getCurrentWorkspaceContext(
+   workspaceSlug: string
+ ): Promise<WorkspaceContext> {
+-  const supabase = await createClient();
++  const supabase = createServiceClient();
+   const { data: workspace, error } = await supabase
+     .from("workspaces")
+     .select("id, slug")
+-- 
+2.43.0
+

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, UserPlus } from "lucide-react";
-import { MemberSearchBar } from "./MemberSearchBar";
+import { useSearch } from "@/context/SearchContext";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import { AddMemberModal } from "./AddMemberModal";
@@ -75,7 +75,7 @@ export function MemberRegistryView({
   planNameMap,
 }: MemberRegistryViewProps) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const { searchQuery: query } = useSearch();
   const [activeFilter, setActiveFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -105,7 +105,6 @@ export function MemberRegistryView({
 
       {/* Search + Filters */}
       <div className="mt-6 space-y-3">
-        <MemberSearchBar value={query} onChange={setQuery} />
         <MemberFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
       </div>
 

@@ -9,6 +9,7 @@ import { AddCategoryModal } from "./AddCategoryModal";
 import { EditExpenseModal } from "./EditExpenseModal";
 import { EditCategoryModal } from "./EditCategoryModal";
 import { createExpense, updateExpense, deleteExpense, markExpensePaid } from "@/app/actions/expense-admin";
+import { useSearch } from "@/context/SearchContext";
 
 interface ExpensesDashboardProps {
   workspaceId: string;
@@ -36,11 +37,25 @@ export function ExpensesDashboard({
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingCategory, setEditingCategory] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const { searchQuery } = useSearch();
 
   const filteredExpenses = useMemo(() => {
-    if (!filterCategory) return expenses;
-    return expenses.filter((e) => e.category_id === filterCategory);
-  }, [expenses, filterCategory]);
+    let result = expenses;
+    if (filterCategory) {
+      result = result.filter((e) => e.category_id === filterCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const catMap = new Map(categories.map((c) => [c.id, c.name.toLowerCase()]));
+      result = result.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          (e.notes ?? "").toLowerCase().includes(q) ||
+          (catMap.get(e.category_id ?? "") ?? "").includes(q)
+      );
+    }
+    return result;
+  }, [expenses, filterCategory, searchQuery, categories]);
 
   const totalPaid = expenses
     .filter((e) => e.status === "paid")

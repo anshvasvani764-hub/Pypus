@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Search, LogIn, ChevronRight } from "lucide-react";
 import type { Member, AttendanceRecord } from "@/lib/members/types";
 import type { MemberFeeSummary } from "@/lib/members/fee-status";
-import { MemberSearchBar } from "@/components/members/MemberSearchBar";
+import { useSearch } from "@/context/SearchContext";
 import { PendingFeesAlert } from "@/components/attendance/PendingFeesAlert";
 import { createClient } from "@/lib/supabase/client";
 import MemberAvatar from "@/components/shared/MemberAvatar";
@@ -79,7 +79,7 @@ export function AttendanceRegister({
   workspaceId,
   feeSummaries,
 }: AttendanceRegisterProps) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery } = useSearch();
   const [activeFilter, setActiveFilter] = useState<AttendanceFilter>("all");
   const [pendingAlertMember, setPendingAlertMember] = useState<Member | null>(null);
 
@@ -153,11 +153,6 @@ export function AttendanceRegister({
 
       {/* Search + Filters */}
       <div className="px-5 pt-5 pb-3 space-y-3">
-        <MemberSearchBar
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder="Search by member name..."
-        />
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {FILTER_OPTIONS.map((opt) => (
             <button

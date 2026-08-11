@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Users, UserPlus, Trash2, MoreVertical, Mail, Calendar } from 'lucide-react';
 import { InviteModal } from './InviteModal';
 import { removeMember } from '@/app/actions/invites';
+import { useSearch } from '@/context/SearchContext';
 
 interface Role {
   id: string;
@@ -38,6 +39,7 @@ interface TeamViewProps {
 export function TeamView({ workspaceSlug, workspaceId, members, roles, currentUserId }: TeamViewProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const { searchQuery } = useSearch();
 
   async function handleRemove(memberId: string) {
     setRemovingId(memberId);
@@ -50,7 +52,17 @@ export function TeamView({ workspaceSlug, workspaceId, members, roles, currentUs
     }
   }
 
-  const activeMembers = members.filter((m) => m.is_active);
+  const activeMembers = members.filter((m) => {
+    if (!m.is_active) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const name = (m.users?.full_name || m.users?.email || 'Unknown').toLowerCase();
+      const email = (m.users?.email || '').toLowerCase();
+      const roleLabel = (m.roles?.name || m.role || '').toLowerCase();
+      return name.includes(q) || email.includes(q) || roleLabel.includes(q);
+    }
+    return true;
+  });
 
   return (
     <div className="w-full max-w-6xl px-8 py-10 space-y-6">
