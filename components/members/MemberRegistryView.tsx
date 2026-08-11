@@ -54,13 +54,13 @@ function filterMembers(
       break;
   }
 
-  if (query.trim()) {
+if (query.trim()) {
     const q = query.toLowerCase().trim();
     result = result.filter(
       (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.phone.toLowerCase().includes(q) ||
-        m.email.toLowerCase().includes(q)
+        (m.name ?? "").toLowerCase().includes(q) ||
+        (m.phone ?? "").toLowerCase().includes(q) ||
+        (m.email ?? "").toLowerCase().includes(q)
     );
   }
 
@@ -94,7 +94,7 @@ export function MemberRegistryView({
         actions={
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            className="flex ss-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             <UserPlus className="h-4 w-4" />
             Add Member
