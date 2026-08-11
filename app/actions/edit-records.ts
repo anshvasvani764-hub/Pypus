@@ -73,6 +73,12 @@ export async function updateFeeRecord({
 /**
  * Update an existing attendance record.
  * Guards by workspace_id + member_id so records can't be tampered with cross-workspace.
+ *
+ * NOTE: fillAbsentDays() (lib/members/attendance.ts) generates synthetic
+ * client-side rows for days with no DB record, using
+ * id = `absent-${memberId}-${date}`. Those rows don't exist in the
+ * "attendance" table yet, so saving an edit on one must INSERT a new row
+ * (or reuse one that already exists for that date) instead of UPDATE by id.
  */
 export async function updateAttendanceRecord({
   workspaceId,
@@ -97,19 +103,63 @@ export async function updateAttendanceRecord({
   const finalCheckIn = status === "present" ? checkIn : null;
   const finalCheckOut = status === "present" ? checkOut : null;
 
-  const { data, error } = await supabase
-    .from("attendance")
-    .update({
-      date,
-      check_in: finalCheckIn,
-      check_out: finalCheckOut,
-      status,
-    })
-    .eq("id", recordId)
-    .eq("workspace_id", workspaceId)
-    .eq("member_id", memberId)
-    .select()
-    .maybeSingle();
+  const isSyntheticRecord = recordId.startsWith("absent-");
+
+  let data: AttendanceRecord | null = null;
+  let error: { message: string } | null = null;
+
+  if (isSyntheticRecord) {
+    // Guard against a real row already existing for this member+date
+    // (e.g. double-clicked save, or attendance was logged in between
+    // page load and this save).
+    const { data: existing } = await supabase
+      .from("attendance")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("member_id", memberId)
+      .eq("date", date)
+      .maybeSingle();
+
+    if (existing) {
+      ({ data, error } = await supabase
+        .from("attendance")
+        .update({
+          check_in: finalCheckIn,
+          check_out: finalCheckOut,
+          status,
+        })
+        .eq("id", existing.id)
+        .select()
+        .maybeSingle());
+    } else {
+      ({ data, error } = await supabase
+        .from("attendance")
+        .insert({
+          workspace_id: workspaceId,
+          member_id: memberId,
+          date,
+          check_in: finalCheckIn,
+          check_out: finalCheckOut,
+          status,
+        })
+        .select()
+        .maybeSingle());
+    }
+  } else {
+    ({ data, error } = await supabase
+      .from("attendance")
+      .update({
+        date,
+        check_in: finalCheckIn,
+        check_out: finalCheckOut,
+        status,
+      })
+      .eq("id", recordId)
+      .eq("workspace_id", workspaceId)
+      .eq("member_id", memberId)
+      .select()
+      .maybeSingle());
+  }
 
   if (error) {
     console.error("updateAttendanceRecord error:", error);
