@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { User, CreditCard, Phone, MessageCircle, Plus, Pencil, Trash2, X, LogOut } from "lucide-react";
 import type { Plan, PlanDuration } from "@/lib/members/types";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { updateProfileSettings, savePlan, deletePlan } from "@/app/actions/settings";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,6 +17,7 @@ const DURATION_LABELS: Record<PlanDuration, string> = {
 };
 
 interface SettingsViewProps {
+  workspaceSlug: string;
   workspaceId: string;
   initialFullName: string;
   initialBusinessName: string;
@@ -37,6 +39,7 @@ function feedbackMessage(name: string, business: string) {
 }
 
 export function SettingsView({
+  workspaceSlug,
   workspaceId,
   initialFullName,
   initialBusinessName,
@@ -122,12 +125,11 @@ export function SettingsView({
         />
       )}
 
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage your profile, plans and get help.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        subtitle="Manage your profile, plans and get help."
+        backHref={`/${workspaceSlug}/workspace`}
+      />
 
       {/* 1. Profile */}
       <section className="rounded-2xl border border-gray-200 bg-white p-6">

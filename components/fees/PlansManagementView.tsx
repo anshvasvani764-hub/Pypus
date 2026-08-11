@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Plus, X } from "lucide-react";
 import type { Plan, Member } from "@/lib/members/types";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PlanCard } from "@/components/fees/PlanCard";
 import { CreatePlanModal } from "@/components/fees/CreatePlanModal";
 import { savePlan } from "@/app/actions/settings";
@@ -90,25 +91,24 @@ export function PlansManagementView({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Membership Plans</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Create and manage gym membership packages.
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            setError(null);
-            setEditPlan(null);
-            setPlanModalOpen(true);
-          }}
-          className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          Create Plan
-        </button>
-      </div>
+      <PageHeader
+        title="Membership Plans"
+        subtitle="Create and manage gym membership packages."
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={
+          <button
+            onClick={() => {
+              setError(null);
+              setEditPlan(null);
+              setPlanModalOpen(true);
+            }}
+            className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Create Plan
+          </button>
+        }
+      />
 
       {error && (
         <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">

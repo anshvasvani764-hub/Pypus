@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Users, UserPlus, Trash2, Mail, Calendar } from 'lucide-react';
+import { MobileTopBar } from '@/components/mobile/MobileTopBar';
 import { InviteModal } from './InviteModal';
 import { removeMember } from '@/app/actions/invites';
 
@@ -54,6 +55,13 @@ export function TeamViewMobile({ workspaceSlug, workspaceId, members, roles, cur
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-28">
+      <MobileTopBar
+        title="Team"
+        label=""
+        workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
+      />
+
       <div className="px-5 pt-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>

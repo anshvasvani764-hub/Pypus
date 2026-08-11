@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Users, UserPlus, Trash2, MoreVertical, Mail, Calendar } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { InviteModal } from './InviteModal';
 import { removeMember } from '@/app/actions/invites';
 import { useSearch } from '@/context/SearchContext';
@@ -66,21 +67,20 @@ export function TeamView({ workspaceSlug, workspaceId, members, roles, currentUs
 
   return (
     <div className="w-full max-w-6xl px-8 py-10 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Team</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage staff and their access to this workspace.
-          </p>
-        </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <UserPlus className="h-4 w-4" />
-          Add Staff
-        </button>
-      </div>
+      <PageHeader
+        title="Team"
+        subtitle="Manage staff and their access to this workspace."
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={
+          <button
+            onClick={() => setModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Staff
+          </button>
+        }
+      />
 
       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
         <div className="overflow-x-auto">

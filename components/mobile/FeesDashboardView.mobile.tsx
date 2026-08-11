@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { Member, FeeRecord } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
+import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { MarkPaidModal, type PaymentMethod } from '@/components/fees/MarkPaidModal'
 import { PlanSelectorModal } from '@/components/members/PlanSelectorModal'
 import { assignPlanToMember, markFeeAsPaid } from '@/app/actions/member-plan'
@@ -144,18 +145,12 @@ export function FeesDashboardView({
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
-      {/* Top Bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-ve-primary-container flex items-center justify-center">
-            <Wallet size={20} className="text-ve-on-primary-container" />
-          </div>
-          <span className="font-ve-headline-lg-mobile text-ve-primary font-black">Pypus</span>
-        </div>
-        <button className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-ve-primary/5 transition-colors active:scale-95">
-          <Search size={20} className="text-ve-primary" />
-        </button>
-      </header>
+      <MobileTopBar
+        title="Fees"
+        label="Pypus"
+        workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
+      />
 
       <main className="px-5 pt-5">
         {/* Snapshot Cards */}

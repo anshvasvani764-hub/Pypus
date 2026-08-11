@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, UserPlus } from "lucide-react";
 import { useSearch } from "@/context/SearchContext";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { MemberFilters } from "./MemberFilters";
 import { MemberCard } from "./MemberCard";
 import { AddMemberModal } from "./AddMemberModal";
@@ -86,22 +87,20 @@ export function MemberRegistryView({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Members</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {members.length} member{members.length !== 1 ? "s" : ""} in your gym
-          </p>
-        </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <UserPlus className="h-4 w-4" />
-          Add Member
-        </button>
-      </div>
+      <PageHeader
+        title="Members"
+        subtitle={`${members.length} member${members.length !== 1 ? "s" : ""} in your gym`}
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Member
+          </button>
+        }
+      />
 
       {/* Search + Filters */}
       <div className="mt-6 space-y-3">

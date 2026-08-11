@@ -51,6 +51,7 @@ export default async function SettingsPage({
 
   return (
     <SettingsViewDesktop
+      workspaceSlug={workspaceSlug}
       workspaceId={workspaceId}
       initialFullName={profile?.full_name ?? ""}
       initialBusinessName={workspace?.name ?? ""}

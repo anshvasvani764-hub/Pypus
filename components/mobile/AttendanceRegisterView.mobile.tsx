@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { Member, AttendanceRecord } from '@/lib/members/types'
 import type { MemberFeeSummary } from '@/lib/members/fee-status'
+import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { createClient } from '@/lib/supabase/client'
 import { getISTDateString } from '@/lib/utils/date'
 import MemberAvatar from '@/components/shared/MemberAvatar'
@@ -112,21 +113,13 @@ export function AttendanceRegisterView({
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
-      {/* Top App Bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm h-16">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-ve-primary-container flex items-center justify-center overflow-hidden">
-            <span className="font-black text-ve-on-primary-container text-xl">P</span>
-          </div>
-          <h1 className="font-headline-lg-mobile font-black text-ve-primary text-xl">Pypus</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />
-          <button className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-ve-primary/5 transition-colors active:scale-95">
-            <Search size={20} className="text-ve-primary" />
-          </button>
-        </div>
-      </header>
+      <MobileTopBar
+        title="Attendance"
+        label="Pypus"
+        workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
+        action={<PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />}
+      />
 
       <main className="px-5 pt-6 space-y-6">
         {/* Stat Cards Section */}

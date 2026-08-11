@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Bot, Send, RotateCcw } from 'lucide-react'
+import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { useWorkspace } from '@/hooks/useWorkspace'
 
 interface Message {
@@ -94,24 +95,20 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface flex flex-col">
-      {/* Top App Bar */}
-      <header className="bg-ve-surface/80 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm flex justify-between items-center w-full px-5 py-3 sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-ve-primary-container flex items-center justify-center">
-            <Bot size={22} className="text-ve-on-primary-container" />
-          </div>
-          <div>
-            <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-black text-ve-primary text-lg">Pypus AI</h1>
-            <p className="font-bold text-[10px] text-ve-primary/70 uppercase tracking-widest">Active Assistant</p>
-          </div>
-        </div>
-        <button
-          onClick={handleReset}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
-        >
-          <RotateCcw size={18} className="text-ve-primary" />
-        </button>
-      </header>
+      <MobileTopBar
+        title="Pypus AI"
+        label=""
+        workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
+        action={
+          <button
+            onClick={handleReset}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
+          >
+            <RotateCcw size={18} className="text-ve-primary" />
+          </button>
+        }
+      />
 
       {/* Chat Canvas */}
       <main className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-48">

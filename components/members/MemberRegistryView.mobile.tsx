@@ -85,6 +85,7 @@ export function MemberRegistryViewMobile({
       <MobileTopBar
         title="Members"
         workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
         action={<span className="size-10" />}
       />
 

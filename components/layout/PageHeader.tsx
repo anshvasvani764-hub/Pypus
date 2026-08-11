@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -14,6 +15,8 @@ interface PageHeaderProps {
   };
   /** Right-aligned action, e.g. an "Add Member" button. */
   actions?: ReactNode;
+  /** Optional back link rendered above the title. */
+  backHref?: string;
 }
 
 /**
@@ -21,9 +24,17 @@ interface PageHeaderProps {
  * Keeps title/subtitle/search/actions visually consistent instead of each
  * page re-implementing its own "flex items-start justify-between" block.
  */
-export function PageHeader({ title, subtitle, search, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, search, actions, backHref }: PageHeaderProps) {
   return (
     <div className="space-y-4">
+      {backHref && (
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          ← Workspace
+        </Link>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>

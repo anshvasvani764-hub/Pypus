@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Search, User, Headset, MessageSquare, Send, CheckCircle2, Phone, CreditCard, LogOut } from 'lucide-react'
+import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { updateProfileSettings } from '@/app/actions/settings'
 import { createClient } from '@/lib/supabase/client'
 
@@ -51,18 +52,12 @@ export function SettingsView({
 
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
-      {/* Top App Bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-ve-primary-container flex items-center justify-center font-black text-ve-on-primary-container text-xl">
-            P
-          </div>
-          <span className="font-headline-lg-mobile text-headline-lg-mobile font-black text-ve-primary text-xl">Pypus</span>
-        </div>
-        <button className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95">
-          <Search size={20} className="text-ve-primary" />
-        </button>
-      </header>
+      <MobileTopBar
+        title="Settings"
+        label="Pypus"
+        workspaceSlug={workspaceSlug}
+        backHref={`/${workspaceSlug}/workspace`}
+      />
 
       <main className="px-5 pt-6 space-y-6">
         {/* Page Title */}

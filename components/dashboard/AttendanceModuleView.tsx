@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { Member, AttendanceRecord } from "@/lib/members/types";
 import type { MemberFeeSummary } from "@/lib/members/fee-status";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { AttendanceSnapshotCards } from "@/components/attendance/AttendanceSnapshotCards";
 import { AttendanceRegister } from "@/components/attendance/AttendanceRegister";
 import { PrintQrButton } from "@/components/attendance/PrintQrButton";
@@ -37,15 +38,12 @@ export function AttendanceModuleView({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Attendance</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Daily check-ins for all gym members
-          </p>
-        </div>
-        <PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />
-      </div>
+      <PageHeader
+        title="Attendance"
+        subtitle="Daily check-ins for all gym members"
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={<PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />}
+      />
 
       <div className="mt-6">
         <AttendanceSnapshotCards

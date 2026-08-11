@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { CreditCard } from "lucide-react";
 import type { Member, FeeRecord } from "@/lib/members/types";
 import { deriveFeeSummary } from "@/lib/members/fee-status";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { FeesSnapshotCards } from "@/components/fees/FeesSnapshotCards";
 import { FeesPaymentsTable } from "@/components/fees/FeesPaymentsTable";
 
@@ -94,21 +95,20 @@ export function FeesDashboard({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Fees Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Track memberships, payments and pending collections.
-          </p>
-        </div>
-        <a
-          href={`/${workspaceSlug}/fees/plans`}
-          className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <CreditCard className="h-4 w-4" />
-          Plans & Pricing
-        </a>
-      </div>
+      <PageHeader
+        title="Fees Management"
+        subtitle="Track memberships, payments and pending collections."
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={
+          <a
+            href={`/${workspaceSlug}/fees/plans`}
+            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <CreditCard className="h-4 w-4" />
+            Plans & Pricing
+          </a>
+        }
+      />
 
       <div className="mt-6">
         <FeesSnapshotCards

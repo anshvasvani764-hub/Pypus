@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Wallet, TrendingUp, Clock, Trash2, Edit3, FolderOpen } from "lucide-react";
 import type { Expense, ExpenseCategory, ExpenseTemplate } from "@/lib/expenses/types";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { AddExpenseModal } from "./AddExpenseModal";
 import { AddCategoryModal } from "./AddCategoryModal";
 import { EditExpenseModal } from "./EditExpenseModal";
@@ -26,6 +27,7 @@ function formatCurrency(amount: number) {
 
 export function ExpensesDashboard({
   workspaceId,
+  workspaceSlug,
   expenses: initialExpenses,
   categories,
 }: ExpensesDashboardProps) {
@@ -160,31 +162,29 @@ export function ExpensesDashboard({
 
   return (
     <div className="w-full max-w-6xl px-8 py-10">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Expenses</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Track fixed, one-time and monthly expenses.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCategoryModal(true)}
-            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <FolderOpen className="h-4 w-4" />
-            Categories
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Add Expense
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Expenses"
+        subtitle="Track fixed, one-time and monthly expenses."
+        backHref={`/${workspaceSlug}/workspace`}
+        actions={
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCategoryModal(true)}
+              className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Categories
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Expense
+            </button>
+          </div>
+        }
+      />
 
       {/* Category Management */}
       {categories.length > 0 && (
