@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getMemberById, getAttendanceForMember, getFeesForMember } from "@/lib/supabase/queries";
 import { createClient } from "@/lib/supabase/server";
 import { deriveFeeSummary } from "@/lib/members/fee-status";
+import { fillAbsentDays } from "@/lib/members/attendance";
 import { MemberBreadcrumbs } from "@/components/members/MemberBreadcrumbs";
 import { MemberProfileHeader } from "@/components/members/MemberProfileHeader";
 import { MemberTabs } from "@/components/members/MemberTabs";
@@ -30,7 +31,8 @@ export default async function MemberAttendancePage({
 
   const basePath = `/${workspaceSlug}/members/${memberId}`;
 
-  const memberAttendance = await getAttendanceForMember(workspaceId, memberId);
+  const rawAttendance = await getAttendanceForMember(workspaceId, memberId);
+  const memberAttendance = fillAbsentDays(rawAttendance, memberId, member.joined_at);
   const fees = await getFeesForMember(workspaceId, memberId);
   const summary = deriveFeeSummary(member, fees);
 
@@ -75,4 +77,3 @@ export default async function MemberAttendancePage({
     </div>
   );
 }
-
