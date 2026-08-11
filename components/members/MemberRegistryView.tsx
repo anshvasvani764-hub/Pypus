@@ -86,7 +86,7 @@ export function MemberRegistryView({
   );
 
   return (
-    <div className="w-full max-w-6xl px-8 py-10">
+    <div className="w-full max-w-6xl px-8 py-6">
       <PageHeader
         title="Members"
         subtitle={`${members.length} member${members.length !== 1 ? "s" : ""} in your gym`}

@@ -90,7 +90,7 @@ export function PlansManagementView({
   }
 
   return (
-    <div className="w-full max-w-6xl px-8 py-10">
+    <div className="w-full max-w-6xl px-8 py-6">
       <PageHeader
         title="Membership Plans"
         subtitle="Create and manage gym membership packages."

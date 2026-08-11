@@ -66,7 +66,7 @@ export function TeamView({ workspaceSlug, workspaceId, members, roles, currentUs
   });
 
   return (
-    <div className="w-full max-w-6xl px-8 py-10 space-y-6">
+    <div className="w-full max-w-6xl px-8 py-6 space-y-6">
       <PageHeader
         title="Team"
         subtitle="Manage staff and their access to this workspace."

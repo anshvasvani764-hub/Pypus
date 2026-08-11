@@ -37,7 +37,7 @@ export function AttendanceModuleView({
   const snapshot = computeSnapshot(members, effectiveRecords);
 
   return (
-    <div className="w-full max-w-6xl px-8 py-10">
+    <div className="w-full max-w-6xl px-8 py-6">
       <PageHeader
         title="Attendance"
         subtitle="Daily check-ins for all gym members"

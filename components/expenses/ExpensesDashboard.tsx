@@ -161,7 +161,7 @@ export function ExpensesDashboard({
   }, [expenses]);
 
   return (
-    <div className="w-full max-w-6xl px-8 py-10">
+    <div className="w-full max-w-6xl px-8 py-6">
       <PageHeader
         title="Expenses"
         subtitle="Track fixed, one-time and monthly expenses."

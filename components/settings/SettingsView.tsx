@@ -110,7 +110,7 @@ export function SettingsView({
   )}`;
 
   return (
-    <div className="w-full max-w-3xl px-8 py-10 space-y-6">
+    <div className="w-full max-w-3xl px-8 py-6 space-y-6">
       {toast && (
         <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded-xl border border-gray-200 bg-white shadow-lg text-sm text-gray-900">
           {toast}
