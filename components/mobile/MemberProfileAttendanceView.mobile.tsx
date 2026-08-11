@@ -72,8 +72,8 @@ export function MemberProfileAttendanceView({ member, workspaceSlug, workspaceId
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 8)
 
-  function handleSaved(updated: AttendanceRecord) {
-    setRecordsState((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+  function handleSaved(originalId: string, updated: AttendanceRecord) {
+    setRecordsState((prev) => prev.map((r) => (r.id === originalId ? updated : r)))
   }
 
   return (

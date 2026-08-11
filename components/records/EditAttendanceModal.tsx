@@ -11,7 +11,7 @@ interface EditAttendanceModalProps {
   record: AttendanceRecord | null;
   workspaceId: string;
   memberId: string;
-  onSaved?: (updated: AttendanceRecord) => void;
+  onSaved?: (originalId: string, updated: AttendanceRecord) => void;
 }
 
 function toISODate(iso: string): string {
@@ -91,7 +91,7 @@ export function EditAttendanceModal({
     setSaving(false);
 
     if (result.success && result.record) {
-      onSaved?.(result.record);
+      onSaved?.(record.id, result.record);
       onClose();
     } else {
       setError(result.error || "Failed to update record");

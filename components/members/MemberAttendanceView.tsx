@@ -99,9 +99,9 @@ export function MemberAttendanceView({ memberId, records, workspaceId }: MemberA
   return streak;
 }
 
-  function handleSaved(updated: AttendanceRecord) {
+  function handleSaved(originalId: string, updated: AttendanceRecord) {
     setRecordsState((prev) =>
-      prev.map((r) => (r.id === updated.id ? updated : r))
+      prev.map((r) => (r.id === originalId ? updated : r))
     );
   }
 
