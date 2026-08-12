@@ -21,15 +21,24 @@ function toISODate(iso: string): string {
 
 function toTime(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  const h = String(d.getHours()).padStart(2, "0");
-  const m = String(d.getMinutes()).padStart(2, "0");
+  // Extract the IST wall-clock time (not the browser's local timezone).
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const h = parts.find((p) => p.type === "hour")?.value ?? "00";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
   return `${h}:${m}`;
 }
 
 function combineDateAndTime(dateStr: string, timeStr: string): string | null {
   if (!dateStr || !timeStr) return null;
-  return `${dateStr}T${timeStr}:00.000Z`;
+  // The date/time picker values are IST wall-clock time entered by the user.
+  // Tag them with the IST offset (+05:30) so the stored UTC instant is correct,
+  // instead of falsely labeling them as UTC ("Z").
+  return `${dateStr}T${timeStr}:00.000+05:30`;
 }
 
 export function EditAttendanceModal({
