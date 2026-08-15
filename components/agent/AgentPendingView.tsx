@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { MessageCircle, Clock, CreditCard, Receipt, Loader2, Check } from "lucide-react";
+import { Clock, CreditCard, Receipt, Check, Hourglass, MessageCircle } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { sendReminder } from "@/app/actions/member-reminders";
-import { markReceiptSent } from "@/app/actions/agent";
 import type {
   AbsenteeWorklistItem,
   FeeWorklistItem,
@@ -27,17 +24,11 @@ type PendingTask =
   | { kind: "receipt"; key: string; item: ReceiptWorklistItem };
 
 export function AgentPendingView({
-  workspaceId,
-  workspaceName,
   absentees,
   feesDue,
   activity,
   receiptsPending,
 }: AgentPendingViewProps) {
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [pendingKey, startTransition] = useTransition();
-  const [sendingKey, setSendingKey] = useState<string | null>(null);
-
   const tasks: PendingTask[] = [
     ...absentees
       .filter((a) => !a.alreadyMessagedToday)
@@ -48,36 +39,7 @@ export function AgentPendingView({
     ...receiptsPending.map(
       (item): PendingTask => ({ kind: "receipt", key: `rcpt-${item.receiptId}`, item })
     ),
-  ].filter((t) => !dismissed.has(t.key));
-
-  function handleSend(task: PendingTask) {
-    setSendingKey(task.key);
-    const memberPhone = task.item.memberPhone ?? "";
-    const cleanPhone = memberPhone.replace(/[^0-9]/g, "");
-    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(task.item.waMessage)}`;
-
-    // Open WhatsApp first — this must happen synchronously in the click
-    // handler or popup blockers eat it.
-    window.open(waUrl, "_blank", "noopener,noreferrer");
-
-    startTransition(async () => {
-      if (task.kind === "receipt") {
-        await markReceiptSent(task.item.receiptId);
-      } else {
-        await sendReminder({
-          workspaceId,
-          memberId: task.item.memberId,
-          memberPhone,
-          memberName: task.item.memberName,
-          workspaceName,
-          feeId: task.kind === "fees" ? task.item.feeId : null,
-          type: task.kind,
-        });
-      }
-      setDismissed((prev) => new Set(prev).add(task.key));
-      setSendingKey(null);
-    });
-  }
+  ];
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
@@ -94,7 +56,7 @@ export function AgentPendingView({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-900">WhatsApp</p>
           <p className="text-xs text-gray-500">
-            Agent prepares the message — you send it with one tap.
+            Agent prepares the message — our team sends it on your behalf.
           </p>
         </div>
       </div>
@@ -118,7 +80,6 @@ export function AgentPendingView({
         ) : (
           <div className="space-y-2">
             {tasks.map((task) => {
-              const isSending = sendingKey === task.key && pendingKey;
               return (
                 <div
                   key={task.key}
@@ -157,25 +118,13 @@ export function AgentPendingView({
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleSend(task)}
-                    disabled={!task.item.memberPhone || isSending}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#1ea952] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                    title={
-                      !task.item.memberPhone
-                        ? "No phone number on file"
-                        : task.kind === "receipt"
-                          ? "Send receipt on WhatsApp"
-                          : "Send on WhatsApp"
-                    }
+                  <span
+                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700"
+                    title="Agent will send this — no action needed from you"
                   >
-                    {isSending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <MessageCircle className="h-3.5 w-3.5" fill="white" strokeWidth={0} />
-                    )}
-                    {isSending ? "Sending" : "Send"}
-                  </button>
+                    <Hourglass className="h-3.5 w-3.5" />
+                    Pending
+                  </span>
                 </div>
               );
             })}
@@ -195,7 +144,7 @@ export function AgentPendingView({
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white border border-gray-200">
                   {a.kind === "reminder" ? (
-                    <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                    <Clock className="h-3.5 w-3.5 text-emerald-600" />
                   ) : (
                     <CreditCard className="h-3.5 w-3.5 text-emerald-600" />
                   )}
