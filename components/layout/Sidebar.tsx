@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { Home, LayoutGrid, Bot, Settings, PanelLeft, Check } from 'lucide-react'
+import { Home, LayoutGrid, Bot, MessageCircle, Settings, PanelLeft, Check } from 'lucide-react'
 import { useSidebar, SidebarMode } from '@/context/SidebarContext'
 import { useUser } from '@/hooks/useUser'
 import { useWorkspace } from '@/hooks/useWorkspace'
@@ -89,6 +89,7 @@ export default function Sidebar() {
         <nav className="flex flex-col gap-1 px-3">
           <NavItem href={base} icon={Home} label="Home" />
           <NavItem href={`${base}/assistant`} icon={Bot} label="AI Assistant" />
+          <NavItem href={`${base}/agent`} icon={MessageCircle} label="Agent" />
           <NavItem href={`${base}/workspace`} icon={LayoutGrid} label="Workspace" />
         </nav>
 

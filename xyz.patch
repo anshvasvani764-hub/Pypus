@@ -1,0 +1,681 @@
+diff --git a/app/[app]/agent/page.tsx b/app/[app]/agent/page.tsx
+new file mode 100644
+index 0000000..8f3527b
+--- /dev/null
++++ b/app/[app]/agent/page.tsx
+@@ -0,0 +1,32 @@
++import { createServiceClient } from "@/lib/supabase/service";
++import { AgentPendingView } from "@/components/agent/AgentPendingView";
++import { getAgentDashboard } from "@/app/actions/agent";
++
++export default async function AgentPage({
++  params,
++}: {
++  params: Promise<{ app: string }>;
++}) {
++  const { app: workspaceSlug } = await params;
++
++  const supabase = createServiceClient();
++  const { data: wsData } = await supabase
++    .from("workspaces")
++    .select("id, name")
++    .eq("slug", workspaceSlug)
++    .single();
++  const workspaceId = wsData?.id ?? "";
++  const workspaceName = wsData?.name ?? "Your Gym";
++
++  const { absentees, feesDue, activity } = await getAgentDashboard(workspaceId);
++
++  return (
++    <AgentPendingView
++      workspaceId={workspaceId}
++      workspaceName={workspaceName}
++      absentees={absentees}
++      feesDue={feesDue}
++      activity={activity}
++    />
++  );
++}
+diff --git a/app/actions/agent.ts b/app/actions/agent.ts
+new file mode 100644
+index 0000000..466b7d8
+--- /dev/null
++++ b/app/actions/agent.ts
+@@ -0,0 +1,57 @@
++'use server';
++
++import { createServiceClient } from "@/lib/supabase/service";
++import { revalidatePath } from "next/cache";
++import {
++  getAbsenteeWorklist,
++  getFeeWorklist,
++  getAgentActivity,
++} from "@/lib/agent/queries";
++
++export async function getAgentDashboard(workspaceId: string) {
++  const [absentees, feesDue, activity] = await Promise.all([
++    getAbsenteeWorklist(workspaceId),
++    getFeeWorklist(workspaceId),
++    getAgentActivity(workspaceId),
++  ]);
++  return { absentees, feesDue, activity };
++}
++
++/** Called right after a payment is marked paid, so the receipt shows up in the Agent activity feed. */
++export async function saveReceipt({
++  workspaceId,
++  memberId,
++  feeId,
++  receiptNumber,
++  amount,
++  paymentMethod,
++  paidDate,
++}: {
++  workspaceId: string;
++  memberId: string;
++  feeId: string | null;
++  receiptNumber: string;
++  amount: number;
++  paymentMethod: string;
++  paidDate: string;
++}): Promise<{ success: boolean; error?: string }> {
++  const supabase = createServiceClient();
++
++  const { error } = await supabase.from("receipts").insert({
++    workspace_id: workspaceId,
++    member_id: memberId,
++    fee_id: feeId,
++    receipt_number: receiptNumber,
++    amount,
++    payment_method: paymentMethod,
++    paid_date: paidDate,
++  });
++
++  if (error) {
++    console.error("saveReceipt insert error:", error);
++    return { success: false, error: error.message };
++  }
++
++  revalidatePath(`/[app]/agent`, "page");
++  return { success: true };
++}
+diff --git a/app/actions/member-reminders.ts b/app/actions/member-reminders.ts
+index 08475a4..5100aa1 100644
+--- a/app/actions/member-reminders.ts
++++ b/app/actions/member-reminders.ts
+@@ -39,6 +39,7 @@ export async function sendReminder({
+       channel: "whatsapp",
+       message,
+       status: "sent",
++      reason: type,
+       sent_at: new Date().toISOString(),
+     });
+ 
+diff --git a/components/agent/AgentPendingView.tsx b/components/agent/AgentPendingView.tsx
+new file mode 100644
+index 0000000..73e5a9a
+--- /dev/null
++++ b/components/agent/AgentPendingView.tsx
+@@ -0,0 +1,186 @@
++"use client";
++
++import { useState, useTransition } from "react";
++import { MessageCircle, Clock, CreditCard, Loader2, Check } from "lucide-react";
++import { PageHeader } from "@/components/layout/PageHeader";
++import { sendReminder } from "@/app/actions/member-reminders";
++import type { AbsenteeWorklistItem, FeeWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
++
++interface AgentPendingViewProps {
++  workspaceId: string;
++  workspaceName: string;
++  absentees: AbsenteeWorklistItem[];
++  feesDue: FeeWorklistItem[];
++  activity: AgentActivityItem[];
++}
++
++type PendingTask =
++  | { kind: "attendance"; key: string; item: AbsenteeWorklistItem }
++  | { kind: "fees"; key: string; item: FeeWorklistItem };
++
++export function AgentPendingView({
++  workspaceId,
++  workspaceName,
++  absentees,
++  feesDue,
++  activity,
++}: AgentPendingViewProps) {
++  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
++  const [pendingKey, startTransition] = useTransition();
++  const [sendingKey, setSendingKey] = useState<string | null>(null);
++
++  const tasks: PendingTask[] = [
++    ...absentees
++      .filter((a) => !a.alreadyMessagedToday)
++      .map((item): PendingTask => ({ kind: "attendance", key: `att-${item.memberId}`, item })),
++    ...feesDue
++      .filter((f) => !f.alreadyMessagedToday)
++      .map((item): PendingTask => ({ kind: "fees", key: `fee-${item.feeId}`, item })),
++  ].filter((t) => !dismissed.has(t.key));
++
++  function handleSend(task: PendingTask) {
++    setSendingKey(task.key);
++    const memberPhone = task.item.memberPhone ?? "";
++    const cleanPhone = memberPhone.replace(/[^0-9]/g, "");
++    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(task.item.waMessage)}`;
++
++    // Open WhatsApp first — this must happen synchronously in the click
++    // handler or popup blockers eat it.
++    window.open(waUrl, "_blank", "noopener,noreferrer");
++
++    startTransition(async () => {
++      await sendReminder({
++        workspaceId,
++        memberId: task.item.memberId,
++        memberPhone,
++        memberName: task.item.memberName,
++        workspaceName,
++        feeId: task.kind === "fees" ? task.item.feeId : null,
++        type: task.kind,
++      });
++      setDismissed((prev) => new Set(prev).add(task.key));
++      setSendingKey(null);
++    });
++  }
++
++  return (
++    <div className="space-y-6">
++      <PageHeader
++        title="Agent"
++        subtitle="Automated attendance nudges, fee reminders and receipts."
++      />
++
++      {/* WhatsApp banner */}
++      <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
++        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366]">
++          <MessageCircle className="h-5 w-5 text-white" fill="white" strokeWidth={0} />
++        </div>
++        <div className="min-w-0">
++          <p className="text-sm font-semibold text-gray-900">WhatsApp</p>
++          <p className="text-xs text-gray-500">
++            Agent prepares the message — you send it with one tap.
++          </p>
++        </div>
++      </div>
++
++      {/* Pending tasks */}
++      <div>
++        <h2 className="mb-3 text-sm font-semibold text-gray-900">
++          Pending tasks {tasks.length > 0 && `(${tasks.length})`}
++        </h2>
++
++        {tasks.length === 0 ? (
++          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
++            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
++              <Check className="h-6 w-6 text-emerald-600" />
++            </div>
++            <p className="text-sm font-medium text-gray-900">No pending task for agent yet</p>
++            <p className="max-w-xs text-xs text-gray-500">
++              When a member misses 3+ days or a fee falls due, it'll show up here ready to send.
++            </p>
++          </div>
++        ) : (
++          <div className="space-y-2">
++            {tasks.map((task) => {
++              const isSending = sendingKey === task.key && pendingKey;
++              return (
++                <div
++                  key={task.key}
++                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3"
++                >
++                  <div
++                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
++                      task.kind === "attendance" ? "bg-orange-50" : "bg-red-50"
++                    }`}
++                  >
++                    {task.kind === "attendance" ? (
++                      <Clock className="h-4 w-4 text-orange-600" />
++                    ) : (
++                      <CreditCard className="h-4 w-4 text-red-600" />
++                    )}
++                  </div>
++
++                  <div className="min-w-0 flex-1">
++                    <p className="truncate text-sm font-medium text-gray-900">
++                      {task.item.memberName}
++                    </p>
++                    <p className="truncate text-xs text-gray-500">
++                      {task.kind === "attendance"
++                        ? `Absent ${task.item.daysAbsent} days — last seen ${task.item.lastSeenDate}`
++                        : task.item.status === "overdue"
++                          ? `₹${task.item.amount.toLocaleString("en-IN")} overdue by ${task.item.daysOverdue} days`
++                          : `₹${task.item.amount.toLocaleString("en-IN")} due ${task.item.dueDate}`}
++                    </p>
++                  </div>
++
++                  <button
++                    onClick={() => handleSend(task)}
++                    disabled={!task.item.memberPhone || isSending}
++                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#1ea952] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
++                    title={!task.item.memberPhone ? "No phone number on file" : "Send on WhatsApp"}
++                  >
++                    {isSending ? (
++                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
++                    ) : (
++                      <MessageCircle className="h-3.5 w-3.5" fill="white" strokeWidth={0} />
++                    )}
++                    {isSending ? "Sending" : "Send"}
++                  </button>
++                </div>
++              );
++            })}
++          </div>
++        )}
++      </div>
++
++      {/* Activity feed — proof the agent is working */}
++      {activity.length > 0 && (
++        <div>
++          <h2 className="mb-3 text-sm font-semibold text-gray-900">Recent activity</h2>
++          <div className="space-y-2">
++            {activity.map((a) => (
++              <div
++                key={a.id}
++                className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50/60 px-4 py-3"
++              >
++                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white border border-gray-200">
++                  {a.kind === "reminder" ? (
++                    <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
++                  ) : (
++                    <CreditCard className="h-3.5 w-3.5 text-emerald-600" />
++                  )}
++                </div>
++                <div className="min-w-0 flex-1">
++                  <p className="truncate text-sm text-gray-900">
++                    <span className="font-medium">{a.memberName}</span> — {a.detail}
++                  </p>
++                </div>
++                <span className="shrink-0 text-xs text-gray-400">{a.at}</span>
++              </div>
++            ))}
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/components/fees/FeesPaymentsTable.tsx b/components/fees/FeesPaymentsTable.tsx
+index 0056b5c..71428d0 100644
+--- a/components/fees/FeesPaymentsTable.tsx
++++ b/components/fees/FeesPaymentsTable.tsx
+@@ -204,6 +204,7 @@ export function FeesPaymentsTable({
+         onConfirm={handlePaidConfirm}
+         memberName={paidTarget?.name ?? ""}
+         memberPhone={paidTarget?.phone ?? ""}
++        workspaceId={workspaceId}
+         workspaceName={workspaceName}
+         planName={paidSummary?.planName ?? null}
+         defaultAmount={paidSummary?.payableFee?.amount_snapshot ?? 0}
+diff --git a/components/fees/MarkPaidModal.tsx b/components/fees/MarkPaidModal.tsx
+index 7140413..fade366 100644
+--- a/components/fees/MarkPaidModal.tsx
++++ b/components/fees/MarkPaidModal.tsx
+@@ -4,6 +4,7 @@ import { useState } from "react";
+ import { X, Download, MessageCircle, Loader2 } from "lucide-react";
+ import { generateReceiptImage, type ReceiptData } from "@/lib/utils/receipt-generator";
+ import { downloadReceipt } from "@/lib/utils/whatsapp-share";
++import { saveReceipt } from "@/app/actions/agent";
+ 
+ export type PaymentMethod = "Cash" | "UPI";
+ 
+@@ -15,6 +16,7 @@ interface MarkPaidModalProps {
+   onConfirm: (amount: number, method: PaymentMethod) => Promise<{ success: boolean; fee?: any; error?: string }>;
+   memberName: string;
+   memberPhone: string;
++  workspaceId: string;
+   workspaceName: string;
+   planName: string | null;
+   defaultAmount: number;
+@@ -40,6 +42,7 @@ function MarkPaidDialog({
+   onConfirm,
+   memberName,
+   memberPhone,
++  workspaceId,
+   workspaceName,
+   planName,
+   defaultAmount,
+@@ -88,6 +91,18 @@ function MarkPaidDialog({
+         setReceiptNumber(receiptData.receiptNumber);
+         setShowReceipt(true);
+         setIsGeneratingReceipt(false);
++
++        // Log it so the Agent activity feed can show it happened — failure
++        // here shouldn't block the owner from seeing/sending the receipt.
++        saveReceipt({
++          workspaceId,
++          memberId: result.fee.member_id,
++          feeId: result.fee.id,
++          receiptNumber: receiptData.receiptNumber,
++          amount: Number(amount),
++          paymentMethod: method,
++          paidDate: receiptData.paidDate,
++        }).catch((err) => console.error("saveReceipt failed:", err));
+       } else {
+         setError(result.error || "Failed to record payment");
+       }
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index ba665ae..b1b3db1 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useEffect, useRef, useState } from 'react'
+ import { useParams } from 'next/navigation'
+-import { Home, LayoutGrid, Bot, Settings, PanelLeft, Check } from 'lucide-react'
++import { Home, LayoutGrid, Bot, MessageCircle, Settings, PanelLeft, Check } from 'lucide-react'
+ import { useSidebar, SidebarMode } from '@/context/SidebarContext'
+ import { useUser } from '@/hooks/useUser'
+ import { useWorkspace } from '@/hooks/useWorkspace'
+@@ -89,6 +89,7 @@ export default function Sidebar() {
+         <nav className="flex flex-col gap-1 px-3">
+           <NavItem href={base} icon={Home} label="Home" />
+           <NavItem href={`${base}/assistant`} icon={Bot} label="AI Assistant" />
++          <NavItem href={`${base}/agent`} icon={MessageCircle} label="Agent" />
+           <NavItem href={`${base}/workspace`} icon={LayoutGrid} label="Workspace" />
+         </nav>
+ 
+diff --git a/components/members/MemberFeesView.tsx b/components/members/MemberFeesView.tsx
+index 6968e05..112fcf2 100644
+--- a/components/members/MemberFeesView.tsx
++++ b/components/members/MemberFeesView.tsx
+@@ -226,6 +226,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
+         onConfirm={handleMarkPaidConfirm}
+         memberName={member.name}
+         memberPhone={member.phone}
++        workspaceId={workspaceId}
+         workspaceName={workspaceName}
+         planName={summary.planName}
+         defaultAmount={summary.payableFee?.amount_snapshot ?? 0}
+diff --git a/components/mobile/FeesDashboardView.mobile.tsx b/components/mobile/FeesDashboardView.mobile.tsx
+index a370393..01735dd 100644
+--- a/components/mobile/FeesDashboardView.mobile.tsx
++++ b/components/mobile/FeesDashboardView.mobile.tsx
+@@ -318,6 +318,7 @@ export function FeesDashboardView({
+         onConfirm={handleMarkPaidConfirm}
+         memberName={markPaidRow?.member.name ?? ''}
+         memberPhone={markPaidRow?.member.phone ?? ''}
++        workspaceId={workspaceId}
+         workspaceName={workspaceName}
+         planName={markPaidRow?.planName ?? null}
+         defaultAmount={markPaidRow?.amount ?? 0}
+diff --git a/components/mobile/MemberProfileFeesView.mobile.tsx b/components/mobile/MemberProfileFeesView.mobile.tsx
+index 074a5b2..36be7f1 100644
+--- a/components/mobile/MemberProfileFeesView.mobile.tsx
++++ b/components/mobile/MemberProfileFeesView.mobile.tsx
+@@ -374,6 +374,7 @@ export function MemberProfileFeesView({
+         onConfirm={handleMarkPaidConfirm}
+         memberName={member.name}
+         memberPhone={member.phone}
++        workspaceId={workspaceId}
+         workspaceName={workspaceName}
+         planName={planName}
+         defaultAmount={amount ?? 0}
+diff --git a/components/mobile/MemberProfileOverviewView.mobile.tsx b/components/mobile/MemberProfileOverviewView.mobile.tsx
+index a8f51b8..40cbd9f 100644
+--- a/components/mobile/MemberProfileOverviewView.mobile.tsx
++++ b/components/mobile/MemberProfileOverviewView.mobile.tsx
+@@ -386,6 +386,7 @@ export function MemberProfileOverviewView({
+         onConfirm={handleMarkPaidConfirm}
+         memberName={member.name}
+         memberPhone={member.phone}
++        workspaceId={workspaceId}
+         workspaceName={workspaceName}
+         planName={planName}
+         defaultAmount={amount ?? 0}
+diff --git a/lib/agent/queries.ts b/lib/agent/queries.ts
+new file mode 100644
+index 0000000..de789eb
+--- /dev/null
++++ b/lib/agent/queries.ts
+@@ -0,0 +1,213 @@
++import { createServiceClient } from "@/lib/supabase/service";
++import { getISTDateString, formatISTDateTime } from "@/lib/utils/date";
++
++export interface AbsenteeWorklistItem {
++  memberId: string;
++  memberName: string;
++  memberPhone: string | null;
++  daysAbsent: number;
++  lastSeenDate: string | null;
++  alreadyMessagedToday: boolean;
++  waMessage: string;
++}
++
++export interface FeeWorklistItem {
++  memberId: string;
++  feeId: string;
++  memberName: string;
++  memberPhone: string | null;
++  planName: string | null;
++  amount: number;
++  dueDate: string;
++  status: "due" | "overdue";
++  daysOverdue: number;
++  alreadyMessagedToday: boolean;
++  waMessage: string;
++}
++
++export interface AgentActivityItem {
++  id: string;
++  kind: "reminder" | "receipt";
++  memberName: string;
++  detail: string;
++  at: string; // formatted IST datetime
++}
++
++function shiftDate(dateStr: string, days: number): string {
++  const [y, m, d] = dateStr.split("-").map(Number);
++  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
++}
++
++/** Members with no "present" attendance row in the last `minDaysAbsent` days (and at least one historical record, so brand-new members aren't flagged). */
++export async function getAbsenteeWorklist(
++  workspaceId: string,
++  minDaysAbsent = 3
++): Promise<AbsenteeWorklistItem[]> {
++  const supabase = createServiceClient();
++  const today = getISTDateString();
++  const windowStart = shiftDate(today, -30); // look back 30 days for "last seen"
++  const cutoff = shiftDate(today, -minDaysAbsent);
++
++  const [membersRes, attRes, remindersRes] = await Promise.all([
++    supabase
++      .from("members")
++      .select("id, name, phone")
++      .eq("workspace_id", workspaceId),
++    supabase
++      .from("attendance")
++      .select("member_id, date, status")
++      .eq("workspace_id", workspaceId)
++      .gte("date", windowStart)
++      .lte("date", today)
++      .order("date", { ascending: false }),
++    supabase
++      .from("reminders")
++      .select("member_id, sent_at, reason")
++      .eq("workspace_id", workspaceId)
++      .eq("reason", "attendance")
++      .gte("sent_at", `${today}T00:00:00.000Z`),
++  ]);
++
++  if (membersRes.error) throw membersRes.error;
++  if (attRes.error) throw attRes.error;
++
++  const members = membersRes.data ?? [];
++  const attendance = attRes.data ?? [];
++  const messagedTodayIds = new Set((remindersRes.data ?? []).map((r) => r.member_id));
++
++  const lastPresentByMember = new Map<string, string>();
++  for (const row of attendance) {
++    if (row.status !== "present") continue;
++    const existing = lastPresentByMember.get(row.member_id);
++    if (!existing || row.date > existing) lastPresentByMember.set(row.member_id, row.date);
++  }
++
++  const out: AbsenteeWorklistItem[] = [];
++  for (const m of members) {
++    const lastSeen = lastPresentByMember.get(m.id) ?? null;
++    // Skip members who were never seen present in the window — likely brand new, not "absent".
++    if (!lastSeen) continue;
++    if (lastSeen > cutoff) continue; // seen recently enough, not flagged
++
++    const daysAbsent = Math.round(
++      (new Date(today).getTime() - new Date(lastSeen).getTime()) / 86400000
++    );
++
++    out.push({
++      memberId: m.id,
++      memberName: m.name,
++      memberPhone: m.phone ?? null,
++      daysAbsent,
++      lastSeenDate: lastSeen,
++      alreadyMessagedToday: messagedTodayIds.has(m.id),
++      waMessage: `Hi ${m.name}, we haven't seen you at the gym in ${daysAbsent} days. Hope everything's doing well — come back soon!`,
++    });
++  }
++
++  return out.sort((a, b) => b.daysAbsent - a.daysAbsent);
++}
++
++/** Fees that are due or overdue right now, each with a ready WhatsApp message. */
++export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistItem[]> {
++  const supabase = createServiceClient();
++  const today = getISTDateString();
++
++  const [feesRes, membersRes, remindersRes] = await Promise.all([
++    supabase
++      .from("fees")
++      .select("id, member_id, plan_name_snapshot, amount_snapshot, paid_amount, due_date, status")
++      .eq("workspace_id", workspaceId)
++      .in("status", ["due", "overdue"]),
++    supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
++    supabase
++      .from("reminders")
++      .select("fee_id, sent_at, reason")
++      .eq("workspace_id", workspaceId)
++      .eq("reason", "fees")
++      .gte("sent_at", `${today}T00:00:00.000Z`),
++  ]);
++
++  if (feesRes.error) throw feesRes.error;
++  if (membersRes.error) throw membersRes.error;
++
++  const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
++  const messagedTodayFeeIds = new Set((remindersRes.data ?? []).map((r) => r.fee_id));
++
++  const out: FeeWorklistItem[] = [];
++  for (const f of feesRes.data ?? []) {
++    const member = nameById.get(f.member_id);
++    if (!member) continue;
++    const outstanding = (f.amount_snapshot ?? 0) - (f.paid_amount ?? 0);
++    if (outstanding <= 0) continue;
++
++    const daysOverdue =
++      f.due_date < today
++        ? Math.round((new Date(today).getTime() - new Date(f.due_date).getTime()) / 86400000)
++        : 0;
++
++    out.push({
++      memberId: f.member_id,
++      feeId: f.id,
++      memberName: member.name,
++      memberPhone: member.phone ?? null,
++      planName: f.plan_name_snapshot,
++      amount: outstanding,
++      dueDate: f.due_date,
++      status: f.status as "due" | "overdue",
++      daysOverdue,
++      alreadyMessagedToday: messagedTodayFeeIds.has(f.id),
++      waMessage:
++        daysOverdue > 0
++          ? `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is overdue by ${daysOverdue} days. Kindly clear it at the earliest.`
++          : `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is due on ${f.due_date}. Kindly pay on time to avoid interruption.`,
++    });
++  }
++
++  return out.sort((a, b) => b.daysOverdue - a.daysOverdue);
++}
++
++/** Recent agent actions (reminders sent + receipts generated) for the "proof it's working" feed. */
++export async function getAgentActivity(workspaceId: string, limit = 20): Promise<AgentActivityItem[]> {
++  const supabase = createServiceClient();
++
++  const [remindersRes, receiptsRes, membersRes] = await Promise.all([
++    supabase
++      .from("reminders")
++      .select("id, member_id, reason, message, sent_at")
++      .eq("workspace_id", workspaceId)
++      .order("sent_at", { ascending: false })
++      .limit(limit),
++    supabase
++      .from("receipts")
++      .select("id, member_id, receipt_number, amount, generated_at")
++      .eq("workspace_id", workspaceId)
++      .order("generated_at", { ascending: false })
++      .limit(limit),
++    supabase.from("members").select("id, name").eq("workspace_id", workspaceId),
++  ]);
++
++  if (remindersRes.error) throw remindersRes.error;
++  if (receiptsRes.error) throw receiptsRes.error;
++
++  const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m.name]));
++
++  const reminderItems: AgentActivityItem[] = (remindersRes.data ?? []).map((r) => ({
++    id: `reminder-${r.id}`,
++    kind: "reminder",
++    memberName: nameById.get(r.member_id) ?? "Unknown member",
++    detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
++    at: formatISTDateTime(r.sent_at),
++  }));
++
++  const receiptItems: AgentActivityItem[] = (receiptsRes.data ?? []).map((r) => ({
++    id: `receipt-${r.id}`,
++    kind: "receipt",
++    memberName: nameById.get(r.member_id) ?? "Unknown member",
++    detail: `Receipt #${r.receipt_number} generated — ₹${Number(r.amount).toLocaleString("en-IN")}`,
++    at: formatISTDateTime(r.generated_at),
++  }));
++
++  return [...reminderItems, ...receiptItems]
++    .sort((a, b) => (a.at < b.at ? 1 : -1))
++    .slice(0, limit);
++}
+diff --git a/supabase/agent-schema.sql b/supabase/agent-schema.sql
+new file mode 100644
+index 0000000..382aaed
+--- /dev/null
++++ b/supabase/agent-schema.sql
+@@ -0,0 +1,23 @@
++-- Agent module schema for Supabase
++-- receipts and reminders tables already existed in production with RLS +
++-- policies in place. This migration only ALTERs them — it does not
++-- create new tables. Already applied to production via Supabase MCP on
++-- 2026-08-15; kept here so the schema is versioned in the repo too.
++
++alter table public.receipts
++  add column if not exists member_id uuid references public.members(id) on delete cascade,
++  add column if not exists amount numeric,
++  add column if not exists payment_method text,
++  add column if not exists paid_date date;
++
++create index if not exists receipts_member_id_idx
++  on public.receipts (member_id);
++
++create index if not exists receipts_workspace_id_idx
++  on public.receipts (workspace_id);
++
++alter table public.reminders
++  add column if not exists reason text;
++
++create index if not exists reminders_workspace_id_sent_at_idx
++  on public.reminders (workspace_id, sent_at desc);

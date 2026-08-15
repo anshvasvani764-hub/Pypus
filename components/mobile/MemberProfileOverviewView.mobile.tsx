@@ -386,6 +386,7 @@ export function MemberProfileOverviewView({
         onConfirm={handleMarkPaidConfirm}
         memberName={member.name}
         memberPhone={member.phone}
+        workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={planName}
         defaultAmount={amount ?? 0}

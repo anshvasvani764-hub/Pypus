@@ -226,6 +226,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         onConfirm={handleMarkPaidConfirm}
         memberName={member.name}
         memberPhone={member.phone}
+        workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={summary.planName}
         defaultAmount={summary.payableFee?.amount_snapshot ?? 0}

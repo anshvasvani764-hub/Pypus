@@ -204,6 +204,7 @@ export function FeesPaymentsTable({
         onConfirm={handlePaidConfirm}
         memberName={paidTarget?.name ?? ""}
         memberPhone={paidTarget?.phone ?? ""}
+        workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={paidSummary?.planName ?? null}
         defaultAmount={paidSummary?.payableFee?.amount_snapshot ?? 0}

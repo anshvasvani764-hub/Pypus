@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Download, MessageCircle, Loader2 } from "lucide-react";
 import { generateReceiptImage, type ReceiptData } from "@/lib/utils/receipt-generator";
 import { downloadReceipt } from "@/lib/utils/whatsapp-share";
+import { saveReceipt } from "@/app/actions/agent";
 
 export type PaymentMethod = "Cash" | "UPI";
 
@@ -15,6 +16,7 @@ interface MarkPaidModalProps {
   onConfirm: (amount: number, method: PaymentMethod) => Promise<{ success: boolean; fee?: any; error?: string }>;
   memberName: string;
   memberPhone: string;
+  workspaceId: string;
   workspaceName: string;
   planName: string | null;
   defaultAmount: number;
@@ -40,6 +42,7 @@ function MarkPaidDialog({
   onConfirm,
   memberName,
   memberPhone,
+  workspaceId,
   workspaceName,
   planName,
   defaultAmount,
@@ -88,6 +91,18 @@ function MarkPaidDialog({
         setReceiptNumber(receiptData.receiptNumber);
         setShowReceipt(true);
         setIsGeneratingReceipt(false);
+
+        // Log it so the Agent activity feed can show it happened — failure
+        // here shouldn't block the owner from seeing/sending the receipt.
+        saveReceipt({
+          workspaceId,
+          memberId: result.fee.member_id,
+          feeId: result.fee.id,
+          receiptNumber: receiptData.receiptNumber,
+          amount: Number(amount),
+          paymentMethod: method,
+          paidDate: receiptData.paidDate,
+        }).catch((err) => console.error("saveReceipt failed:", err));
       } else {
         setError(result.error || "Failed to record payment");
       }

@@ -318,6 +318,7 @@ export function FeesDashboardView({
         onConfirm={handleMarkPaidConfirm}
         memberName={markPaidRow?.member.name ?? ''}
         memberPhone={markPaidRow?.member.phone ?? ''}
+        workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={markPaidRow?.planName ?? null}
         defaultAmount={markPaidRow?.amount ?? 0}

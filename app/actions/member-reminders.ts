@@ -39,6 +39,7 @@ export async function sendReminder({
       channel: "whatsapp",
       message,
       status: "sent",
+      reason: type,
       sent_at: new Date().toISOString(),
     });
 
