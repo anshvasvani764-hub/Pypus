@@ -18,7 +18,7 @@ export default async function AgentPage({
   const workspaceId = wsData?.id ?? "";
   const workspaceName = wsData?.name ?? "Your Gym";
 
-  const { absentees, feesDue, activity } = await getAgentDashboard(workspaceId);
+  const { absentees, feesDue, activity, receiptsPending } = await getAgentDashboard(workspaceId);
 
   return (
     <AgentPendingView
@@ -27,6 +27,7 @@ export default async function AgentPage({
       absentees={absentees}
       feesDue={feesDue}
       activity={activity}
+      receiptsPending={receiptsPending}
     />
   );
 }

@@ -1,10 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MessageCircle, Clock, CreditCard, Loader2, Check } from "lucide-react";
+import { MessageCircle, Clock, CreditCard, Receipt, Loader2, Check } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { sendReminder } from "@/app/actions/member-reminders";
-import type { AbsenteeWorklistItem, FeeWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
+import { markReceiptSent } from "@/app/actions/agent";
+import type {
+  AbsenteeWorklistItem,
+  FeeWorklistItem,
+  ReceiptWorklistItem,
+  AgentActivityItem,
+} from "@/lib/agent/queries";
 
 interface AgentPendingViewProps {
   workspaceId: string;
@@ -12,11 +18,13 @@ interface AgentPendingViewProps {
   absentees: AbsenteeWorklistItem[];
   feesDue: FeeWorklistItem[];
   activity: AgentActivityItem[];
+  receiptsPending: ReceiptWorklistItem[];
 }
 
 type PendingTask =
   | { kind: "attendance"; key: string; item: AbsenteeWorklistItem }
-  | { kind: "fees"; key: string; item: FeeWorklistItem };
+  | { kind: "fees"; key: string; item: FeeWorklistItem }
+  | { kind: "receipt"; key: string; item: ReceiptWorklistItem };
 
 export function AgentPendingView({
   workspaceId,
@@ -24,6 +32,7 @@ export function AgentPendingView({
   absentees,
   feesDue,
   activity,
+  receiptsPending,
 }: AgentPendingViewProps) {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [pendingKey, startTransition] = useTransition();
@@ -36,6 +45,9 @@ export function AgentPendingView({
     ...feesDue
       .filter((f) => !f.alreadyMessagedToday)
       .map((item): PendingTask => ({ kind: "fees", key: `fee-${item.feeId}`, item })),
+    ...receiptsPending.map(
+      (item): PendingTask => ({ kind: "receipt", key: `rcpt-${item.receiptId}`, item })
+    ),
   ].filter((t) => !dismissed.has(t.key));
 
   function handleSend(task: PendingTask) {
@@ -49,22 +61,26 @@ export function AgentPendingView({
     window.open(waUrl, "_blank", "noopener,noreferrer");
 
     startTransition(async () => {
-      await sendReminder({
-        workspaceId,
-        memberId: task.item.memberId,
-        memberPhone,
-        memberName: task.item.memberName,
-        workspaceName,
-        feeId: task.kind === "fees" ? task.item.feeId : null,
-        type: task.kind,
-      });
+      if (task.kind === "receipt") {
+        await markReceiptSent(task.item.receiptId);
+      } else {
+        await sendReminder({
+          workspaceId,
+          memberId: task.item.memberId,
+          memberPhone,
+          memberName: task.item.memberName,
+          workspaceName,
+          feeId: task.kind === "fees" ? task.item.feeId : null,
+          type: task.kind,
+        });
+      }
       setDismissed((prev) => new Set(prev).add(task.key));
       setSendingKey(null);
     });
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-6 py-6 md:px-8">
       <PageHeader
         title="Agent"
         subtitle="Automated attendance nudges, fee reminders and receipts."
@@ -110,13 +126,19 @@ export function AgentPendingView({
                 >
                   <div
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      task.kind === "attendance" ? "bg-orange-50" : "bg-red-50"
+                      task.kind === "attendance"
+                        ? "bg-orange-50"
+                        : task.kind === "fees"
+                          ? "bg-red-50"
+                          : "bg-violet-50"
                     }`}
                   >
                     {task.kind === "attendance" ? (
                       <Clock className="h-4 w-4 text-orange-600" />
-                    ) : (
+                    ) : task.kind === "fees" ? (
                       <CreditCard className="h-4 w-4 text-red-600" />
+                    ) : (
+                      <Receipt className="h-4 w-4 text-violet-600" />
                     )}
                   </div>
 
@@ -127,9 +149,11 @@ export function AgentPendingView({
                     <p className="truncate text-xs text-gray-500">
                       {task.kind === "attendance"
                         ? `Absent ${task.item.daysAbsent} days — last seen ${task.item.lastSeenDate}`
-                        : task.item.status === "overdue"
-                          ? `₹${task.item.amount.toLocaleString("en-IN")} overdue by ${task.item.daysOverdue} days`
-                          : `₹${task.item.amount.toLocaleString("en-IN")} due ${task.item.dueDate}`}
+                        : task.kind === "fees"
+                          ? task.item.status === "overdue"
+                            ? `₹${task.item.amount.toLocaleString("en-IN")} overdue by ${task.item.daysOverdue} days`
+                            : `₹${task.item.amount.toLocaleString("en-IN")} due ${task.item.dueDate}`
+                          : `Receipt #${task.item.receiptNumber} — ₹${task.item.amount.toLocaleString("en-IN")} not sent yet`}
                     </p>
                   </div>
 
@@ -137,7 +161,13 @@ export function AgentPendingView({
                     onClick={() => handleSend(task)}
                     disabled={!task.item.memberPhone || isSending}
                     className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#1ea952] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                    title={!task.item.memberPhone ? "No phone number on file" : "Send on WhatsApp"}
+                    title={
+                      !task.item.memberPhone
+                        ? "No phone number on file"
+                        : task.kind === "receipt"
+                          ? "Send receipt on WhatsApp"
+                          : "Send on WhatsApp"
+                    }
                   >
                     {isSending ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

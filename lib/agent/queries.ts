@@ -25,6 +25,17 @@ export interface FeeWorklistItem {
   waMessage: string;
 }
 
+export interface ReceiptWorklistItem {
+  receiptId: string;
+  memberId: string;
+  memberName: string;
+  memberPhone: string | null;
+  receiptNumber: string;
+  amount: number;
+  paidDate: string;
+  waMessage: string;
+}
+
 export interface AgentActivityItem {
   id: string;
   kind: "reminder" | "receipt";
@@ -164,6 +175,39 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
   }
 
   return out.sort((a, b) => b.daysOverdue - a.daysOverdue);
+}
+
+/** Receipts that were generated but not yet sent to the member on WhatsApp. */
+export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWorklistItem[]> {
+  const supabase = createServiceClient();
+
+  const [receiptsRes, membersRes] = await Promise.all([
+    supabase
+      .from("receipts")
+      .select("id, member_id, receipt_number, amount, paid_date")
+      .eq("workspace_id", workspaceId)
+      .is("whatsapp_sent_at", null),
+    supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
+  ]);
+
+  if (receiptsRes.error) throw receiptsRes.error;
+
+  const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
+
+  return (receiptsRes.data ?? []).map((r) => {
+    const member = nameById.get(r.member_id);
+    const amount = Number(r.amount);
+    return {
+      receiptId: r.id,
+      memberId: r.member_id,
+      memberName: member?.name ?? "Unknown member",
+      memberPhone: member?.phone ?? null,
+      receiptNumber: r.receipt_number,
+      amount,
+      paidDate: r.paid_date,
+      waMessage: `Hi ${member?.name ?? ""}, thanks for your payment of ₹${amount.toLocaleString("en-IN")}. Receipt #${r.receipt_number} — please save it for your records.`,
+    };
+  });
 }
 
 /** Recent agent actions (reminders sent + receipts generated) for the "proof it's working" feed. */
