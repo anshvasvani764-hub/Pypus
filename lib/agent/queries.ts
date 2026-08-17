@@ -76,7 +76,7 @@ export async function getAbsenteeWorklist(
       .select("member_id, sent_at, reason")
       .eq("workspace_id", workspaceId)
       .eq("reason", "attendance")
-      .gte("sent_at", `${today}T00:00:00.000Z`),
+      .gte("sent_at", `${windowStart}T00:00:00.000Z`),
   ]);
 
   if (membersRes.error) throw membersRes.error;
@@ -84,7 +84,16 @@ export async function getAbsenteeWorklist(
 
   const members = membersRes.data ?? [];
   const attendance = attRes.data ?? [];
-  const messagedTodayIds = new Set((remindersRes.data ?? []).map((r) => r.member_id));
+
+  // Latest attendance reminder sent per member — a reminder only "covers" the
+  // CURRENT absence episode if it was sent after their last present day. This
+  // way "done" is permanent for this episode, not just for today, but a member
+  // who comes back and goes absent again correctly gets flagged fresh.
+  const lastAttReminderByMember = new Map<string, string>();
+  for (const r of remindersRes.data ?? []) {
+    const existing = lastAttReminderByMember.get(r.member_id);
+    if (!existing || r.sent_at > existing) lastAttReminderByMember.set(r.member_id, r.sent_at);
+  }
 
   const lastPresentByMember = new Map<string, string>();
   for (const row of attendance) {
@@ -104,13 +113,17 @@ export async function getAbsenteeWorklist(
       (new Date(today).getTime() - new Date(lastSeen).getTime()) / 86400000
     );
 
+    const lastReminded = lastAttReminderByMember.get(m.id);
+    // Reminded after this absence episode started? Then it's handled — skip.
+    if (lastReminded && lastReminded.slice(0, 10) >= lastSeen) continue;
+
     out.push({
       memberId: m.id,
       memberName: m.name,
       memberPhone: m.phone ?? null,
       daysAbsent,
       lastSeenDate: lastSeen,
-      alreadyMessagedToday: messagedTodayIds.has(m.id),
+      alreadyMessagedToday: false,
       waMessage: `Hi ${m.name}, we haven't seen you at the gym in ${daysAbsent} days. Hope everything's doing well — come back soon!`,
     });
   }
@@ -134,15 +147,17 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
       .from("reminders")
       .select("fee_id, sent_at, reason")
       .eq("workspace_id", workspaceId)
-      .eq("reason", "fees")
-      .gte("sent_at", `${today}T00:00:00.000Z`),
+      .eq("reason", "fees"),
   ]);
 
   if (feesRes.error) throw feesRes.error;
   if (membersRes.error) throw membersRes.error;
 
   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
-  const messagedTodayFeeIds = new Set((remindersRes.data ?? []).map((r) => r.fee_id));
+  // Once a reminder has EVER been sent for a fee, stay hidden until it's paid —
+  // a paid fee drops out of the query above entirely, and the next due cycle
+  // gets a fresh fee id, so this never blocks a genuinely new bill.
+  const feeIdsEverReminded = new Set((remindersRes.data ?? []).map((r) => r.fee_id));
 
   const out: FeeWorklistItem[] = [];
   for (const f of feesRes.data ?? []) {
@@ -150,6 +165,7 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
     if (!member) continue;
     const outstanding = (f.amount_snapshot ?? 0) - (f.paid_amount ?? 0);
     if (outstanding <= 0) continue;
+    if (feeIdsEverReminded.has(f.id)) continue;
 
     const daysOverdue =
       f.due_date < today
@@ -166,7 +182,7 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
       dueDate: f.due_date,
       status: f.status as "due" | "overdue",
       daysOverdue,
-      alreadyMessagedToday: messagedTodayFeeIds.has(f.id),
+      alreadyMessagedToday: false,
       waMessage:
         daysOverdue > 0
           ? `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is overdue by ${daysOverdue} days. Kindly clear it at the earliest.`
