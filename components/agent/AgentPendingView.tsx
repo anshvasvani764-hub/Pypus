@@ -29,10 +29,16 @@ export function AgentPendingView({
   activity,
   receiptsPending,
 }: AgentPendingViewProps) {
+  // TEMP: attendance nudges hidden from the pending list for now.
+  // To bring them back, just remove this line and restore the spread below.
+  const SHOW_ATTENDANCE = false;
+
   const tasks: PendingTask[] = [
-    ...absentees
-      .filter((a) => !a.alreadyMessagedToday)
-      .map((item): PendingTask => ({ kind: "attendance", key: `att-${item.memberId}`, item })),
+    ...(SHOW_ATTENDANCE
+      ? absentees
+          .filter((a) => !a.alreadyMessagedToday)
+          .map((item): PendingTask => ({ kind: "attendance", key: `att-${item.memberId}`, item }))
+      : []),
     ...feesDue
       .filter((f) => !f.alreadyMessagedToday)
       .map((item): PendingTask => ({ kind: "fees", key: `fee-${item.feeId}`, item })),
