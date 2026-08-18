@@ -4,7 +4,7 @@ import {
   verifyCashfreeWebhookSignature,
   getCashfreeOrderStatus,
 } from "@/lib/payments/cashfree"
-import { SAAS_PLAN } from "@/lib/subscriptions/plans"
+import { resolvePlan } from "@/lib/subscriptions/plans"
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text()
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const { data: payment } = await supabase
     .from("payments")
-    .select("id, workspace_id, status")
+    .select("id, workspace_id, status, plan_id")
     .eq("cf_order_id", cfOrderId)
     .single()
 
@@ -58,9 +58,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, note: "Already processed" })
   }
 
+  const plan = resolvePlan(payment.plan_id)
   const paidAt = new Date()
   const currentPeriodEnd = new Date(
-    paidAt.getTime() + SAAS_PLAN.cycleDays * 24 * 60 * 60 * 1000
+    paidAt.getTime() + plan.cycleDays * 24 * 60 * 60 * 1000
   )
 
   const { error: payUpdateErr } = await supabase

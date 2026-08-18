@@ -1,6 +1,10 @@
 import Link from "next/link"
+import { CheckCircle2, XCircle } from "lucide-react"
 import { createServiceClient } from "@/lib/supabase/service"
 import { getCashfreeOrderStatus } from "@/lib/payments/cashfree"
+import { resolvePlan } from "@/lib/subscriptions/plans"
+import { inter, jetbrainsMono } from "@/components/landing/fonts"
+import styles from "@/components/subscribe/subscribe.module.css"
 
 export default async function SubscribeReturnPage({
   params,
@@ -32,6 +36,12 @@ export default async function SubscribeReturnPage({
           .single()
 
         if (workspace) {
+          const { data: payment } = await supabase
+            .from("payments")
+            .select("plan_id")
+            .eq("cf_order_id", orderId)
+            .maybeSingle()
+
           const { data: sub } = await supabase
             .from("workspace_subscriptions")
             .select("status")
@@ -42,8 +52,11 @@ export default async function SubscribeReturnPage({
 
           // Only backfill if the webhook hasn't already activated it.
           if (sub && sub.status !== "active") {
+            const plan = resolvePlan(payment?.plan_id)
             const paidAt = new Date()
-            const currentPeriodEnd = new Date(paidAt.getTime() + 30 * 24 * 60 * 60 * 1000)
+            const currentPeriodEnd = new Date(
+              paidAt.getTime() + plan.cycleDays * 24 * 60 * 60 * 1000
+            )
             await supabase
               .from("workspace_subscriptions")
               .update({
@@ -64,39 +77,48 @@ export default async function SubscribeReturnPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#08080A] px-4 py-12 text-white">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0F0F12] p-8 text-center">
-        {paid ? (
-          <>
-            <h1 className="text-2xl font-semibold text-[#10B981]">Payment successful</h1>
-            <p className="mt-3 text-sm text-white/60">
-              Your subscription is active. You&apos;re all set for the next 30 days.
-            </p>
-            <Link
-              href={`/${workspaceSlug}`}
-              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#10B981] px-6 py-3 text-base font-semibold text-white transition-colors duration-200 hover:bg-[#059669] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#10B981]"
-            >
-              Go to your workspace
-            </Link>
-          </>
-        ) : (
-          <>
-            <h1 className="text-2xl font-semibold">
-              {checkError ? "Couldn't confirm payment" : "Payment not completed"}
-            </h1>
-            <p className="mt-3 text-sm text-white/60">
-              {checkError
-                ? "We couldn't verify this payment right now. If money was deducted, it will reflect shortly."
-                : "Looks like the payment didn't go through. You can try again."}
-            </p>
-            <Link
-              href={`/subscribe/${workspaceSlug}`}
-              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg border border-white/20 px-6 py-3 text-base font-semibold text-white transition-colors duration-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#10B981]"
-            >
-              Try again
-            </Link>
-          </>
-        )}
+    <main className={`${styles.root} ${inter.variable} ${jetbrainsMono.variable}`}>
+      <div className={styles.glow} aria-hidden="true" />
+      <div className={styles.body}>
+        <div className={styles.resultCard}>
+          {paid ? (
+            <>
+              <div className={styles.resultIconWrap}>
+                <CheckCircle2 size={26} />
+              </div>
+              <h1 className={styles.resultHeading}>Payment successful</h1>
+              <p className={styles.resultSub}>
+                Your subscription is active. You&apos;re all set for the next 30 days.
+              </p>
+              <Link
+                href={`/${workspaceSlug}`}
+                className={`${styles.resultLink} ${styles.resultLinkPrimary}`}
+              >
+                Go to your workspace
+              </Link>
+            </>
+          ) : (
+            <>
+              <div className={`${styles.resultIconWrap} ${styles.fail}`}>
+                <XCircle size={26} />
+              </div>
+              <h1 className={styles.resultHeading}>
+                {checkError ? "Couldn't confirm payment" : "Payment not completed"}
+              </h1>
+              <p className={styles.resultSub}>
+                {checkError
+                  ? "We couldn't verify this payment right now. If money was deducted, it will reflect shortly."
+                  : "Looks like the payment didn't go through. You can try again."}
+              </p>
+              <Link
+                href={`/subscribe/${workspaceSlug}`}
+                className={`${styles.resultLink} ${styles.resultLinkGhost}`}
+              >
+                Try again
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     </main>
   )

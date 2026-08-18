@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import Script from "next/script"
+import { Loader2, ArrowRight } from "lucide-react"
+import styles from "./subscribe.module.css"
 
 declare global {
   interface Window {
@@ -14,7 +16,15 @@ declare global {
   }
 }
 
-export function SubscribeButton({ workspaceSlug }: { workspaceSlug: string }) {
+export function SubscribeButton({
+  workspaceSlug,
+  plan = "growth",
+  label,
+}: {
+  workspaceSlug: string
+  plan?: "growth" | "test"
+  label: string
+}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sdkReady, setSdkReady] = useState(false)
@@ -26,7 +36,7 @@ export function SubscribeButton({ workspaceSlug }: { workspaceSlug: string }) {
       const res = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceSlug }),
+        body: JSON.stringify({ workspaceSlug, plan }),
       })
       const data = await res.json()
 
@@ -62,12 +72,22 @@ export function SubscribeButton({ workspaceSlug }: { workspaceSlug: string }) {
         onClick={handleSubscribe}
         disabled={loading || !sdkReady}
         aria-busy={loading}
-        className="min-h-11 w-full rounded-lg bg-[#10B981] px-6 py-3 text-base font-semibold text-white transition-colors duration-200 hover:bg-[#059669] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#10B981] disabled:cursor-not-allowed disabled:opacity-60"
+        className={styles.cta}
       >
-        {loading ? "Opening checkout…" : "Subscribe — ₹999/month"}
+        {loading ? (
+          <>
+            <Loader2 className={styles.spin} size={18} />
+            Opening checkout…
+          </>
+        ) : (
+          <>
+            {label}
+            <ArrowRight size={18} />
+          </>
+        )}
       </button>
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-400">
+        <p role="alert" className={styles.errorText}>
           {error}
         </p>
       )}

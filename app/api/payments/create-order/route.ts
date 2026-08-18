@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/service"
 import { createCashfreeOrder } from "@/lib/payments/cashfree"
-import { SAAS_PLAN } from "@/lib/subscriptions/plans"
+import { resolvePlan } from "@/lib/subscriptions/plans"
 
 export async function POST(req: NextRequest) {
   try {
-    const { workspaceSlug } = await req.json()
+    const { workspaceSlug, plan: planId } = await req.json()
 
     if (!workspaceSlug || typeof workspaceSlug !== "string") {
       return NextResponse.json({ error: "workspaceSlug is required" }, { status: 400 })
     }
+
+    const plan = resolvePlan(typeof planId === "string" ? planId : undefined)
 
     const supabase = createServiceClient()
 
@@ -39,11 +41,11 @@ export async function POST(req: NextRequest) {
 
     const { orderId: cfOrderId, paymentSessionId } = await createCashfreeOrder({
       orderId,
-      amount: SAAS_PLAN.amount,
+      amount: plan.amount,
       customerId: workspace.owner_id,
       customerPhone: phone.replace(/^\+91/, ""),
       customerEmail: owner?.email,
-      returnUrl: `${appUrl}/subscribe/${workspaceSlug}/return?order_id=${orderId}`,
+      returnUrl: `${appUrl}/subscribe/${workspaceSlug}/return?order_id=${orderId}${plan.id === "test" ? "&test=1" : ""}`,
       notifyUrl: `${appUrl}/api/payments/webhook`,
     })
 
@@ -53,7 +55,8 @@ export async function POST(req: NextRequest) {
     const { error: payErr } = await supabase.from("payments").insert({
       workspace_id: workspace.id,
       cf_order_id: cfOrderId,
-      amount: SAAS_PLAN.amount,
+      amount: plan.amount,
+      plan_id: plan.id,
       status: "initiated",
     })
 
