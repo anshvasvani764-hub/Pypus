@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { SAAS_PLAN } from '@/lib/subscriptions/plans'
 
 export interface TemplateModule {
   id: string
@@ -102,6 +103,30 @@ export async function performWorkspaceCreation(
   if (memErr) {
     console.error('Workspace member error:', memErr)
     throw new Error(memErr.message || 'Failed to add workspace owner member')
+  }
+
+  // Start the 14-day free trial. Must happen AFTER the workspace_members
+  // insert above — the RLS policy on workspace_subscriptions requires the
+  // caller to already be an active member of the workspace.
+  const trialEndsAt = new Date(
+    Date.now() + SAAS_PLAN.trialDays * 24 * 60 * 60 * 1000
+  ).toISOString()
+
+  const { error: subErr } = await supabase.from('workspace_subscriptions').insert({
+    workspace_id: cleanUUID(workspaceId),
+    plan_id: SAAS_PLAN.id,
+    plan_name: SAAS_PLAN.name,
+    amount: SAAS_PLAN.amount,
+    billing_period: SAAS_PLAN.billingPeriod,
+    status: 'trialing',
+    trial_ends_at: trialEndsAt,
+  })
+
+  if (subErr) {
+    // Don't block workspace creation over this — but log loudly, since a
+    // missing subscription row means getSubscriptionState() will treat
+    // this workspace as status "none" and block it at the paywall gate.
+    console.error('Trial subscription creation error:', subErr)
   }
 
   if (selectedTemplate.modules?.length) {

@@ -1,10 +1,12 @@
+import { redirect } from 'next/navigation'
 import { SidebarProvider } from '@/context/SidebarContext'
 import { SearchProvider } from '@/context/SearchContext'
 import Sidebar from '@/components/layout/Sidebar'
 import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
 import { GlobalHeader } from '@/components/layout/GlobalHeader'
 import { getDevice } from '@/lib/device'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { getSubscriptionState } from '@/lib/subscriptions/get-subscription-status'
 
 export default async function AppLayout({
   children,
@@ -16,6 +18,27 @@ export default async function AppLayout({
   const device = await getDevice()
   const { app: workspaceSlug } = await params
 
+  // Resolve workspace id + name once, then gate on subscription status.
+  // NOTE: this uses the service-role client purely to look up the
+  // workspace row and check billing status — it does not read gym data
+  // (members/fees/attendance), so it does not widen what an unauthenticated
+  // caller can see. Per-workspace data access is still governed by RLS
+  // inside each page/action. This gate does NOT replace real session auth —
+  // see PYPUS_AUTH_TODO.md for the separate auth gap that still needs fixing.
+  const supabase = createServiceClient()
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('id, name')
+    .eq('slug', workspaceSlug)
+    .single()
+
+  if (workspace?.id) {
+    const subState = await getSubscriptionState(workspace.id)
+    if (!subState.allowed) {
+      redirect(`/subscribe/${workspaceSlug}?reason=${subState.status}`)
+    }
+  }
+
   if (device === 'mobile') {
     return (
       <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface">
@@ -24,14 +47,6 @@ export default async function AppLayout({
       </div>
     )
   }
-
-  // Fetch workspace display name for the GlobalHeader breadcrumb
-  const supabase = await createClient()
-  const { data: workspace } = await supabase
-    .from('workspaces')
-    .select('name')
-    .eq('slug', workspaceSlug)
-    .single()
 
   const workspaceName = workspace?.name ?? workspaceSlug
 
