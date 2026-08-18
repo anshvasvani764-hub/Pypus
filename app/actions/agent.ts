@@ -65,7 +65,7 @@ export async function sendAgentReceipt({
       paymentMethod,
       validTillDate ? formatReceiptDate(validTillDate) : "—",
     ],
-    "en_US",
+    "en",
     receiptImageUrl
   );
 
