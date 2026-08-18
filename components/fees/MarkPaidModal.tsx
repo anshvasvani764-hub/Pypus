@@ -92,8 +92,12 @@ function MarkPaidDialog({
         setShowReceipt(true);
         setIsGeneratingReceipt(false);
 
-        // Log it so the Agent activity feed can show it happened — failure
-        // here shouldn't block the owner from seeing/sending the receipt.
+        // Log it so the Agent activity feed can show it happened, and
+        // upload the receipt image so it's ready as a WhatsApp photo —
+        // failure here shouldn't block the owner from seeing/sending the receipt.
+        const imageFile = new File([blob], `${receiptData.receiptNumber}.jpg`, {
+          type: "image/jpeg",
+        });
         saveReceipt({
           workspaceId,
           memberId: result.fee.member_id,
@@ -102,6 +106,7 @@ function MarkPaidDialog({
           amount: Number(amount),
           paymentMethod: method,
           paidDate: receiptData.paidDate,
+          imageFile,
         }).catch((err) => console.error("saveReceipt failed:", err));
       } else {
         setError(result.error || "Failed to record payment");

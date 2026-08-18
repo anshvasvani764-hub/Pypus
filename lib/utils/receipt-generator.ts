@@ -206,7 +206,8 @@ export async function generateReceiptImage(
   ctx.font = '14px Arial, sans-serif';
   ctx.fillText('Powered by Pypus', width / 2, yPos);
 
-  // Convert canvas to blob and data URL
+  // Convert canvas to blob and data URL — JPEG keeps storage small (~30-40KB
+  // vs ~120KB+ for PNG) with no visible quality loss for a receipt.
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
@@ -214,8 +215,8 @@ export async function generateReceiptImage(
         return;
       }
 
-      const dataUrl = canvas.toDataURL('image/png');
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       resolve({ dataUrl, blob });
-    }, 'image/png', 0.95);
+    }, 'image/jpeg', 0.85);
   });
 }

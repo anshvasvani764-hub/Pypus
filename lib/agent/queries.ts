@@ -33,6 +33,9 @@ export interface ReceiptWorklistItem {
   receiptNumber: string;
   amount: number;
   paidDate: string;
+  paymentMethod: string;
+  validTillDate: string | null;
+  receiptImageUrl: string | null;
   waMessage: string;
 }
 
@@ -200,7 +203,7 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
   const [receiptsRes, membersRes] = await Promise.all([
     supabase
       .from("receipts")
-      .select("id, member_id, receipt_number, amount, paid_date")
+      .select("id, member_id, fee_id, receipt_number, amount, paid_date, payment_method, receipt_image_url")
       .eq("workspace_id", workspaceId)
       .is("whatsapp_sent_at", null),
     supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
@@ -209,6 +212,15 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
   if (receiptsRes.error) throw receiptsRes.error;
 
   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
+
+  // "Valid till" = the due_date on the fee this receipt was paid against,
+  // i.e. the next renewal date the payment covers up to.
+  const feeIds = (receiptsRes.data ?? []).map((r) => r.fee_id).filter(Boolean) as string[];
+  const dueDateByFeeId = new Map<string, string>();
+  if (feeIds.length > 0) {
+    const feesRes = await supabase.from("fees").select("id, due_date").in("id", feeIds);
+    for (const f of feesRes.data ?? []) dueDateByFeeId.set(f.id, f.due_date);
+  }
 
   return (receiptsRes.data ?? []).map((r) => {
     const member = nameById.get(r.member_id);
@@ -221,6 +233,9 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
       receiptNumber: r.receipt_number,
       amount,
       paidDate: r.paid_date,
+      paymentMethod: r.payment_method ?? "Cash",
+      validTillDate: r.fee_id ? (dueDateByFeeId.get(r.fee_id) ?? null) : null,
+      receiptImageUrl: r.receipt_image_url ?? null,
       waMessage: `Hi ${member?.name ?? ""}, thanks for your payment of ₹${amount.toLocaleString("en-IN")}. Receipt #${r.receipt_number} — please save it for your records.`,
     };
   });

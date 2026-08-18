@@ -1,7 +1,9 @@
 "use client";
 
-import { Clock, CreditCard, Receipt, Check, Hourglass, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Clock, CreditCard, Receipt, Check, Loader2, MessageCircle, Send } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { sendAgentReminder, sendAgentReceipt } from "@/app/actions/agent";
 import type {
   AbsenteeWorklistItem,
   FeeWorklistItem,
@@ -24,6 +26,8 @@ type PendingTask =
   | { kind: "receipt"; key: string; item: ReceiptWorklistItem };
 
 export function AgentPendingView({
+  workspaceId,
+  workspaceName,
   absentees,
   feesDue,
   activity,
@@ -32,6 +36,54 @@ export function AgentPendingView({
   // TEMP: attendance nudges hidden from the pending list for now.
   // To bring them back, just remove this line and restore the spread below.
   const SHOW_ATTENDANCE = false;
+
+  const [sendingKey, setSendingKey] = useState<string | null>(null);
+  const [sentKeys, setSentKeys] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flashToast(message: string) {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function handleSend(task: PendingTask) {
+    if (!task.item.memberPhone) {
+      flashToast("No phone number on file for this member");
+      return;
+    }
+
+    setSendingKey(task.key);
+
+    const result =
+      task.kind === "receipt"
+        ? await sendAgentReceipt({
+            receiptId: task.item.receiptId,
+            memberPhone: task.item.memberPhone,
+            memberName: task.item.memberName,
+            amount: task.item.amount,
+            workspaceName,
+            paymentMethod: task.item.paymentMethod,
+            validTillDate: task.item.validTillDate,
+            receiptImageUrl: task.item.receiptImageUrl,
+          })
+        : await sendAgentReminder({
+            workspaceId,
+            memberId: task.item.memberId,
+            memberPhone: task.item.memberPhone,
+            feeId: task.kind === "fees" ? task.item.feeId : null,
+            reason: task.kind,
+            message: task.item.waMessage,
+          });
+
+    setSendingKey(null);
+
+    if (result.success) {
+      setSentKeys((prev) => new Set(prev).add(task.key));
+      flashToast("Sent on WhatsApp");
+    } else {
+      flashToast(result.error || "Failed to send — check WhatsApp setup");
+    }
+  }
 
   const tasks: PendingTask[] = [
     ...(SHOW_ATTENDANCE
@@ -45,7 +97,7 @@ export function AgentPendingView({
     ...receiptsPending.map(
       (item): PendingTask => ({ kind: "receipt", key: `rcpt-${item.receiptId}`, item })
     ),
-  ];
+  ].filter((task) => !sentKeys.has(task.key));
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
@@ -62,7 +114,7 @@ export function AgentPendingView({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-900">WhatsApp</p>
           <p className="text-xs text-gray-500">
-            Agent prepares the message — our team sends it on your behalf.
+            Agent prepares the message — tap Send to deliver it on WhatsApp.
           </p>
         </div>
       </div>
@@ -124,13 +176,24 @@ export function AgentPendingView({
                     </p>
                   </div>
 
-                  <span
-                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-700"
-                    title="Agent will send this — no action needed from you"
+                  <button
+                    type="button"
+                    onClick={() => handleSend(task)}
+                    disabled={sendingKey === task.key}
+                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 min-h-[44px] sm:min-h-0"
                   >
-                    <Hourglass className="h-3.5 w-3.5" />
-                    Pending
-                  </span>
+                    {sendingKey === task.key ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Sending
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Send
+                      </>
+                    )}
+                  </button>
                 </div>
               );
             })}
@@ -164,6 +227,15 @@ export function AgentPendingView({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-sm rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-medium text-white shadow-lg sm:inset-x-auto sm:right-6"
+        >
+          {toast}
         </div>
       )}
     </div>
