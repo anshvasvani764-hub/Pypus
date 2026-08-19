@@ -44,7 +44,8 @@ export interface AgentActivityItem {
   kind: "reminder" | "receipt";
   memberName: string;
   detail: string;
-  at: string; // formatted IST datetime
+  at: string; // formatted IST datetime (display only — don't sort on this)
+  atRaw: string; // ISO timestamp, used for sorting
 }
 
 function shiftDate(dateStr: string, days: number): string {
@@ -242,7 +243,7 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
 }
 
 /** Recent agent actions (reminders sent + receipts generated) for the "proof it's working" feed. */
-export async function getAgentActivity(workspaceId: string, limit = 20): Promise<AgentActivityItem[]> {
+export async function getAgentActivity(workspaceId: string, limit = 100): Promise<AgentActivityItem[]> {
   const supabase = createServiceClient();
 
   const [remindersRes, receiptsRes, membersRes] = await Promise.all([
@@ -272,6 +273,7 @@ export async function getAgentActivity(workspaceId: string, limit = 20): Promise
     memberName: nameById.get(r.member_id) ?? "Unknown member",
     detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
     at: formatISTDateTime(r.sent_at),
+    atRaw: r.sent_at,
   }));
 
   const receiptItems: AgentActivityItem[] = (receiptsRes.data ?? []).map((r) => ({
@@ -280,9 +282,12 @@ export async function getAgentActivity(workspaceId: string, limit = 20): Promise
     memberName: nameById.get(r.member_id) ?? "Unknown member",
     detail: `Receipt #${r.receipt_number} generated — ₹${Number(r.amount).toLocaleString("en-IN")}`,
     at: formatISTDateTime(r.generated_at),
+    atRaw: r.generated_at,
   }));
 
+  // Sort on the raw ISO timestamp, not the formatted display string — string
+  // sorting "12:33 am" vs "01:37 am" puts 12 before 01 and scrambles the feed.
   return [...reminderItems, ...receiptItems]
-    .sort((a, b) => (a.at < b.at ? 1 : -1))
+    .sort((a, b) => (a.atRaw < b.atRaw ? 1 : -1))
     .slice(0, limit);
 }

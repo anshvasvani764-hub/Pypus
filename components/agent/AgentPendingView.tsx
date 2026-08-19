@@ -44,6 +44,8 @@ interface HistoryRow {
   at: string;
 }
 
+const PAGE_SIZE = 10;
+
 const MIN_DELAY_S = 1;
 const MAX_DELAY_S = 30;
 const randomDelaySeconds = () =>
@@ -68,6 +70,7 @@ export function AgentPendingView({
   const [statusFilter, setStatusFilter] = useState<"all" | RowStatus>("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [menuKey, setMenuKey] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const queuedKeysRef = useRef<Set<string>>(new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -175,6 +178,16 @@ export function AgentPendingView({
     return true;
   });
 
+  // Reset pagination whenever the filtered set changes shape (new search/filter).
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [query, statusFilter]);
+
+  const visibleLive = filteredLive.slice(0, visibleCount);
+  const visibleHistory = filteredHistory.slice(0, Math.max(0, visibleCount - filteredLive.length));
+  const totalFiltered = filteredLive.length + filteredHistory.length;
+  const hasMore = visibleCount < totalFiltered;
+
   const sentCount = rows.filter((r) => r.status === "sent").length + historyRows.length;
   const totalCount = rows.length + historyRows.length;
 
@@ -250,7 +263,7 @@ export function AgentPendingView({
         </div>
       ) : (
         <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-          {filteredLive.map((row) => {
+          {visibleLive.map((row) => {
             const s = STATUS_STYLES[row.status];
             return (
               <div
@@ -335,7 +348,7 @@ export function AgentPendingView({
             );
           })}
 
-          {filteredHistory.map((row) => (
+          {visibleHistory.map((row) => (
             <div key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
                 <Receipt className="h-4 w-4 text-gray-400" />
@@ -351,6 +364,18 @@ export function AgentPendingView({
               <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Load more
+          </button>
         </div>
       )}
     </div>
