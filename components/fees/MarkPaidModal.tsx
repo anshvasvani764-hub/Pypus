@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Download, MessageCircle, Loader2 } from "lucide-react";
+import { X, Download, MessageCircle, Loader2, Check, RotateCcw } from "lucide-react";
 import { generateReceiptImage, type ReceiptData } from "@/lib/utils/receipt-generator";
 import { downloadReceipt } from "@/lib/utils/whatsapp-share";
-import { saveReceipt } from "@/app/actions/agent";
+import { saveReceipt, sendAgentReceipt } from "@/app/actions/agent";
 
 export type PaymentMethod = "Cash" | "UPI";
 
@@ -55,8 +55,14 @@ function MarkPaidDialog({
   const [receiptImageUrl, setReceiptImageUrl] = useState<string | null>(null);
   const [receiptBlob, setReceiptBlob] = useState<Blob | null>(null);
   const [receiptNumber, setReceiptNumber] = useState<string>("");
+  const [receiptId, setReceiptId] = useState<string | null>(null);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-send status — the receipt goes out on WhatsApp on its own right
+  // after it's generated. No "Send" button to press.
+  const [waStatus, setWaStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [waError, setWaError] = useState<string | null>(null);
 
   const valid = Number(amount) > 0;
 
@@ -91,23 +97,41 @@ function MarkPaidDialog({
         setReceiptNumber(receiptData.receiptNumber);
         setShowReceipt(true);
         setIsGeneratingReceipt(false);
+        setWaStatus("sending");
+        setWaError(null);
 
-        // Log it so the Agent activity feed can show it happened, and
-        // upload the receipt image so it's ready as a WhatsApp photo —
-        // failure here shouldn't block the owner from seeing/sending the receipt.
+        // Upload the receipt image and — this is the automatic part —
+        // send it to the member on WhatsApp right away. No button to tap.
         const imageFile = new File([blob], `${receiptData.receiptNumber}.jpg`, {
           type: "image/jpeg",
         });
-        saveReceipt({
-          workspaceId,
-          memberId: result.fee.member_id,
-          feeId: result.fee.id,
-          receiptNumber: receiptData.receiptNumber,
-          amount: Number(amount),
-          paymentMethod: method,
-          paidDate: receiptData.paidDate,
-          imageFile,
-        }).catch((err) => console.error("saveReceipt failed:", err));
+        try {
+          const saved = await saveReceipt({
+            workspaceId,
+            memberId: result.fee.member_id,
+            memberName,
+            memberPhone: memberPhone || null,
+            feeId: result.fee.id,
+            receiptNumber: receiptData.receiptNumber,
+            amount: Number(amount),
+            paymentMethod: method,
+            paidDate: receiptData.paidDate,
+            validTillDate: dueDate,
+            workspaceName,
+            imageFile,
+          });
+          setReceiptId(saved.receiptId ?? null);
+          if (saved.whatsapp.success) {
+            setWaStatus("sent");
+          } else {
+            setWaStatus("failed");
+            setWaError(saved.whatsapp.error || "Couldn't send automatically");
+          }
+        } catch (err) {
+          console.error("saveReceipt failed:", err);
+          setWaStatus("failed");
+          setWaError("Couldn't send automatically");
+        }
       } else {
         setError(result.error || "Failed to record payment");
       }
@@ -118,28 +142,28 @@ function MarkPaidDialog({
     }
   }
 
-  async function handleSendWhatsApp() {
-    if (!receiptBlob || !memberPhone) return;
+  async function handleRetryWhatsApp() {
+    if (!receiptId) return;
+    setWaStatus("sending");
+    setWaError(null);
 
-    let cleanPhone = memberPhone.replace(/[\s\-()]/g, '');
-    if (!cleanPhone.startsWith('+')) {
-      if (!cleanPhone.startsWith('91')) {
-        cleanPhone = '91' + cleanPhone;
-      }
+    const result = await sendAgentReceipt({
+      receiptId,
+      memberPhone: memberPhone || null,
+      memberName,
+      amount: Number(amount),
+      workspaceName,
+      paymentMethod: method,
+      validTillDate: dueDate,
+      receiptImageUrl,
+    });
+
+    if (result.success) {
+      setWaStatus("sent");
     } else {
-      cleanPhone = cleanPhone.slice(1);
+      setWaStatus("failed");
+      setWaError(result.error || "Couldn't send automatically");
     }
-
-    const message = `Payment Receipt\nAmount: ₹${Number(amount).toLocaleString('en-IN')}\nReceipt #${receiptNumber}\n\nThank you for your payment!`;
-
-    // Download receipt image
-    downloadReceipt(receiptBlob, receiptNumber);
-
-    // Open WhatsApp chat directly with member's number + text message
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-
-    handleClose();
   }
 
   function handleDownload() {
@@ -152,6 +176,9 @@ function MarkPaidDialog({
     setReceiptImageUrl(null);
     setReceiptBlob(null);
     setReceiptNumber("");
+    setReceiptId(null);
+    setWaStatus("idle");
+    setWaError(null);
     setError(null);
     onClose();
   }
@@ -189,15 +216,44 @@ function MarkPaidDialog({
 
           {/* Sticky Action Buttons */}
           <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-white space-y-3">
-            <button
-              onClick={handleSendWhatsApp}
-              disabled={!memberPhone}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-              title={!memberPhone ? "Member phone number not available" : ""}
+            {/* WhatsApp auto-send status — no button, it just goes */}
+            <div
+              className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
+                waStatus === "sent"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : waStatus === "failed"
+                    ? "bg-red-50 text-red-600"
+                    : "bg-gray-50 text-gray-600"
+              }`}
             >
-              <MessageCircle className="h-4 w-4" />
-              Send via WhatsApp
-            </button>
+              {waStatus === "sending" && (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending on WhatsApp…
+                </>
+              )}
+              {waStatus === "sent" && (
+                <>
+                  <Check className="h-4 w-4" />
+                  Sent to {memberName} on WhatsApp
+                </>
+              )}
+              {waStatus === "failed" && (
+                <>
+                  <MessageCircle className="h-4 w-4 shrink-0" />
+                  <span className="flex-1">{waError || "Couldn't send automatically"}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetryWhatsApp}
+                    className="flex shrink-0 items-center gap-1 rounded-full border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Retry
+                  </button>
+                </>
+              )}
+              {waStatus === "idle" && "Preparing to send on WhatsApp…"}
+            </div>
 
             <button
               onClick={handleDownload}

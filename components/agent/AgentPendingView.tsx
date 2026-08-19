@@ -1,109 +1,135 @@
 "use client";
 
-import { useState } from "react";
-import { Clock, CreditCard, Receipt, Check, Loader2, MessageCircle, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Receipt, Check, Loader2, MessageCircle, Clock, RotateCcw, X as XIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { sendAgentReminder, sendAgentReceipt } from "@/app/actions/agent";
-import type {
-  AbsenteeWorklistItem,
-  FeeWorklistItem,
-  ReceiptWorklistItem,
-  AgentActivityItem,
-} from "@/lib/agent/queries";
+import { sendAgentReceipt } from "@/app/actions/agent";
+import type { ReceiptWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
 
 interface AgentPendingViewProps {
-  workspaceId: string;
+  workspaceSlug: string;
   workspaceName: string;
-  absentees: AbsenteeWorklistItem[];
-  feesDue: FeeWorklistItem[];
   activity: AgentActivityItem[];
   receiptsPending: ReceiptWorklistItem[];
 }
 
-type PendingTask =
-  | { kind: "attendance"; key: string; item: AbsenteeWorklistItem }
-  | { kind: "fees"; key: string; item: FeeWorklistItem }
-  | { kind: "receipt"; key: string; item: ReceiptWorklistItem };
+type LogStatus = "queued" | "sending" | "sent" | "failed";
+
+interface ReceiptLog {
+  key: string;
+  item: ReceiptWorklistItem;
+  status: LogStatus;
+  secondsLeft: number;
+  error?: string;
+}
+
+// Receipts that reach this page are ones the automatic send (fired the
+// moment the receipt was created — see saveReceipt) didn't manage to
+// deliver. Rather than dumping them in front of the owner as one more
+// thing to click, the agent just quietly retries each one on its own,
+// staggered over the next 1-30s, and this box is a live log of that.
+const MIN_DELAY_S = 1;
+const MAX_DELAY_S = 30;
+const randomDelaySeconds = () => Math.floor(Math.random() * (MAX_DELAY_S - MIN_DELAY_S + 1)) + MIN_DELAY_S;
 
 export function AgentPendingView({
-  workspaceId,
+  workspaceSlug,
   workspaceName,
-  absentees,
-  feesDue,
   activity,
   receiptsPending,
 }: AgentPendingViewProps) {
-  // TEMP: attendance nudges hidden from the pending list for now.
-  // To bring them back, just remove this line and restore the spread below.
-  const SHOW_ATTENDANCE = false;
+  const router = useRouter();
+  const [logs, setLogs] = useState<ReceiptLog[]>([]);
+  const queuedKeysRef = useRef<Set<string>>(new Set());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const [sendingKey, setSendingKey] = useState<string | null>(null);
-  const [sentKeys, setSentKeys] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
+  // Seed the log with whatever's pending and schedule each one's retry —
+  // nothing here waits on a click.
+  useEffect(() => {
+    const fresh = receiptsPending.filter(
+      (r) => !queuedKeysRef.current.has(`rcpt-${r.receiptId}`)
+    );
+    if (fresh.length === 0) return;
 
-  function flashToast(message: string) {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    const withDelays = fresh.map((item) => ({ item, delay: randomDelaySeconds() }));
+
+    setLogs((prev) => [
+      ...withDelays.map(
+        ({ item, delay }): ReceiptLog => ({
+          key: `rcpt-${item.receiptId}`,
+          item,
+          status: "queued",
+          secondsLeft: delay,
+        })
+      ),
+      ...prev,
+    ]);
+
+    withDelays.forEach(({ item, delay }) => {
+      const key = `rcpt-${item.receiptId}`;
+      queuedKeysRef.current.add(key);
+      const timer = setTimeout(() => void fireSend(key, item), delay * 1000);
+      timersRef.current.set(key, timer);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptsPending]);
+
+  // Ticks the "sending in Xs" countdown once a second.
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setLogs((prev) =>
+        prev.map((l) =>
+          l.status === "queued" && l.secondsLeft > 0 ? { ...l, secondsLeft: l.secondsLeft - 1 } : l
+        )
+      );
+    }, 1000);
+    return () => {
+      clearInterval(tick);
+      timersRef.current.forEach((t) => clearTimeout(t));
+    };
+  }, []);
+
+  async function fireSend(key: string, item: ReceiptWorklistItem) {
+    setLogs((prev) => prev.map((l) => (l.key === key ? { ...l, status: "sending" } : l)));
+
+    const result = await sendAgentReceipt({
+      receiptId: item.receiptId,
+      memberPhone: item.memberPhone,
+      memberName: item.memberName,
+      amount: item.amount,
+      workspaceName,
+      paymentMethod: item.paymentMethod,
+      validTillDate: item.validTillDate,
+      receiptImageUrl: item.receiptImageUrl,
+    });
+
+    setLogs((prev) =>
+      prev.map((l) =>
+        l.key === key
+          ? result.success
+            ? { ...l, status: "sent" }
+            : { ...l, status: "failed", error: result.error }
+          : l
+      )
+    );
   }
 
-  async function handleSend(task: PendingTask) {
-    if (!task.item.memberPhone) {
-      flashToast("No phone number on file for this member");
-      return;
-    }
-
-    setSendingKey(task.key);
-
-    const result =
-      task.kind === "receipt"
-        ? await sendAgentReceipt({
-            receiptId: task.item.receiptId,
-            memberPhone: task.item.memberPhone,
-            memberName: task.item.memberName,
-            amount: task.item.amount,
-            workspaceName,
-            paymentMethod: task.item.paymentMethod,
-            validTillDate: task.item.validTillDate,
-            receiptImageUrl: task.item.receiptImageUrl,
-          })
-        : await sendAgentReminder({
-            workspaceId,
-            memberId: task.item.memberId,
-            memberPhone: task.item.memberPhone,
-            feeId: task.kind === "fees" ? task.item.feeId : null,
-            reason: task.kind,
-            message: task.item.waMessage,
-          });
-
-    setSendingKey(null);
-
-    if (result.success) {
-      setSentKeys((prev) => new Set(prev).add(task.key));
-      flashToast("Sent on WhatsApp");
-    } else {
-      flashToast(result.error || "Failed to send — check WhatsApp setup");
-    }
+  function retryNow(key: string, item: ReceiptWorklistItem) {
+    const existing = timersRef.current.get(key);
+    if (existing) clearTimeout(existing);
+    void fireSend(key, item);
   }
 
-  const tasks: PendingTask[] = [
-    ...(SHOW_ATTENDANCE
-      ? absentees
-          .filter((a) => !a.alreadyMessagedToday)
-          .map((item): PendingTask => ({ kind: "attendance", key: `att-${item.memberId}`, item }))
-      : []),
-    ...feesDue
-      .filter((f) => !f.alreadyMessagedToday)
-      .map((item): PendingTask => ({ kind: "fees", key: `fee-${item.feeId}`, item })),
-    ...receiptsPending.map(
-      (item): PendingTask => ({ kind: "receipt", key: `rcpt-${item.receiptId}`, item })
-    ),
-  ].filter((task) => !sentKeys.has(task.key));
+  function openMemberFees(memberId: string) {
+    router.push(`/${workspaceSlug}/members/${memberId}/fees`);
+  }
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
       <PageHeader
         title="Agent"
-        subtitle="Automated attendance nudges, fee reminders and receipts."
+        subtitle="Payment receipts send themselves on WhatsApp the moment they're created."
       />
 
       {/* WhatsApp banner */}
@@ -114,89 +140,95 @@ export function AgentPendingView({
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-900">WhatsApp</p>
           <p className="text-xs text-gray-500">
-            Agent prepares the message — tap Send to deliver it on WhatsApp.
+            No button to press — receipts go out automatically. This log only shows the rare one that needs a retry.
           </p>
         </div>
       </div>
 
-      {/* Pending tasks */}
+      {/* Receipt log */}
       <div>
         <h2 className="mb-3 text-sm font-semibold text-gray-900">
-          Pending tasks {tasks.length > 0 && `(${tasks.length})`}
+          Receipt log {logs.length > 0 && `(${logs.length})`}
         </h2>
 
-        {tasks.length === 0 ? (
+        {logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
               <Check className="h-6 w-6 text-emerald-600" />
             </div>
-            <p className="text-sm font-medium text-gray-900">No pending task for agent yet</p>
+            <p className="text-sm font-medium text-gray-900">Nothing waiting on the agent</p>
             <p className="max-w-xs text-xs text-gray-500">
-              When a member misses 3+ days or a fee falls due, it'll show up here ready to send.
+              Every receipt has gone out on WhatsApp already. This only fills up if a send fails and needs a retry.
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {tasks.map((task) => {
-              return (
-                <div
-                  key={task.key}
-                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3"
-                >
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      task.kind === "attendance"
-                        ? "bg-orange-50"
-                        : task.kind === "fees"
-                          ? "bg-red-50"
-                          : "bg-violet-50"
-                    }`}
-                  >
-                    {task.kind === "attendance" ? (
-                      <Clock className="h-4 w-4 text-orange-600" />
-                    ) : task.kind === "fees" ? (
-                      <CreditCard className="h-4 w-4 text-red-600" />
-                    ) : (
-                      <Receipt className="h-4 w-4 text-violet-600" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900">
-                      {task.item.memberName}
-                    </p>
-                    <p className="truncate text-xs text-gray-500">
-                      {task.kind === "attendance"
-                        ? `Absent ${task.item.daysAbsent} days — last seen ${task.item.lastSeenDate}`
-                        : task.kind === "fees"
-                          ? task.item.status === "overdue"
-                            ? `₹${task.item.amount.toLocaleString("en-IN")} overdue by ${task.item.daysOverdue} days`
-                            : `₹${task.item.amount.toLocaleString("en-IN")} due ${task.item.dueDate}`
-                          : `Receipt #${task.item.receiptNumber} — ₹${task.item.amount.toLocaleString("en-IN")} not sent yet`}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSend(task)}
-                    disabled={sendingKey === task.key}
-                    className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 min-h-[44px] sm:min-h-0"
-                  >
-                    {sendingKey === task.key ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Sending
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-3.5 w-3.5" />
-                        Send
-                      </>
-                    )}
-                  </button>
+          <div className="space-y-2 rounded-2xl border border-gray-200 bg-white p-2">
+            {logs.map((log) => (
+              <div
+                key={log.key}
+                role="button"
+                tabIndex={0}
+                onClick={() => openMemberFees(log.item.memberId)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openMemberFees(log.item.memberId);
+                }}
+                className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-gray-50"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-50">
+                  <Receipt className="h-4 w-4 text-violet-600" />
                 </div>
-              );
-            })}
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{log.item.memberName}</p>
+                  <p className="truncate text-xs text-gray-500">
+                    Receipt #{log.item.receiptNumber} — ₹{log.item.amount.toLocaleString("en-IN")}
+                  </p>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                  {log.status === "queued" && (
+                    <span className="flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+                      <Clock className="h-3 w-3" />
+                      Retrying in {log.secondsLeft}s
+                    </span>
+                  )}
+                  {log.status === "sending" && (
+                    <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Sending
+                    </span>
+                  )}
+                  {log.status === "sent" && (
+                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                      <Check className="h-3 w-3" />
+                      Sent
+                    </span>
+                  )}
+                  {log.status === "failed" && (
+                    <>
+                      <span
+                        className="flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600"
+                        title={log.error}
+                      >
+                        <XIcon className="h-3 w-3" />
+                        Failed
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          retryNow(log.key, log.item);
+                        }}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100"
+                        title="Retry now"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -215,7 +247,7 @@ export function AgentPendingView({
                   {a.kind === "reminder" ? (
                     <Clock className="h-3.5 w-3.5 text-emerald-600" />
                   ) : (
-                    <CreditCard className="h-3.5 w-3.5 text-emerald-600" />
+                    <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -227,15 +259,6 @@ export function AgentPendingView({
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {toast && (
-        <div
-          role="status"
-          className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-sm rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-medium text-white shadow-lg sm:inset-x-auto sm:right-6"
-        >
-          {toast}
         </div>
       )}
     </div>
