@@ -65,7 +65,7 @@ async function sendReceiptOverWhatsApp({
       paymentMethod,
       validTillDate ? formatReceiptDate(validTillDate) : "—",
     ],
-    "en_US",
+    "en",
     receiptImageUrl
   );
 

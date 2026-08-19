@@ -104,7 +104,7 @@ export async function sendWhatsAppTemplate(
   to: string,
   templateName: string,
   bodyParams: string[] = [],
-  languageCode = "en_US",
+  languageCode = "en",
   headerImageLink?: string
 ): Promise<WhatsAppSendResult> {
   const components: Record<string, unknown>[] = [];
