@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  X as XIcon,
   Loader2,
   Clock,
   RotateCcw,
@@ -13,8 +12,9 @@ import {
   Search,
   ChevronDown,
   MoreHorizontal,
-  GitBranch,
+  X as XIcon,
 } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { sendAgentReceipt } from "@/app/actions/agent";
 import type { ReceiptWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
 
@@ -49,11 +49,11 @@ const MAX_DELAY_S = 30;
 const randomDelaySeconds = () =>
   Math.floor(Math.random() * (MAX_DELAY_S - MIN_DELAY_S + 1)) + MIN_DELAY_S;
 
-const STATUS_STYLES: Record<RowStatus, { dot: string; text: string; label: string }> = {
-  queued: { dot: "bg-gray-500", text: "text-gray-400", label: "Retrying" },
-  sending: { dot: "bg-sky-400 animate-pulse", text: "text-sky-400", label: "Sending" },
-  sent: { dot: "bg-emerald-400", text: "text-emerald-400", label: "Sent" },
-  failed: { dot: "bg-red-400", text: "text-red-400", label: "Failed" },
+const STATUS_STYLES: Record<RowStatus, { badge: string; dot: string; label: string }> = {
+  queued: { badge: "bg-gray-100 text-gray-600", dot: "bg-gray-400", label: "Retrying" },
+  sending: { badge: "bg-sky-50 text-sky-700", dot: "bg-sky-500", label: "Sending" },
+  sent: { badge: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500", label: "Sent" },
+  failed: { badge: "bg-red-50 text-red-600", dot: "bg-red-500", label: "Failed" },
 };
 
 export function AgentPendingView({
@@ -179,31 +179,27 @@ export function AgentPendingView({
   const totalCount = rows.length + historyRows.length;
 
   return (
-    <div className="px-6 py-6 md:px-8">
-    <div className="rounded-2xl border border-white/10 bg-[#0a0a0a] p-5 md:p-6">
-      {/* Header */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-gray-100">Agent</h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            Payment receipts send themselves on WhatsApp — this is the live log.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-full bg-[#25D366]/10 px-3 py-1.5 text-xs font-medium text-[#25D366]">
-          <MessageCircle className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
-          WhatsApp connected
-        </div>
-      </div>
+    <div className="space-y-6 px-6 py-6 md:px-8">
+      <PageHeader
+        title="Agent"
+        subtitle="Payment receipts send themselves on WhatsApp — this is the live log."
+        actions={
+          <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+            <MessageCircle className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
+            WhatsApp connected
+          </div>
+        }
+      />
 
       {/* Toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter by member"
-            className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-gray-200 placeholder:text-gray-500 outline-none focus:border-white/20"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
           />
         </div>
 
@@ -211,13 +207,13 @@ export function AgentPendingView({
           <button
             type="button"
             onClick={() => setFilterOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-300 hover:bg-white/[0.06]"
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
             {statusFilter === "all" ? "All statuses" : STATUS_STYLES[statusFilter].label}
-            <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
           </button>
           {filterOpen && (
-            <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-lg border border-white/10 bg-[#141414] py-1 shadow-xl">
+            <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
               {(["all", "sent", "sending", "queued", "failed"] as const).map((s) => (
                 <button
                   key={s}
@@ -226,7 +222,7 @@ export function AgentPendingView({
                     setStatusFilter(s);
                     setFilterOpen(false);
                   }}
-                  className="block w-full px-3 py-1.5 text-left text-sm text-gray-300 hover:bg-white/[0.06]"
+                  className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
                 >
                   {s === "all" ? "All statuses" : STATUS_STYLES[s].label}
                 </button>
@@ -235,29 +231,25 @@ export function AgentPendingView({
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-gray-400">
-          <span className="flex -space-x-0.5">
-            {Array.from({ length: Math.min(totalCount, 5) }).map((_, i) => (
-              <span key={i} className="h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0a0a0a]" />
-            ))}
-          </span>
+        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+          <span className="h-2 w-2 rounded-full bg-emerald-500" />
           Sent {sentCount}/{totalCount || 0}
         </div>
       </div>
 
       {/* Row list */}
       {filteredLive.length === 0 && filteredHistory.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-white/10 px-6 py-16 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-            <Check className="h-6 w-6 text-emerald-400" />
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+            <Check className="h-6 w-6 text-emerald-600" />
           </div>
-          <p className="text-sm font-medium text-gray-200">No receipts yet</p>
+          <p className="text-sm font-medium text-gray-900">No receipts yet</p>
           <p className="max-w-xs text-xs text-gray-500">
             As soon as a payment is marked paid, its receipt goes out on WhatsApp and shows up here.
           </p>
         </div>
       ) : (
-        <div className="divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10">
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {filteredLive.map((row) => {
             const s = STATUS_STYLES[row.status];
             return (
@@ -267,46 +259,38 @@ export function AgentPendingView({
                 tabIndex={0}
                 onClick={() => openMemberFees(row.item.memberId)}
                 onKeyDown={(e) => e.key === "Enter" && openMemberFees(row.item.memberId)}
-                className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 hover:bg-white/[0.03]"
+                className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 hover:bg-gray-50"
               >
-                <p className="min-w-[160px] flex-1 truncate text-sm font-medium text-gray-100">
-                  Fee receipt of {row.item.memberName}
-                </p>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-50">
+                  <Receipt className="h-4 w-4 text-violet-600" />
+                </div>
 
-                <span className={`flex shrink-0 items-center gap-1.5 text-xs font-medium ${s.text}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    {row.item.memberName}
+                  </p>
+                  <p className="truncate text-xs text-gray-500">
+                    Receipt #{row.item.receiptNumber} — ₹{row.item.amount.toLocaleString("en-IN")}
+                  </p>
+                </div>
+
+                <span
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${s.badge}`}
+                >
+                  {row.status === "sending" ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : row.status === "queued" ? (
+                    <Clock className="h-3 w-3" />
+                  ) : row.status === "sent" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <XIcon className="h-3 w-3" />
+                  )}
                   {row.status === "queued" ? `Retrying in ${row.secondsLeft}s` : s.label}
                 </span>
 
-                <span className="shrink-0 text-xs text-gray-500">
-                  ₹{row.item.amount.toLocaleString("en-IN")}
-                </span>
-
-                <span className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#25D366] sm:flex">
-                  <MessageCircle className="h-3 w-3" fill="currentColor" strokeWidth={0} />
-                  WhatsApp
-                </span>
-
-                <span className="hidden shrink-0 items-center gap-1.5 font-mono text-xs text-gray-500 sm:flex">
-                  <Receipt className="h-3 w-3" />
-                  #{row.item.receiptNumber}
-                </span>
-
-                <span className="hidden shrink-0 items-center gap-1.5 text-xs text-gray-500 md:flex">
-                  <GitBranch className="h-3 w-3" />
-                  auto-send
-                </span>
-
-                <span className="ml-auto flex shrink-0 items-center gap-3">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      row.status === "sent"
-                        ? "bg-emerald-400"
-                        : row.status === "failed"
-                          ? "bg-red-400"
-                          : "bg-gray-600"
-                    }`}
-                  />
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${s.dot}`} />
                   <span className="relative">
                     <button
                       type="button"
@@ -314,14 +298,14 @@ export function AgentPendingView({
                         e.stopPropagation();
                         setMenuKey((k) => (k === row.key ? null : row.key));
                       }}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-white/[0.06] hover:text-gray-300"
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                     {menuKey === row.key && (
                       <div
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-lg border border-white/10 bg-[#141414] py-1 shadow-xl"
+                        className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
                       >
                         <button
                           type="button"
@@ -329,7 +313,7 @@ export function AgentPendingView({
                             setMenuKey(null);
                             openMemberFees(row.item.memberId);
                           }}
-                          className="block w-full px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/[0.06]"
+                          className="block w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
                         >
                           Open member fee page
                         </button>
@@ -337,7 +321,7 @@ export function AgentPendingView({
                           <button
                             type="button"
                             onClick={() => retryNow(row.key, row.item)}
-                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-gray-300 hover:bg-white/[0.06]"
+                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50"
                           >
                             <RotateCcw className="h-3 w-3" />
                             Retry now
@@ -346,33 +330,29 @@ export function AgentPendingView({
                       </div>
                     )}
                   </span>
-                </span>
+                </div>
               </div>
             );
           })}
 
           {filteredHistory.map((row) => (
-            <div
-              key={row.key}
-              role="button"
-              tabIndex={0}
-              className="flex cursor-default flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3 opacity-80"
-            >
-              <p className="min-w-[160px] flex-1 truncate text-sm font-medium text-gray-300">
-                Fee receipt of {row.memberName}
-              </p>
-              <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <div key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
+                <Receipt className="h-4 w-4 text-gray-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-gray-900">{row.memberName}</p>
+                <p className="truncate text-xs text-gray-500">{row.detail}</p>
+              </div>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                <Check className="h-3 w-3" />
                 Sent
               </span>
-              <span className="hidden shrink-0 truncate text-xs text-gray-500 sm:block">{row.detail}</span>
-              <span className="ml-auto shrink-0 text-xs text-gray-500">{row.at}</span>
-              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+              <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
             </div>
           ))}
         </div>
       )}
-    </div>
     </div>
   );
 }
