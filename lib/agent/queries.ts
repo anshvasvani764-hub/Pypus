@@ -271,7 +271,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
     id: `reminder-${r.id}`,
     kind: "reminder",
     memberName: nameById.get(r.member_id) ?? "Unknown member",
-    detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
+    detail: r.reason === "fees" ? "Fee reminder will be sent on WhatsApp soon" : "Attendance nudge will be sent on WhatsApp soon",
     at: formatISTDateTime(r.sent_at),
     atRaw: r.sent_at,
   }));

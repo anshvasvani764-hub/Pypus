@@ -3,8 +3,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppText, sendWhatsAppTemplate } from "@/lib/whatsapp/client";
+import { notifyReceiptGenerated } from "@/lib/telegram/client";
 import { formatReceiptDate } from "@/lib/utils/date";
 import { getAgentActivity, getReceiptWorklist } from "@/lib/agent/queries";
+import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
 
 // Fee/attendance nudges are hidden from the Agent tab for now — it's
 // receipts-only. getFeeWorklist / getAbsenteeWorklist still live in
@@ -47,6 +49,10 @@ async function sendReceiptOverWhatsApp({
   receiptImageUrl: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createServiceClient();
+
+  if (!AUTO_WHATSAPP_ENABLED) {
+    return { success: false, error: "queued" };
+  }
 
   if (!memberPhone) {
     return { success: false, error: "No phone number on file for this member" };
@@ -127,6 +133,10 @@ export async function sendAgentReminder({
   reason: "fees" | "attendance";
   message: string;
 }): Promise<{ success: boolean; error?: string }> {
+  if (!AUTO_WHATSAPP_ENABLED) {
+    return { success: false, error: "queued" };
+  }
+
   const supabase = createServiceClient();
 
   const result = await sendWhatsAppText(memberPhone, message);
@@ -159,11 +169,10 @@ export async function sendAgentReminder({
 
 /** Called right after a payment is marked paid. Uploads the receipt image
  * (generated client-side on canvas) to Supabase Storage, saves the row,
- * and — this is the automatic part — immediately sends it to the member
- * on WhatsApp. No one has to open the Agent tab or press Send; it just
- * goes out. If the auto-send fails for some reason (no phone on file,
- * WhatsApp API hiccup, image not ready), the receipt lands in the Agent
- * tab's log as a retry item instead of silently disappearing. */
+ * and pings the owner on Telegram so they know to send it on WhatsApp
+ * manually (auto-send via the WhatsApp API is off — see
+ * AUTO_WHATSAPP_ENABLED above). The receipt still lands in the Agent
+ * tab's log either way, so nothing silently disappears. */
 export async function saveReceipt({
   workspaceId,
   memberId,
@@ -241,16 +250,28 @@ export async function saveReceipt({
     };
   }
 
-  const whatsapp = await sendReceiptOverWhatsApp({
-    receiptId: data.id,
-    memberPhone,
+  const whatsapp = AUTO_WHATSAPP_ENABLED
+    ? await sendReceiptOverWhatsApp({
+        receiptId: data.id,
+        memberPhone,
+        memberName,
+        amount,
+        workspaceName,
+        paymentMethod,
+        validTillDate,
+        receiptImageUrl,
+      })
+    : { success: false, error: "queued" };
+
+  // Ping the owner on Telegram so they know to send the receipt manually.
+  notifyReceiptGenerated({
     memberName,
     amount,
     workspaceName,
     paymentMethod,
-    validTillDate,
-    receiptImageUrl,
-  });
+    receiptNumber,
+    memberPhone,
+  }).catch((err) => console.error("Telegram notify failed:", err));
 
   revalidatePath(`/[app]/agent`, "page");
   return {

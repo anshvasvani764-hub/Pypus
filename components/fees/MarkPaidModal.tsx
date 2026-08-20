@@ -5,6 +5,7 @@ import { X, Download, MessageCircle, Loader2, Check, RotateCcw } from "lucide-re
 import { generateReceiptImage, type ReceiptData } from "@/lib/utils/receipt-generator";
 import { downloadReceipt } from "@/lib/utils/whatsapp-share";
 import { saveReceipt, sendAgentReceipt } from "@/app/actions/agent";
+import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
 
 export type PaymentMethod = "Cash" | "UPI";
 
@@ -61,7 +62,7 @@ function MarkPaidDialog({
 
   // Auto-send status — the receipt goes out on WhatsApp on its own right
   // after it's generated. No "Send" button to press.
-  const [waStatus, setWaStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const [waStatus, setWaStatus] = useState<"idle" | "sending" | "sent" | "queued" | "failed">("idle");
   const [waError, setWaError] = useState<string | null>(null);
 
   const valid = Number(amount) > 0;
@@ -123,14 +124,20 @@ function MarkPaidDialog({
           setReceiptId(saved.receiptId ?? null);
           if (saved.whatsapp.success) {
             setWaStatus("sent");
+          } else if (!AUTO_WHATSAPP_ENABLED) {
+            setWaStatus("queued");
           } else {
             setWaStatus("failed");
             setWaError(saved.whatsapp.error || "Couldn't send automatically");
           }
         } catch (err) {
           console.error("saveReceipt failed:", err);
-          setWaStatus("failed");
-          setWaError("Couldn't send automatically");
+          if (!AUTO_WHATSAPP_ENABLED) {
+            setWaStatus("queued");
+          } else {
+            setWaStatus("failed");
+            setWaError("Couldn't send automatically");
+          }
         }
       } else {
         setError(result.error || "Failed to record payment");
@@ -216,7 +223,7 @@ function MarkPaidDialog({
 
           {/* Sticky Action Buttons */}
           <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 bg-white space-y-3">
-            {/* WhatsApp auto-send status — no button, it just goes */}
+            {/* WhatsApp send status — no button, it just goes */}
             <div
               className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium ${
                 waStatus === "sent"
@@ -236,6 +243,12 @@ function MarkPaidDialog({
                 <>
                   <Check className="h-4 w-4" />
                   Sent to {memberName} on WhatsApp
+                </>
+              )}
+              {waStatus === "queued" && (
+                <>
+                  <MessageCircle className="h-4 w-4" />
+                  Will be sent to {memberName} on WhatsApp shortly
                 </>
               )}
               {waStatus === "failed" && (

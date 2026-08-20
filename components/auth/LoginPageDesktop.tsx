@@ -1,11 +1,31 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
 import { OnboardingAurora } from '@/components/onboarding/OnboardingAurora'
 
+// Dev-only test-user bypass so you can test the dashboard locally without
+// going through the real Google OAuth screen every time. It still creates a
+// real Supabase session (via signInWithPassword) so everything downstream
+// that calls supabase.auth.getUser() keeps working normally.
+//
+// Setup (one-time, in your Supabase project):
+//   1. Dashboard -> Authentication -> Users -> Add user
+//   2. Create one with an email/password of your choice, "Auto Confirm User" ON
+//   3. Add to .env.local:
+//        NEXT_PUBLIC_DEV_TEST_EMAIL=test@pypus.local
+//        NEXT_PUBLIC_DEV_TEST_PASSWORD=whatever-you-set
+// This button only renders when NODE_ENV === "development" and both env
+// vars are set — it's a no-op (and invisible) in production builds.
+const DEV_TEST_EMAIL = process.env.NEXT_PUBLIC_DEV_TEST_EMAIL
+const DEV_TEST_PASSWORD = process.env.NEXT_PUBLIC_DEV_TEST_PASSWORD
+const DEV_BYPASS_AVAILABLE =
+  process.env.NODE_ENV === 'development' && !!DEV_TEST_EMAIL && !!DEV_TEST_PASSWORD
+
 export function LoginPageDesktop() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -29,6 +49,33 @@ export function LoginPageDesktop() {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'An error occurred during sign in'
+      setErrorMsg(message)
+      setIsLoading(false)
+    }
+  }
+
+  const handleDevBypass = async () => {
+    if (!DEV_TEST_EMAIL || !DEV_TEST_PASSWORD) return
+    try {
+      setIsLoading(true)
+      setErrorMsg(null)
+      const supabase = createClient()
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: DEV_TEST_EMAIL,
+        password: DEV_TEST_PASSWORD,
+      })
+
+      if (error) {
+        setErrorMsg(`Dev bypass failed: ${error.message}`)
+        setIsLoading(false)
+        return
+      }
+
+      router.push('/')
+      router.refresh()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An error occurred during dev sign in'
       setErrorMsg(message)
       setIsLoading(false)
     }
@@ -107,6 +154,17 @@ export function LoginPageDesktop() {
               </>
             )}
           </button>
+
+          {DEV_BYPASS_AVAILABLE && (
+            <button
+              onClick={handleDevBypass}
+              disabled={isLoading}
+              className="w-full text-xs font-semibold py-2 rounded-lg border border-dashed"
+              style={{ borderColor: 'rgba(255,255,255,0.2)', color: 'var(--onb-ink-soft)' }}
+            >
+              🧪 Continue as test user (dev only)
+            </button>
+          )}
         </div>
 
         {/* Trust strip */}

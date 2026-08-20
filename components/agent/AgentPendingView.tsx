@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { sendAgentReceipt } from "@/app/actions/agent";
+import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
 import type { ReceiptWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
 
 interface AgentPendingViewProps {
@@ -52,7 +53,11 @@ const randomDelaySeconds = () =>
   Math.floor(Math.random() * (MAX_DELAY_S - MIN_DELAY_S + 1)) + MIN_DELAY_S;
 
 const STATUS_STYLES: Record<RowStatus, { badge: string; dot: string; label: string }> = {
-  queued: { badge: "bg-gray-100 text-gray-600", dot: "bg-gray-400", label: "Retrying" },
+  queued: {
+    badge: "bg-sky-50 text-sky-700",
+    dot: "bg-sky-500",
+    label: "Queued",
+  },
   sending: { badge: "bg-sky-50 text-sky-700", dot: "bg-sky-500", label: "Sending" },
   sent: { badge: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500", label: "Sent" },
   failed: { badge: "bg-red-50 text-red-600", dot: "bg-red-500", label: "Failed" },
@@ -103,8 +108,12 @@ export function AgentPendingView({
     withDelays.forEach(({ item, delay }) => {
       const key = `rcpt-${item.receiptId}`;
       queuedKeysRef.current.add(key);
-      const timer = setTimeout(() => void fireSend(key, item), delay * 1000);
-      timersRef.current.set(key, timer);
+      // Auto-send is off — leave the row as "Pending" for the owner to send
+      // manually instead of scheduling an automatic (and doomed) retry.
+      if (AUTO_WHATSAPP_ENABLED) {
+        const timer = setTimeout(() => void fireSend(key, item), delay * 1000);
+        timersRef.current.set(key, timer);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptsPending]);
@@ -299,7 +308,9 @@ export function AgentPendingView({
                   ) : (
                     <XIcon className="h-3 w-3" />
                   )}
-                  {row.status === "queued" ? `Retrying in ${row.secondsLeft}s` : s.label}
+                  {row.status === "queued" && AUTO_WHATSAPP_ENABLED
+                    ? `Retrying in ${row.secondsLeft}s`
+                    : s.label}
                 </span>
 
                 <div className="flex shrink-0 items-center gap-2">

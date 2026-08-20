@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard, Pencil } from "lucide-react";
+import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard, Pencil, Receipt as ReceiptIcon, Check, Loader2 } from "lucide-react";
 import MemberAvatar from "@/components/shared/MemberAvatar";
 import { createClient } from "@/lib/supabase/client";
 import type { FeeRecord, Member } from "@/lib/members/types";
@@ -11,6 +11,7 @@ import { MarkPaidModal, type PaymentMethod } from "@/components/fees/MarkPaidMod
 import { assignPlanToMember, markFeeAsPaid } from "@/app/actions/member-plan";
 import { sendReminder } from "@/app/actions/member-reminders";
 import { EditFeeModal } from "@/components/records/EditFeeModal";
+import { generateReceiptImage } from "@/lib/utils/receipt-generator";
 
 interface MemberFeesViewProps {
   memberId: string;
@@ -24,6 +25,25 @@ function formatCurrency(amount: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+// The Clipboard API's ClipboardItem only reliably accepts "image/png" across
+// browsers — generateReceiptImage() produces a JPEG blob, so re-draw it onto
+// a canvas and re-export as PNG before copying.
+async function jpegBlobToPng(jpegBlob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(jpegBlob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas context not available");
+  ctx.drawImage(bitmap, 0, 0);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("Failed to convert receipt to PNG"));
+    }, "image/png");
+  });
 }
 
 function formatDate(dateStr: string) {
@@ -72,6 +92,8 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
   const [toast, setToast] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState("");
   const [editingFee, setEditingFee] = useState<FeeRecord | null>(null);
+  const [copyingFeeId, setCopyingFeeId] = useState<string | null>(null);
+  const [copiedFeeId, setCopiedFeeId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -190,6 +212,52 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
       flashToast(result.error || "Failed to send reminder");
     }
     setShowReminderMenu(false);
+  }
+
+  // Renders this fee record as a receipt image and copies it to the
+  // clipboard so it can be pasted straight into WhatsApp/Telegram/etc.
+  // Works for any fee record — paid, due, or overdue.
+  async function handleCopyReceipt(record: FeeRecord) {
+    if (copyingFeeId) return;
+    setCopyingFeeId(record.id);
+    try {
+      const { blob } = await generateReceiptImage({
+        receiptNumber: `#${record.id.slice(-6).toUpperCase()}`,
+        workspaceName: workspaceName || "Pypus",
+        memberName: member.name,
+        memberPhone: member.phone ?? "—",
+        planName: record.plan_name_snapshot,
+        amount: record.paid_amount || record.amount_snapshot,
+        paymentMethod: (record.payment_method as "Cash" | "UPI") ?? "Cash",
+        paidDate: record.paid_date ?? record.due_date,
+        dueDate: record.due_date,
+      });
+
+      if (navigator.clipboard && "write" in navigator.clipboard && typeof ClipboardItem !== "undefined") {
+        // Clipboard image support is PNG-only in most browsers — re-encode
+        // the JPEG blob to PNG via canvas before writing it.
+        const pngBlob = await jpegBlobToPng(blob);
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+        setCopiedFeeId(record.id);
+        flashToast("Receipt copied — paste it anywhere");
+        setTimeout(() => setCopiedFeeId(null), 2000);
+      } else {
+        // Clipboard image API not available (older browser / non-HTTPS) —
+        // fall back to downloading the receipt instead.
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `receipt-${record.id.slice(-6)}.jpg`;
+        a.click();
+        URL.revokeObjectURL(url);
+        flashToast("Clipboard not available — receipt downloaded instead");
+      }
+    } catch (err) {
+      console.error("Receipt copy failed:", err);
+      flashToast("Couldn't generate the receipt");
+    } finally {
+      setCopyingFeeId(null);
+    }
   }
 
   if (loading) {
@@ -434,6 +502,20 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
                     {formatCurrency(record.amount_snapshot)}
                   </span>
                   <PaymentStatusBadge status={record.status} />
+                  <button
+                    onClick={() => handleCopyReceipt(record)}
+                    disabled={copyingFeeId === record.id}
+                    className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                    title="Copy receipt image to clipboard"
+                  >
+                    {copyingFeeId === record.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : copiedFeeId === record.id ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <ReceiptIcon className="h-3.5 w-3.5" />
+                    )}
+                  </button>
                   <button
                     onClick={() => setEditingFee(record)}
                     className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
