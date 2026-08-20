@@ -112,7 +112,7 @@ export function AttendanceRegisterView({
   }
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       <MobileTopBar
         title="Attendance"
         label="Pypus"

@@ -60,16 +60,17 @@ function StatCard({
   return (
     <Link
       href={href}
-      className={`relative flex aspect-square flex-col justify-between overflow-hidden rounded-ve-md bg-gradient-to-br p-4 text-white active:scale-[0.98] ${gradient}`}
+      className={`relative flex flex-col justify-between overflow-hidden rounded-ve-md bg-gradient-to-br p-3.5 text-white active:scale-[0.98] ${gradient}`}
+      style={{ aspectRatio: '4 / 3' }}
     >
-      <Icon className="absolute -top-4 -right-4 opacity-10" size={96} strokeWidth={1.5} />
-      <div className="glass-lite flex size-9 items-center justify-center rounded-full">
-        <Icon size={18} />
+      <Icon className="absolute -top-3 -right-3 opacity-10" size={64} strokeWidth={1.5} />
+      <div className="glass-lite flex size-7 items-center justify-center rounded-full">
+        <Icon size={15} />
       </div>
       <div className="relative">
         <p className="text-ve-stats tabular-nums-lining leading-none">{value}</p>
-        <p className="text-ve-label mt-2 uppercase opacity-80">{label}</p>
-        <p className="mt-0.5 text-xs opacity-70">{sub}</p>
+        <p className="text-ve-label mt-1.5 uppercase opacity-80">{label}</p>
+        <p className="mt-0.5 text-[11px] opacity-70">{sub}</p>
       </div>
     </Link>
   )
@@ -113,15 +114,15 @@ export function HomeOverviewViewMobile({
 
         <div className="mt-ve-gutter rounded-ve-lg border border-ve-outline-variant/20 bg-white overflow-hidden">
           <div className="grid grid-cols-2">
-            <div className="px-4 py-3 border-r border-ve-outline-variant/20">
-              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Profit</p>
-              <p className={`text-lg font-black mt-1 ${(overview.revenue - overview.expenses) < 0 ? "text-red-600" : "text-emerald-600"}`}>
+            <div className="px-3.5 py-2.5 border-r border-ve-outline-variant/20">
+              <p className="text-[9px] font-semibold text-ve-on-surface-variant uppercase tracking-wider">Profit</p>
+              <p className={`text-[15px] font-bold mt-0.5 ${(overview.revenue - overview.expenses) < 0 ? "text-red-600" : "text-emerald-600"}`}>
                 ₹{Math.abs(overview.revenue - overview.expenses).toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="px-4 py-3">
-              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Expenses</p>
-              <p className="text-lg font-black mt-1 text-red-600">
+            <div className="px-3.5 py-2.5">
+              <p className="text-[9px] font-semibold text-ve-on-surface-variant uppercase tracking-wider">Expenses</p>
+              <p className="text-[15px] font-bold mt-0.5 text-red-600">
                 ₹{overview.expenses.toLocaleString("en-IN")}
               </p>
             </div>
@@ -151,20 +152,20 @@ export function HomeOverviewViewMobile({
                   <li key={`${item.kind}-${item.memberId}`}>
                     <Link
                       href={`${base}/members/${item.memberId}`}
-                      className="flex items-center gap-3 rounded-ve bg-ve-surface-container-lowest p-3 active:scale-[0.99]"
+                      className="flex items-center gap-2.5 rounded-ve bg-ve-surface-container-lowest p-2.5 active:scale-[0.99]"
                     >
-                      <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${style.classes}`}>
-                        <Icon size={18} />
+                      <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${style.classes}`}>
+                        <Icon size={15} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold text-ve-on-surface">
+                        <span className="block truncate text-[14px] font-medium text-ve-on-surface">
                           {item.memberName}
                         </span>
-                        <span className="block truncate text-sm text-ve-on-surface-variant">
+                        <span className="block truncate text-[12px] text-ve-on-surface-variant">
                           {item.detail}
                         </span>
                       </span>
-                      <ChevronRight size={18} className="shrink-0 text-ve-on-surface-variant/50" />
+                      <ChevronRight size={16} className="shrink-0 text-ve-on-surface-variant/50" />
                     </Link>
                   </li>
                 )

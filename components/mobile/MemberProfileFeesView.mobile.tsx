@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, TrendingUp, CheckCircle2, XCircle, MoreVertical, ExternalLink, Pencil } from 'lucide-react'
+import { ArrowLeft, Menu, AlertTriangle, TrendingUp, CheckCircle2, XCircle, MoreVertical, ExternalLink, Pencil } from 'lucide-react'
+import { useMobileNav } from '@/context/MobileNavContext'
 import MemberAvatar from '@/components/shared/MemberAvatar'
 import type { Member, FeeRecord } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
@@ -51,6 +52,7 @@ export function MemberProfileFeesView({
   payableFeeId,
   workspaceId,
 }: Props) {
+  const { open } = useMobileNav()
   const [activeTab] = useState<Tab>('Fees')
   const [fees, setFees] = useState<FeeRecord[]>(initialFees)
   const [markPaidOpen, setMarkPaidOpen] = useState(false)
@@ -154,10 +156,17 @@ export function MemberProfileFeesView({
   }
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       {/* Top Bar */}
       <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
         <div className="flex items-center gap-3">
+          <button
+            onClick={open}
+            aria-label="Open menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
+          >
+            <Menu size={20} className="text-ve-primary" />
+          </button>
           <Link
             href={`/${workspaceSlug}/members`}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"

@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Users, CalendarCheck, CreditCard, Wallet, MoreHorizontal, Sparkles, ArrowRight } from 'lucide-react'
+import { Users, CalendarCheck, CreditCard, MoreHorizontal, Sparkles, ArrowRight, Menu } from 'lucide-react'
+import { useMobileNav } from '@/context/MobileNavContext'
 
 interface Props {
   workspaceSlug: string
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ModulesView({ workspaceSlug, stats }: Props) {
+  const { open } = useMobileNav()
   const modules = [
     {
       href: `/${workspaceSlug}/members`,
@@ -39,14 +41,6 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
       shadow: 'shadow-[0_8px_24px_rgba(16,185,129,0.25)]',
     },
     {
-      href: `/${workspaceSlug}/expenses`,
-      icon: Wallet,
-      title: 'Expenses',
-      description: 'Track expenses',
-      accent: 'from-red-500 to-red-700',
-      shadow: 'shadow-[0_8px_24px_rgba(239,68,68,0.25)]',
-    },
-    {
       href: `/${workspaceSlug}/team`,
       icon: Users,
       title: 'Team',
@@ -57,19 +51,17 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
   ]
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       {/* Top App Bar */}
-      <header className="sticky top-0 z-40 bg-ve-surface/80 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm px-5 py-3 flex justify-between items-center w-full">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-ve-primary flex items-center justify-center overflow-hidden">
-            <span className="font-black text-white text-xl">P</span>
-          </div>
-          <h1 className="font-headline-lg-mobile text-headline-lg-mobile font-black text-ve-primary text-xl">Pypus</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* placeholder to keep header layout balanced */}
-          <div className="w-10 h-10" />
-        </div>
+      <header className="sticky top-0 z-40 bg-ve-surface/85 backdrop-blur-xl border-b border-ve-outline-variant/20 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center gap-2.5 w-full">
+        <button
+          onClick={open}
+          aria-label="Open menu"
+          className="flex size-8 shrink-0 -ml-1.5 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
+        >
+          <Menu size={19} />
+        </button>
+        <h1 className="text-[17px] font-semibold leading-tight text-ve-on-surface">Pypus</h1>
       </header>
 
       <main className="px-5 pt-6">

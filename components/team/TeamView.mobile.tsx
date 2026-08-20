@@ -54,7 +54,7 @@ export function TeamViewMobile({ workspaceSlug, workspaceId, members, roles, cur
   const activeMembers = members.filter((m) => m.is_active);
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-28">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       <MobileTopBar
         title="Team"
         label=""

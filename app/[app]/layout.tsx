@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { SidebarProvider } from '@/context/SidebarContext'
 import { SearchProvider } from '@/context/SearchContext'
 import Sidebar from '@/components/layout/Sidebar'
-import { MobileBottomNav } from '@/components/mobile/MobileBottomNav'
+import { MobileNavDrawer } from '@/components/mobile/MobileNavDrawer'
+import { MobileNavProvider } from '@/context/MobileNavContext'
 import { GlobalHeader } from '@/components/layout/GlobalHeader'
 import { getDevice } from '@/lib/device'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -41,10 +42,12 @@ export default async function AppLayout({
 
   if (device === 'mobile') {
     return (
-      <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface">
-        <main className="pb-28">{children}</main>
-        <MobileBottomNav workspaceSlug={workspaceSlug} />
-      </div>
+      <MobileNavProvider>
+        <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface">
+          <MobileNavDrawer workspaceSlug={workspaceSlug} />
+          <main className="pb-6">{children}</main>
+        </div>
+      </MobileNavProvider>
     )
   }
 

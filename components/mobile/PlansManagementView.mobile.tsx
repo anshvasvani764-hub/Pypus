@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, Edit2, Trash2, Users, Clock, BadgeCheck } from 'lucide-react'
+import { ArrowLeft, Menu, Plus, TrendingUp, TrendingDown, Edit2, Trash2, Users, Clock, BadgeCheck } from 'lucide-react'
+import { useMobileNav } from '@/context/MobileNavContext'
 import type { Plan, Member } from '@/lib/members/types'
 
 interface Props {
@@ -23,6 +24,7 @@ const DURATION_LABELS: Record<string, string> = {
 }
 
 export function PlansManagementView({ workspaceSlug, plans, members }: Props) {
+  const { open } = useMobileNav()
   const [activeIds, setActiveIds] = useState<Set<string>>(
     new Set(plans.filter((p) => p.status === 'active').map((p) => p.id))
   )
@@ -46,10 +48,17 @@ export function PlansManagementView({ workspaceSlug, plans, members }: Props) {
   const avgRevenue = plans.length > 0 ? totalRevenue / plans.length : 0
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       {/* Top Bar */}
       <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
         <div className="flex items-center gap-3">
+          <button
+            onClick={open}
+            aria-label="Open menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
+          >
+            <Menu size={20} className="text-ve-primary" />
+          </button>
           <Link
             href={`/${workspaceSlug}/fees`}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"

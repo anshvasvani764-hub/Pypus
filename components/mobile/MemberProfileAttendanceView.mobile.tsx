@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Dumbbell, Flame, CheckCircle2, XCircle, ArrowRight, Pencil } from 'lucide-react'
+import { ArrowLeft, Menu, Dumbbell, Flame, CheckCircle2, XCircle, ArrowRight, Pencil } from 'lucide-react'
+import { useMobileNav } from '@/context/MobileNavContext'
 import type { Member, AttendanceRecord } from '@/lib/members/types'
 import { EditAttendanceModal } from '@/components/records/EditAttendanceModal'
 
@@ -50,6 +51,7 @@ function fmtTime(iso: string | null) {
 const SESSION_ICONS = [Dumbbell, Dumbbell, Dumbbell]
 
 export function MemberProfileAttendanceView({ member, workspaceSlug, workspaceId, records }: Props) {
+  const { open } = useMobileNav()
   const [recordsState, setRecordsState] = useState<AttendanceRecord[]>(records)
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null)
   const basePath = `/${workspaceSlug}/members/${member.id}`
@@ -77,7 +79,7 @@ export function MemberProfileAttendanceView({ member, workspaceSlug, workspaceId
   }
 
   return (
-    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-32">
+    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       <EditAttendanceModal
         isOpen={editingRecord !== null}
         onClose={() => setEditingRecord(null)}
@@ -90,6 +92,13 @@ export function MemberProfileAttendanceView({ member, workspaceSlug, workspaceId
       {/* Top Bar */}
       <header className="sticky top-0 z-50 flex items-center justify-between bg-ve-surface/80 px-5 py-3 backdrop-blur-xl border-b border-ve-outline-variant/30 shadow-sm">
         <div className="flex items-center gap-3">
+          <button
+            onClick={open}
+            aria-label="Open menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
+          >
+            <Menu size={20} className="text-ve-primary" />
+          </button>
           <Link
             href={`/${workspaceSlug}/members`}
             className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-ve-primary/5 transition-colors active:scale-95"
