@@ -257,6 +257,10 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
       .from("receipts")
       .select("id, member_id, receipt_number, amount, generated_at")
       .eq("workspace_id", workspaceId)
+      // Only receipts actually confirmed sent belong in the "Sent" history —
+      // otherwise a receipt shows as both "Queued" (from getReceiptWorklist)
+      // and "Sent" (from here) at the same time.
+      .not("whatsapp_sent_at", "is", null)
       .order("generated_at", { ascending: false })
       .limit(limit),
     supabase.from("members").select("id, name").eq("workspace_id", workspaceId),
