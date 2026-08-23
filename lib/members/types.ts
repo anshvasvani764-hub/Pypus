@@ -10,7 +10,10 @@ export type MembershipStatus = "active" | "expired";
 export type FeeStatus = "paid" | "due";
 export type AttendanceStatus = "present" | "absent";
 export type PaymentStatus = "completed" | "pending" | "overdue";
-export type PlanDuration = "monthly" | "quarterly" | "yearly";
+// "<n>_month" for n = 1..12 (see lib/members/plan-duration.ts). Old plans
+// may still have the legacy "monthly" | "quarterly" | "yearly" values —
+// every helper that reads duration accepts both.
+export type PlanDuration = string;
 export type SubscriptionStatus = "paid" | "due" | "overdue";
 
 export interface Member {

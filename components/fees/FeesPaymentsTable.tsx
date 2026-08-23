@@ -168,9 +168,11 @@ export function FeesPaymentsTable({
     if (result.success && result.fee) {
       onPaid(result.fee, result.recorded ? amount : 0);
       flashToast(
-        result.recorded
-          ? `Payment recorded for ${member.name}`
-          : `${member.name} is already paid up`
+        !result.recorded
+          ? `${member.name} is already paid up`
+          : result.fee.status === "paid"
+            ? `Payment recorded for ${member.name} — fully paid`
+            : `Partial payment recorded for ${member.name}`
       );
     } else {
       flashToast(result.error || "Failed to record payment");
@@ -207,7 +209,8 @@ export function FeesPaymentsTable({
         workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={paidSummary?.planName ?? null}
-        defaultAmount={paidSummary?.payableFee?.amount_snapshot ?? 0}
+        amountSnapshot={paidSummary?.payableFee?.amount_snapshot ?? 0}
+        alreadyPaid={paidSummary?.payableFee?.paid_amount ?? 0}
         dueDate={paidSummary?.dueDate ?? null}
       />
 
@@ -283,9 +286,19 @@ export function FeesPaymentsTable({
                       {summary.planName ?? "—"}
                     </p>
 
-                    <p className="w-24 text-center text-sm font-medium text-gray-900 hidden md:block">
-                      {summary.amount != null ? formatCurrency(summary.amount) : "—"}
-                    </p>
+                    <div className="w-24 text-center hidden md:block">
+                      <p className="text-sm font-medium text-gray-900">
+                        {summary.amount != null ? formatCurrency(summary.amount) : "—"}
+                      </p>
+                      {summary.payableFee && (summary.payableFee.paid_amount ?? 0) > 0 && (
+                        <p className="text-[11px] text-amber-600 mt-0.5">
+                          Paid {formatCurrency(summary.payableFee.paid_amount ?? 0)} · Pending{" "}
+                          {formatCurrency(
+                            (summary.payableFee.amount_snapshot ?? 0) - (summary.payableFee.paid_amount ?? 0)
+                          )}
+                        </p>
+                      )}
+                    </div>
 
                     <p className="w-28 text-center text-xs text-gray-500 hidden lg:block">
                       {summary.dueDate ? formatDate(summary.dueDate) : "—"}

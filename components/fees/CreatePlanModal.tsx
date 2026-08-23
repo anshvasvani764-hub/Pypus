@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { Plan, PlanDuration } from "@/lib/members/types";
+import { PLAN_DURATION_OPTIONS } from "@/lib/members/plan-duration";
 
 interface CreatePlanModalProps {
   isOpen: boolean;
@@ -25,7 +26,7 @@ function PlanDialog({
   editPlan,
 }: Pick<CreatePlanModalProps, "onClose" | "onSave" | "editPlan">) {
   const [name, setName] = useState(editPlan?.name ?? "");
-  const [duration, setDuration] = useState<PlanDuration>(editPlan?.duration ?? "monthly");
+  const [duration, setDuration] = useState<PlanDuration>(editPlan?.duration ?? "1_month");
   const [price, setPrice] = useState(editPlan ? String(editPlan.price) : "");
   const [features, setFeatures] = useState(editPlan?.features.join("\n") ?? "");
   const [status, setStatus] = useState(editPlan?.status ?? "active");
@@ -81,9 +82,11 @@ function PlanDialog({
                 onChange={(e) => setDuration(e.target.value as PlanDuration)}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
               >
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
+                {PLAN_DURATION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

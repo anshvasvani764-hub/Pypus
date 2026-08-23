@@ -40,6 +40,7 @@ export function MemberProfileOverviewView({
   amount,
   dueDate,
   payableFeeId,
+  fees,
 }: Props) {
   const router = useRouter()
   const { open: openNav } = useMobileNav()
@@ -68,7 +69,13 @@ export function MemberProfileOverviewView({
     })
     setBusy(false)
     if (result.success) {
-      flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')
+      flashToast(
+        !result.recorded
+          ? 'Already paid up'
+          : result.fee?.status === 'paid'
+            ? 'Payment recorded — fully paid'
+            : 'Partial payment recorded'
+      )
       router.refresh()
     } else {
       flashToast(result.error || 'Failed to mark as paid')
@@ -398,7 +405,8 @@ export function MemberProfileOverviewView({
         workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={planName}
-        defaultAmount={amount ?? 0}
+        amountSnapshot={amount ?? 0}
+        alreadyPaid={fees.find((f) => f.id === payableFeeId)?.paid_amount ?? 0}
         dueDate={dueDate}
       />
 

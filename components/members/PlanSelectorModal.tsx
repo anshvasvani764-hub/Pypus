@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Check } from "lucide-react";
 import type { Plan } from "@/lib/members/types";
 import { getISTDateString } from "@/lib/utils/date";
+import { PLAN_DURATION_OPTIONS, daysForDuration } from "@/lib/members/plan-duration";
 
 interface PlanSelectorModalProps {
   isOpen: boolean;
@@ -17,12 +18,6 @@ interface PlanSelectorModalProps {
   workspaceId: string;
   memberName?: string;
 }
-
-const DURATION_DAYS: Record<string, number> = {
-  monthly: 30,
-  quarterly: 90,
-  yearly: 365,
-};
 
 function addDays(days: number): string {
   const d = new Date();
@@ -45,7 +40,7 @@ function PlanSelectorDialog({
   const [mode, setMode] = useState<"existing" | "custom">("existing");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [customName, setCustomName] = useState("");
-  const [customDuration, setCustomDuration] = useState("monthly");
+  const [customDuration, setCustomDuration] = useState("1_month");
   const [customAmount, setCustomAmount] = useState("");
   const [dueDate, setDueDate] = useState(() => addDays(30));
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -83,12 +78,12 @@ function PlanSelectorDialog({
 
   function handleSelectPlan(plan: Plan) {
     setSelectedPlan(plan);
-    setDueDate(addDays(DURATION_DAYS[plan.duration] ?? 30));
+    setDueDate(addDays(daysForDuration(plan.duration)));
   }
 
   function handleCustomDurationChange(value: string) {
     setCustomDuration(value);
-    setDueDate(addDays(DURATION_DAYS[value] ?? 30));
+    setDueDate(addDays(daysForDuration(value)));
   }
 
   const canSubmit = Boolean(
@@ -217,9 +212,11 @@ function PlanSelectorDialog({
                   onChange={(e) => handleCustomDurationChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
-                  <option value="monthly">Monthly (30 days)</option>
-                  <option value="quarterly">Quarterly (90 days)</option>
-                  <option value="yearly">Yearly (365 days)</option>
+                  {PLAN_DURATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label} ({opt.months * 30} days)
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

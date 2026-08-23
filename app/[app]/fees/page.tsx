@@ -49,6 +49,7 @@ export default async function FeesPage({
         feeStatus: summary.status,
         planName: summary.planName,
         amount: summary.amount,
+        paidAmount: summary.payableFee?.paid_amount ?? 0,
         dueDate: summary.dueDate,
         payableFeeId: summary.payableFee?.id ?? null,
       };

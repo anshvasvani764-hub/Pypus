@@ -186,7 +186,13 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
           ? prev.map((f) => (f.id === result.fee!.id ? result.fee! : f))
           : [...prev, result.fee!];
       });
-      flashToast(result.recorded ? "Payment recorded" : "Already paid up");
+      flashToast(
+        !result.recorded
+          ? "Already paid up"
+          : result.fee.status === "paid"
+            ? "Payment recorded — fully paid"
+            : "Partial payment recorded"
+      );
     } else {
       flashToast(result.error || "Failed to mark as paid");
     }
@@ -228,6 +234,11 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         memberPhone: member.phone ?? "—",
         planName: record.plan_name_snapshot,
         amount: record.paid_amount || record.amount_snapshot,
+        planAmount: record.amount_snapshot,
+        remainingAmount:
+          record.status === "paid"
+            ? 0
+            : Math.max(record.amount_snapshot - (record.paid_amount ?? 0), 0),
         paymentMethod: (record.payment_method as "Cash" | "UPI") ?? "Cash",
         paidDate: record.paid_date ?? record.due_date,
         dueDate: record.due_date,
@@ -297,7 +308,8 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={summary.planName}
-        defaultAmount={summary.payableFee?.amount_snapshot ?? 0}
+        amountSnapshot={summary.payableFee?.amount_snapshot ?? 0}
+        alreadyPaid={summary.payableFee?.paid_amount ?? 0}
         dueDate={summary.dueDate}
       />
 
@@ -498,9 +510,17 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
                   </p>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
-                  <span className="text-sm font-bold text-gray-900">
-                    {formatCurrency(record.amount_snapshot)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-gray-900 block">
+                      {formatCurrency(record.amount_snapshot)}
+                    </span>
+                    {record.status !== "paid" && (record.paid_amount ?? 0) > 0 && (
+                      <span className="text-[11px] text-amber-600">
+                        Paid {formatCurrency(record.paid_amount ?? 0)} · Pending{" "}
+                        {formatCurrency((record.amount_snapshot ?? 0) - (record.paid_amount ?? 0))}
+                      </span>
+                    )}
+                  </div>
                   <PaymentStatusBadge status={record.status} />
                   <button
                     onClick={() => handleCopyReceipt(record)}

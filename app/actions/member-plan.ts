@@ -4,12 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { revalidatePath } from "next/cache";
 import type { FeeRecord } from "@/lib/members/types";
 import { getISTDateString } from "@/lib/utils/date";
-
-const DURATION_DAYS: Record<string, number> = {
-  monthly: 30,
-  quarterly: 90,
-  yearly: 365,
-};
+import { daysForDuration } from "@/lib/members/plan-duration";
 
 /**
  * A payment always has to buy coverage that ends in the future. Settling a row
@@ -41,7 +36,7 @@ async function cycleDaysForPlan(
     .eq("id", planId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
-  return DURATION_DAYS[data?.duration ?? ""] ?? 30;
+  return daysForDuration(data?.duration);
 }
 
 function revalidateMember(memberId: string) {
@@ -123,6 +118,8 @@ export async function markFeeAsPaid({
   fee?: FeeRecord;
   /** False when the row was already settled, so callers don't double-count revenue. */
   recorded?: boolean;
+  /** Amount still owed on the returned row — 0 once it's fully paid. */
+  remaining?: number;
 }> {
   const supabase = createServiceClient();
   const paidDate = getISTDateString();
@@ -141,15 +138,22 @@ export async function markFeeAsPaid({
   }
 
   const cycleDays = await cycleDaysForPlan(supabase, workspaceId, target.plan_id);
+  const amountDue = target.amount_snapshot ?? 0;
 
   // An already-paid row whose due_date has passed means the member is renewing:
-  // settle the new cycle as its own row so payment history stays intact.
+  // settle the new cycle as its own row so payment history/partial tracking
+  // per cycle stays intact.
   if (target.status === "paid") {
     // Guard against double-billing: if this row still covers the member, the
     // renewal was already recorded (double click, stale UI) — return it as-is.
     if (target.due_date > paidDate) {
-      return { success: true, fee: target as FeeRecord, recorded: false };
+      return { success: true, fee: target as FeeRecord, recorded: false, remaining: 0 };
     }
+
+    // The new cycle's own row starts its own paid/pending tracking from 0 —
+    // a partial payment here keeps the row "due" at the same cycle's due
+    // date instead of pretending the member already renewed.
+    const fullyPaid = amount >= amountDue;
 
     const { data: renewal, error: renewalError } = await supabase
       .from("fees")
@@ -158,12 +162,12 @@ export async function markFeeAsPaid({
         member_id: memberId,
         plan_id: target.plan_id,
         plan_name_snapshot: target.plan_name_snapshot,
-        amount_snapshot: target.amount_snapshot,
+        amount_snapshot: amountDue,
         paid_amount: amount,
-        due_date: nextDueDate(target.due_date, cycleDays, paidDate),
+        due_date: fullyPaid ? nextDueDate(target.due_date, cycleDays, paidDate) : target.due_date,
         paid_date: paidDate,
         payment_method: paymentMethod,
-        status: "paid",
+        status: fullyPaid ? "paid" : "overdue",
       })
       .select()
       .single();
@@ -174,21 +178,41 @@ export async function markFeeAsPaid({
     }
 
     revalidateMember(memberId);
-    return { success: true, fee: renewal as FeeRecord, recorded: true };
+    return {
+      success: true,
+      fee: renewal as FeeRecord,
+      recorded: true,
+      remaining: Math.max(amountDue - amount, 0),
+    };
   }
 
-  // Paying an overdue row also has to move its due date into the future,
-  // otherwise it derives straight back to "due" the moment it is settled.
-  const settledDueDate =
-    target.due_date <= paidDate
+  // Partial payments accumulate on the row instead of overwriting it — a
+  // member who paid ₹8,000 of a ₹12,000 plan and comes back later to pay the
+  // rest should end up at paid_amount = 12,000, not have their first ₹8,000
+  // wiped out.
+  const previouslyPaid = target.paid_amount ?? 0;
+  const totalPaid = previouslyPaid + amount;
+  const fullyPaid = totalPaid >= amountDue;
+
+  // The due date only rolls forward once the plan is fully paid — a partial
+  // payment shouldn't extend the membership or hide that money is still owed.
+  const settledDueDate = fullyPaid
+    ? target.due_date <= paidDate
       ? nextDueDate(target.due_date, cycleDays, paidDate)
-      : target.due_date;
+      : target.due_date
+    : target.due_date;
+
+  const newStatus: FeeRecord["status"] = fullyPaid
+    ? "paid"
+    : target.due_date <= paidDate
+      ? "overdue"
+      : "due";
 
   const { data: paidFee, error } = await supabase
     .from("fees")
     .update({
-      status: "paid",
-      paid_amount: amount,
+      status: newStatus,
+      paid_amount: totalPaid,
       paid_date: paidDate,
       payment_method: paymentMethod,
       due_date: settledDueDate,
@@ -215,10 +239,21 @@ export async function markFeeAsPaid({
       .eq("workspace_id", workspaceId)
       .single();
     revalidateMember(memberId);
-    return { success: true, fee: (current ?? target) as FeeRecord, recorded: false };
+    const currentFee = (current ?? target) as FeeRecord;
+    return {
+      success: true,
+      fee: currentFee,
+      recorded: false,
+      remaining: Math.max((currentFee.amount_snapshot ?? 0) - (currentFee.paid_amount ?? 0), 0),
+    };
   }
 
   revalidateMember(memberId);
 
-  return { success: true, fee: paidFee as FeeRecord, recorded: true };
+  return {
+    success: true,
+    fee: paidFee as FeeRecord,
+    recorded: true,
+    remaining: Math.max(amountDue - totalPaid, 0),
+  };
 }

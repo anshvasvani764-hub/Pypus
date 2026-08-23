@@ -20,7 +20,10 @@ interface MarkPaidModalProps {
   workspaceId: string;
   workspaceName: string;
   planName: string | null;
-  defaultAmount: number;
+  /** Full plan amount for this billing cycle. */
+  amountSnapshot: number;
+  /** Amount already recorded against this fee row (e.g. an earlier partial payment). Defaults to 0. */
+  alreadyPaid?: number;
   dueDate: string | null;
 }
 
@@ -30,6 +33,14 @@ function formatDate(dateStr: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export function MarkPaidModal({ isOpen, ...rest }: MarkPaidModalProps) {
@@ -46,10 +57,14 @@ function MarkPaidDialog({
   workspaceId,
   workspaceName,
   planName,
-  defaultAmount,
+  amountSnapshot,
+  alreadyPaid = 0,
   dueDate,
 }: Omit<MarkPaidModalProps, "isOpen">) {
-  const [amount, setAmount] = useState(String(defaultAmount));
+  // Someone who already paid part of this cycle should see — and pay against
+  // — what's left, not the full plan price again.
+  const remainingDue = Math.max(amountSnapshot - alreadyPaid, 0);
+  const [amount, setAmount] = useState(String(remainingDue || amountSnapshot));
   const [method, setMethod] = useState<PaymentMethod>("Cash");
   const [submitting, setSubmitting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -66,11 +81,17 @@ function MarkPaidDialog({
   const [waError, setWaError] = useState<string | null>(null);
 
   const valid = Number(amount) > 0;
+  const [paidThisTime, setPaidThisTime] = useState(0);
+  const pendingAfterPayment = Math.max(remainingDue - paidThisTime, 0);
+  // Live preview of what's left once this payment is confirmed — updates as
+  // the user types, instead of showing the pre-payment remaining balance.
+  const liveRemaining = Math.max(remainingDue - (Number(amount) || 0), 0);
 
   async function handleConfirm() {
     if (!valid) return;
     setSubmitting(true);
     setError(null);
+    setPaidThisTime(Number(amount));
 
     try {
       const result = await onConfirm(Number(amount), method);
@@ -79,6 +100,7 @@ function MarkPaidDialog({
         // Generate receipt
         setIsGeneratingReceipt(true);
 
+        const remainingAfterThisPayment = Math.max(remainingDue - Number(amount), 0);
         const receiptData: ReceiptData = {
           receiptNumber: result.fee.id.slice(-8).toUpperCase(),
           workspaceName: workspaceName,
@@ -86,6 +108,8 @@ function MarkPaidDialog({
           memberPhone: memberPhone,
           planName: planName ?? "No Plan",
           amount: Number(amount),
+          planAmount: amountSnapshot,
+          remainingAmount: remainingAfterThisPayment,
           paymentMethod: method,
           paidDate: new Date().toISOString(),
           dueDate: dueDate ?? new Date().toISOString(),
@@ -212,6 +236,15 @@ function MarkPaidDialog({
 
           {/* Scrollable Image Area */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
+            {pendingAfterPayment > 0 ? (
+              <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-700">
+                Partially paid — {formatCurrency(pendingAfterPayment)} still pending
+              </div>
+            ) : (
+              <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-700">
+                Fully paid
+              </div>
+            )}
             <div className="rounded-xl overflow-hidden border border-gray-200">
               <img
                 src={receiptImageUrl}
@@ -328,6 +361,21 @@ function MarkPaidDialog({
               {dueDate && <p className="mt-0.5">Due {formatDate(dueDate)}</p>}
             </div>
           )}
+
+          <div className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 flex items-center justify-between gap-3">
+            <span>Plan amount</span>
+            <span className="font-semibold text-gray-900">{formatCurrency(amountSnapshot)}</span>
+          </div>
+          {alreadyPaid > 0 && (
+            <div className="rounded-xl bg-emerald-50 px-4 py-3 text-xs text-emerald-700 flex items-center justify-between gap-3">
+              <span>Already paid</span>
+              <span className="font-semibold">{formatCurrency(alreadyPaid)}</span>
+            </div>
+          )}
+          <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-700 flex items-center justify-between gap-3">
+            <span>Remaining</span>
+            <span className="font-semibold">{formatCurrency(liveRemaining)}</span>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">

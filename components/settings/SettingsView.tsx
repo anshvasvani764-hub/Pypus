@@ -6,15 +6,10 @@ import type { Plan, PlanDuration } from "@/lib/members/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { updateProfileSettings, savePlan, deletePlan } from "@/app/actions/settings";
 import { createClient } from "@/lib/supabase/client";
+import { PLAN_DURATION_OPTIONS, durationLabel } from "@/lib/members/plan-duration";
 
 const SUPPORT_PHONE = "+917827621580";
 const WHATSAPP_NUMBER = "917827621580";
-
-const DURATION_LABELS: Record<PlanDuration, string> = {
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  yearly: "Yearly",
-};
 
 interface SettingsViewProps {
   workspaceSlug: string;
@@ -229,7 +224,7 @@ export function SettingsView({
                     {plan.name}
                   </p>
                   <p className="w-24 text-xs text-gray-500">
-                    {DURATION_LABELS[plan.duration]}
+                    {durationLabel(plan.duration)}
                   </p>
                   <p className="w-24 text-right text-sm font-medium text-gray-900">
                     {formatCurrency(plan.price)}
@@ -333,7 +328,7 @@ interface PlanFormModalProps {
 
 function PlanFormModal({ plan, onClose, onSave }: PlanFormModalProps) {
   const [name, setName] = useState(plan?.name ?? "");
-  const [duration, setDuration] = useState<PlanDuration>(plan?.duration ?? "monthly");
+  const [duration, setDuration] = useState<PlanDuration>(plan?.duration ?? "1_month");
   const [price, setPrice] = useState(plan ? String(plan.price) : "");
   const [submitting, setSubmitting] = useState(false);
 
@@ -384,9 +379,11 @@ function PlanFormModal({ plan, onClose, onSave }: PlanFormModalProps) {
                   onChange={(e) => setDuration(e.target.value as PlanDuration)}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                 >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
+                  {PLAN_DURATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

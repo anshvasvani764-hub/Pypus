@@ -20,6 +20,7 @@ interface MemberFeeRow {
   feeStatus: DerivedFeeStatus
   planName: string | null
   amount: number | null
+  paidAmount: number
   dueDate: string | null
   payableFeeId: string | null
 }
@@ -96,7 +97,13 @@ export function FeesDashboardView({
     })
     setBusy(false)
     if (result.success) {
-      flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')
+      flashToast(
+        !result.recorded
+          ? 'Already paid up'
+          : result.fee?.status === 'paid'
+            ? 'Payment recorded — fully paid'
+            : 'Partial payment recorded'
+      )
       router.refresh()
     } else {
       flashToast(result.error || 'Failed to mark as paid')
@@ -244,7 +251,8 @@ export function FeesDashboardView({
             </div>
           ) : (
             filtered.map((row) => {
-              const { member, feeStatus, planName, amount, dueDate, payableFeeId } = row
+              const { member, feeStatus, planName, amount, paidAmount, dueDate, payableFeeId } = row
+              const pendingOnRow = amount != null ? Math.max(amount - paidAmount, 0) : null
               return (
               <div
                 key={member.id}
@@ -277,6 +285,11 @@ export function FeesDashboardView({
                     <p className="text-[11px] text-ve-outline truncate">
                       {planName ?? 'No active subscription'} {amount ? `• ${fmt(amount)}` : ''}
                     </p>
+                    {feeStatus !== 'paid' && paidAmount > 0 && pendingOnRow != null && (
+                      <p className="text-[11px] font-semibold text-amber-600 truncate">
+                        Paid {fmt(paidAmount)} · Pending {fmt(pendingOnRow)}
+                      </p>
+                    )}
                   </div>
                 </Link>
 
@@ -321,7 +334,8 @@ export function FeesDashboardView({
         workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={markPaidRow?.planName ?? null}
-        defaultAmount={markPaidRow?.amount ?? 0}
+        amountSnapshot={markPaidRow?.amount ?? 0}
+        alreadyPaid={markPaidRow?.paidAmount ?? 0}
         dueDate={markPaidRow?.dueDate ?? null}
       />
 

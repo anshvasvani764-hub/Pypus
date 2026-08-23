@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Menu, Plus, TrendingUp, TrendingDown, Edit2, Trash2, Users, Clock, BadgeCheck } from 'lucide-react'
 import { useMobileNav } from '@/context/MobileNavContext'
 import type { Plan, Member } from '@/lib/members/types'
+import { durationLabel } from '@/lib/members/plan-duration'
 
 interface Props {
   workspaceSlug: string
@@ -15,12 +16,6 @@ interface Props {
 
 function fmt(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-}
-
-const DURATION_LABELS: Record<string, string> = {
-  monthly: 'Monthly',
-  quarterly: 'Quarterly',
-  yearly: 'Yearly',
 }
 
 export function PlansManagementView({ workspaceSlug, plans, members }: Props) {
@@ -123,7 +118,7 @@ export function PlansManagementView({ workspaceSlug, plans, members }: Props) {
                           {fmt(plan.price)}
                         </span>
                         <span className={`text-sm ${isEnterprise ? 'text-white/60' : 'text-ve-on-surface-variant/60'}`}>
-                          /{DURATION_LABELS[plan.duration] ?? plan.duration}
+                          /{durationLabel(plan.duration)}
                         </span>
                       </div>
                     </div>
@@ -170,7 +165,7 @@ export function PlansManagementView({ workspaceSlug, plans, members }: Props) {
                         <Clock size={14} className={`${isEnterprise ? 'text-white/60' : 'text-ve-on-surface-variant/60'}`} />
                       )}
                       <span className={`text-[10px] font-bold uppercase ${isEnterprise ? 'text-white/60' : 'text-ve-on-surface-variant/60'}`}>
-                        {isEnterprise ? 'CUSTOM' : DURATION_LABELS[plan.duration]?.toUpperCase() ?? 'UNLIMITED'}
+                        {isEnterprise ? 'CUSTOM' : durationLabel(plan.duration).toUpperCase()}
                       </span>
                     </div>
                   </div>

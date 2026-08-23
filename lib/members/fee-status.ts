@@ -1,5 +1,6 @@
 import type { FeeRecord, Member } from "./types";
 import { getISTDateString } from "@/lib/utils/date";
+import { daysForDuration } from "@/lib/members/plan-duration";
 
 export type DerivedFeeStatus = "paid" | "due" | "overdue" | "no_plan";
 
@@ -17,6 +18,8 @@ export interface MemberFeeSummary {
   monthlyValue: number;
 }
 
+/** @deprecated kept for backward compatibility — use daysForDuration() from
+ *  lib/members/plan-duration.ts, which also understands 1-12 month plans. */
 const CYCLE_DAYS: Record<string, number> = {
   monthly: 30,
   quarterly: 90,
@@ -29,7 +32,7 @@ export { CYCLE_DAYS };
  *  member's plan pass it in; without it we assume a monthly cycle. */
 export function toMonthlyValue(fee: FeeRecord | null, planDuration?: string): number {
   if (!fee) return 0;
-  const days = CYCLE_DAYS[planDuration ?? ""] ?? 30;
+  const days = daysForDuration(planDuration);
   return ((fee.amount_snapshot ?? 0) * 30) / days;
 }
 

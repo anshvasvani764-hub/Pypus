@@ -107,7 +107,13 @@ export function MemberProfileFeesView({
     setBusy(false)
     if (result.success && result.fee) {
       mergeFee(result.fee)
-      flashToast(result.recorded ? 'Payment recorded' : 'Already paid up')
+      flashToast(
+        !result.recorded
+          ? 'Already paid up'
+          : result.fee.status === 'paid'
+            ? 'Payment recorded — fully paid'
+            : 'Partial payment recorded'
+      )
     } else {
       flashToast(result.error || 'Failed to mark as paid')
     }
@@ -333,6 +339,11 @@ export function MemberProfileFeesView({
                   <div className="flex items-center gap-2">
                     <div className="text-right">
                       <p className="text-sm font-bold text-ve-on-surface">{fmt(fee.amount_snapshot)}</p>
+                      {fee.status !== 'paid' && (fee.paid_amount ?? 0) > 0 && (
+                        <p className="text-[10px] font-bold text-amber-600">
+                          Paid {fmt(fee.paid_amount ?? 0)} · Pending {fmt(fee.amount_snapshot - (fee.paid_amount ?? 0))}
+                        </p>
+                      )}
                       <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${statusChipClass[fee.status]}`}>
                         {fee.status}
                       </span>
@@ -386,7 +397,8 @@ export function MemberProfileFeesView({
         workspaceId={workspaceId}
         workspaceName={workspaceName}
         planName={planName}
-        defaultAmount={amount ?? 0}
+        amountSnapshot={amount ?? 0}
+        alreadyPaid={fees.find((f) => f.id === payableFeeId)?.paid_amount ?? 0}
         dueDate={dueDate}
       />
 
