@@ -104,7 +104,7 @@ function drawCalendarIcon(
   ctx.lineWidth = 2.5;
   roundRectPath(ctx, x, y, size, size, size * 0.18);
   ctx.stroke();
-  solidLine(ctx, x, y + size * 0.32, x + size, y + size * 0.32, color);
+  + solidLine(ctx, x, y + size * 0.32, x + size, color);
   ctx.strokeStyle = color;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
