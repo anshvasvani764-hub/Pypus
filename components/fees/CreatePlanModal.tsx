@@ -26,7 +26,7 @@ function PlanDialog({
   editPlan,
 }: Pick<CreatePlanModalProps, "onClose" | "onSave" | "editPlan">) {
   const [name, setName] = useState(editPlan?.name ?? "");
-  const [duration, setDuration] = useState<PlanDuration>(editPlan?.duration ?? "1_month");
+  const [duration, setDuration] = useState<PlanDuration>(editPlan?.duration ?? "1");
   const [price, setPrice] = useState(editPlan ? String(editPlan.price) : "");
   const [features, setFeatures] = useState(editPlan?.features.join("\n") ?? "");
   const [status, setStatus] = useState(editPlan?.status ?? "active");

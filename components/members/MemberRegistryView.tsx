@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Users, UserPlus } from "lucide-react";
+import { Users, UserPlus, FileSpreadsheet } from "lucide-react";
 import { useSearch } from "@/context/SearchContext";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MemberFilters } from "./MemberFilters";
@@ -92,13 +92,22 @@ export function MemberRegistryView({
         subtitle={`${members.length} member${members.length !== 1 ? "s" : ""} in your gym`}
         backHref={`/${workspaceSlug}/workspace`}
         actions={
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex ss-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <UserPlus className="h-4 w-4" />
-            Add Member
-          </button>
+          <>
+            <button
+              onClick={() => router.push(`/${workspaceSlug}/members/import`)}
+              className="flex ss-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Import from Excel
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex ss-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Member
+            </button>
+          </>
         }
       />
 

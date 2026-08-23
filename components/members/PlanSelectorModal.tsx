@@ -40,7 +40,7 @@ function PlanSelectorDialog({
   const [mode, setMode] = useState<"existing" | "custom">("existing");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [customName, setCustomName] = useState("");
-  const [customDuration, setCustomDuration] = useState("1_month");
+  const [customDuration, setCustomDuration] = useState("1");
   const [customAmount, setCustomAmount] = useState("");
   const [dueDate, setDueDate] = useState(() => addDays(30));
   const [plans, setPlans] = useState<Plan[]>([]);

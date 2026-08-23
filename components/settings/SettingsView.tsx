@@ -328,7 +328,7 @@ interface PlanFormModalProps {
 
 function PlanFormModal({ plan, onClose, onSave }: PlanFormModalProps) {
   const [name, setName] = useState(plan?.name ?? "");
-  const [duration, setDuration] = useState<PlanDuration>(plan?.duration ?? "1_month");
+  const [duration, setDuration] = useState<PlanDuration>(plan?.duration ?? "1");
   const [price, setPrice] = useState(plan ? String(plan.price) : "");
   const [submitting, setSubmitting] = useState(false);
 

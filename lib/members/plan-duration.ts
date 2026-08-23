@@ -1,11 +1,11 @@
 // ──────────────────────────────────────────────
 // Plan duration helpers
-// Plans now store duration as "<n>_month" for n = 1..12 (e.g. "1_month",
-// "3_month", "12_month") so a gym can price any month-count plan instead of
-// being stuck with monthly/quarterly/yearly. Old plans created before this
-// change still have duration = "monthly" | "quarterly" | "yearly" — every
-// helper below accepts both formats, so existing plans/fees keep working
-// with no data migration needed.
+// Plans store duration as a plain number string for n = 1..12 (e.g. "1",
+// "3", "12") so a gym can price any month-count plan instead of being stuck
+// with monthly/quarterly/yearly. Old plans created before this change still
+// have duration = "monthly" | "quarterly" | "yearly", and a short-lived
+// earlier format used "<n>_month" — every helper below accepts all three,
+// so existing plans/fees keep working with no data migration needed.
 // ──────────────────────────────────────────────
 
 export interface PlanDurationOption {
@@ -20,7 +20,7 @@ export const PLAN_DURATION_OPTIONS: PlanDurationOption[] = Array.from(
   (_, i) => {
     const months = i + 1;
     return {
-      value: `${months}_month`,
+      value: `${months}`,
       label: months === 1 ? "1 Month" : `${months} Months`,
       months,
     };
@@ -45,12 +45,13 @@ const LEGACY_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
-/** Number of calendar months a plan duration covers. Understands both the
- *  new "<n>_month" values and the old monthly/quarterly/yearly strings. */
+/** Number of calendar months a plan duration covers. Understands the plain
+ *  "<n>" format, the short-lived "<n>_month" format, and the legacy
+ *  monthly/quarterly/yearly strings. */
 export function monthsForDuration(duration: string | null | undefined): number {
   if (!duration) return 1;
   if (duration in LEGACY_MONTHS) return LEGACY_MONTHS[duration];
-  const match = /^(\d+)_month$/.exec(duration);
+  const match = /^(\d+)(?:_month)?$/.exec(duration);
   if (match) return Math.min(12, Math.max(1, Number(match[1])));
   return 1;
 }
