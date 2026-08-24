@@ -2,13 +2,13 @@ import Link from 'next/link'
 import {
   Users,
   CreditCard,
-  Clock,
   AlertTriangle,
   CalendarClock,
   UserX,
   TrendingDown,
   ChevronRight,
   TrendingUp,
+  Crown,
 } from 'lucide-react'
 import type { HomeOverview, AttentionItem } from '@/lib/dashboard/get-home-overview'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
@@ -48,29 +48,32 @@ function StatCard({
   value,
   sub,
   icon: Icon,
-  gradient,
+  iconClasses,
+  valueClasses,
 }: {
   href: string
   label: string
   value: string
   sub: string
   icon: typeof Users
-  gradient: string
+  iconClasses: string
+  valueClasses?: string
 }) {
   return (
     <Link
       href={href}
-      className={`relative flex flex-col justify-between overflow-hidden rounded-ve-md bg-gradient-to-br p-3.5 text-white active:scale-[0.98] ${gradient}`}
-      style={{ aspectRatio: '4 / 3' }}
+      className="flex flex-col gap-1.5 rounded-ve-md border border-ve-outline-variant/15 bg-white p-3 active:scale-[0.98] active:bg-ve-surface-container-lowest"
     >
-      <Icon className="absolute -top-3 -right-3 opacity-10" size={64} strokeWidth={1.5} />
-      <div className="glass-lite flex size-7 items-center justify-center rounded-full">
-        <Icon size={15} />
+      <div className="flex items-center justify-between">
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-full ${iconClasses}`}>
+          <Icon size={15} strokeWidth={2} />
+        </span>
+        <ChevronRight size={14} className="text-ve-on-surface-variant/30" />
       </div>
-      <div className="relative">
-        <p className="text-ve-stats tabular-nums-lining leading-none">{value}</p>
-        <p className="text-ve-label mt-1.5 uppercase opacity-80">{label}</p>
-        <p className="mt-0.5 text-[11px] opacity-70">{sub}</p>
+      <div>
+        <p className={`text-[19px] font-bold leading-tight tabular-nums-lining text-ve-on-surface whitespace-nowrap ${valueClasses ?? ''}`}>{value}</p>
+        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-ve-on-surface-variant/60 truncate">{label}</p>
+        <p className="text-[10.5px] text-ve-on-surface-variant/55 truncate">{sub}</p>
       </div>
     </Link>
   )
@@ -93,40 +96,54 @@ export function HomeOverviewViewMobile({
       <MobileTopBar label="Hello," title={workspaceName} workspaceSlug={workspaceSlug} />
 
       <div className="px-ve-margin">
-        <div className="grid grid-cols-2 gap-ve-gutter">
+        <div className="rounded-ve-lg bg-gradient-to-br from-ve-secondary to-[#7a7dff] p-3.5 text-white">
+          <div className="flex items-center gap-2.5">
+            <span className="glass-lite flex size-9 shrink-0 items-center justify-center rounded-full">
+              <Crown size={17} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[14px] font-semibold leading-tight">Welcome back! 👋</p>
+              <p className="mt-0.5 text-[11.5px] leading-snug opacity-80">
+                Here&apos;s what&apos;s happening with your gym today.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <StatCard
             href={`${base}/members`}
             label="Active members"
             value={String(overview.activeMembers)}
             sub={`${overview.presentToday} present today`}
             icon={Users}
-            gradient="from-ve-on-background to-ve-inverse-surface"
+            iconClasses="bg-emerald-100 text-emerald-600"
           />
           <StatCard
             href={`${base}/fees`}
             label="Expected"
             value={rupees(expected)}
             sub="Collected + pending"
-            icon={TrendingUp}
-            gradient="from-ve-tertiary to-ve-on-tertiary-container"
+            icon={CreditCard}
+            iconClasses="bg-violet-100 text-violet-600"
           />
-        </div>
-
-        <div className="mt-ve-gutter rounded-ve-lg border border-ve-outline-variant/20 bg-white overflow-hidden">
-          <div className="grid grid-cols-2">
-            <div className="px-3.5 py-2.5 border-r border-ve-outline-variant/20">
-              <p className="text-[9px] font-semibold text-ve-on-surface-variant uppercase tracking-wider">Profit</p>
-              <p className={`text-[15px] font-bold mt-0.5 ${(overview.revenue - overview.expenses) < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                ₹{Math.abs(overview.revenue - overview.expenses).toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="px-3.5 py-2.5">
-              <p className="text-[9px] font-semibold text-ve-on-surface-variant uppercase tracking-wider">Expenses</p>
-              <p className="text-[15px] font-bold mt-0.5 text-red-600">
-                ₹{overview.expenses.toLocaleString("en-IN")}
-              </p>
-            </div>
-          </div>
+          <StatCard
+            href={`${base}/fees`}
+            label="Profit"
+            value={`${(overview.revenue - overview.expenses) < 0 ? '-' : ''}₹${Math.abs(overview.revenue - overview.expenses).toLocaleString('en-IN')}`}
+            sub="This month"
+            icon={TrendingUp}
+            iconClasses="bg-emerald-100 text-emerald-600"
+            valueClasses={(overview.revenue - overview.expenses) < 0 ? 'text-red-600' : 'text-emerald-600'}
+          />
+          <StatCard
+            href={`${base}/fees`}
+            label="Expenses"
+            value={overview.expenses > 0 ? rupees(overview.expenses) : '₹0'}
+            sub={overview.expenses > 0 ? 'This month' : 'No expenses added'}
+            icon={TrendingDown}
+            iconClasses="bg-red-100 text-red-600"
+          />
         </div>
 
         <section className="mt-ve-xl">

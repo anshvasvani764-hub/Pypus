@@ -71,6 +71,7 @@ export default async function MembersPage({
       <MemberRegistryViewMobile
         members={members}
         workspaceSlug={workspaceSlug}
+        workspaceId={workspaceId}
         attendanceMap={attendanceMap}
         feeStatusMap={feeStatusMap}
         planNameMap={planNameMap}

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Users, CalendarCheck, CreditCard, MoreHorizontal, Sparkles, ArrowRight, Menu } from 'lucide-react'
+import { Users, CalendarCheck, CreditCard, Wallet, MoreHorizontal, Sparkles, ArrowRight, Menu } from 'lucide-react'
 import { useMobileNav } from '@/context/MobileNavContext'
 
 interface Props {
@@ -39,6 +39,14 @@ export function ModulesView({ workspaceSlug, stats }: Props) {
       description: 'Payments & billing',
       accent: 'from-emerald-500 to-emerald-700',
       shadow: 'shadow-[0_8px_24px_rgba(16,185,129,0.25)]',
+    },
+    {
+      href: `/${workspaceSlug}/expenses`,
+      icon: Wallet,
+      title: 'Expenses',
+      description: 'Track spends & categories',
+      accent: 'from-red-500 to-rose-700',
+      shadow: 'shadow-[0_8px_24px_rgba(239,68,68,0.25)]',
     },
     {
       href: `/${workspaceSlug}/team`,

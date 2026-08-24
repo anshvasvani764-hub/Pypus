@@ -4,8 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Search, Wallet, Clock, TrendingUp, MoreVertical,
-  CheckCircle2, Settings2, UserX, AlertCircle,
+  Search, Wallet, Clock, TrendingUp,
+  Settings2, UserX,
 } from 'lucide-react'
 import type { Member, FeeRecord } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
@@ -159,53 +159,57 @@ export function FeesDashboardView({
         backHref={`/${workspaceSlug}/workspace`}
       />
 
-      <main className="px-5 pt-5">
+      <main className="px-4 pt-4">
         {/* Snapshot Cards */}
-        <div className="flex flex-col gap-3 mb-6">
+        <div className="flex flex-col gap-2.5 mb-4">
           {/* Monthly Collection */}
-          <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-primary-container text-ve-on-primary-container p-5 shadow-[0_8px_24px_-8px_rgba(0,110,22,0.3)] group hover:scale-[1.02] transition-transform duration-200">
+          <div className="relative overflow-hidden rounded-2xl bg-ve-primary-container text-ve-on-primary-container p-3.5 shadow-md group hover:scale-[1.02] transition-transform duration-200">
             <div className="flex items-start justify-between z-10">
               <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Monthly Collection</span>
-              <Wallet size={20} />
+              <Wallet size={16} />
             </div>
-            <div className="text-3xl font-black mt-2 z-10">{fmt(monthlyCollection)}</div>
-            <div className="flex items-center gap-1 mt-1 z-10">
-              <TrendingUp size={14} />
-              <span className="text-[11px] font-bold">{collectionRate}% Collection Rate</span>
+            <div className="text-[22px] font-black mt-0.5 z-10">{fmt(monthlyCollection)}</div>
+            <div className="flex items-center gap-1 mt-0.5 z-10">
+              <TrendingUp size={12} />
+              <span className="text-[10px] font-bold">{collectionRate}% Collection Rate</span>
             </div>
             <div className="absolute -right-4 -bottom-4 h-24 w-24 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {/* Pending Dues */}
-            <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-secondary-container text-ve-on-secondary-container p-5 shadow-[0_8px_24px_-8px_rgba(70,72,212,0.3)] group hover:scale-[1.02] transition-transform duration-200">
+            <div className="relative overflow-hidden rounded-2xl bg-ve-secondary-container text-ve-on-secondary-container p-3.5 shadow-md group hover:scale-[1.02] transition-transform duration-200 h-[88px] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pending</span>
-                <Clock size={16} />
+                <Clock size={14} />
               </div>
-              <div className="text-2xl font-black mt-2">{fmt(pendingDues)}</div>
-              <div className="text-[11px] font-bold mt-1 opacity-80">{overdueCount} overdue</div>
+              <div>
+                <div className="text-[18px] font-black leading-tight">{fmt(pendingDues)}</div>
+                <div className="text-[10px] font-bold opacity-80">{overdueCount} overdue</div>
+              </div>
               <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
             </div>
 
             {/* Expected */}
-            <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-tertiary-container text-ve-on-tertiary-container p-5 shadow-[0_8px_24px_-8px_rgba(133,83,0,0.2)] group hover:scale-[1.02] transition-transform duration-200">
+            <div className="relative overflow-hidden rounded-2xl bg-ve-tertiary-container text-ve-on-tertiary-container p-3.5 shadow-md group hover:scale-[1.02] transition-transform duration-200 h-[88px] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Expected</span>
-                <TrendingUp size={16} />
+                <TrendingUp size={14} />
               </div>
-              <div className="text-2xl font-black mt-2">{fmt(expectedTotal)}</div>
-              <div className="text-[11px] font-bold mt-1 opacity-80">This month</div>
+              <div>
+                <div className="text-[18px] font-black leading-tight">{fmt(expectedTotal)}</div>
+                <div className="text-[10px] font-bold opacity-80">This month</div>
+              </div>
               <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
             </div>
           </div>
         </div>
 
         {/* Search */}
-        <div className="flex items-center gap-3 rounded-xl bg-ve-surface-container px-4 py-3 mb-4 border-2 border-transparent focus-within:border-ve-primary transition-all">
-          <Search size={18} className="text-ve-outline shrink-0" />
+        <div className="relative mb-4">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ve-outline" size={17} />
           <input
-            className="bg-transparent border-none focus:ring-0 w-full text-sm text-ve-on-surface placeholder:text-ve-outline outline-none"
+            className="w-full pl-10 pr-3.5 py-3 bg-white border border-ve-outline-variant/30 rounded-xl focus:outline-none focus:border-ve-primary transition-all text-[13px] font-medium text-ve-on-surface placeholder:text-ve-outline"
             placeholder="Search members…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -213,12 +217,12 @@ export function FeesDashboardView({
         </div>
 
         {/* Filter Chips */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mb-5">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mb-4">
           {FILTERS.map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-all active:scale-95 ${
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
                 filter === f
                   ? 'bg-ve-primary text-white shadow-md'
                   : 'bg-ve-surface-container-high text-ve-on-surface-variant hover:bg-ve-surface-container-highest'
@@ -230,23 +234,23 @@ export function FeesDashboardView({
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-ve-on-surface">
+        <div className="flex items-center justify-between mb-2.5">
+          <h3 className="text-[11px] font-bold text-ve-on-surface-variant tracking-wider uppercase">
             {filter === 'All' ? 'All Members' : filter} ({filtered.length})
-          </h2>
+          </h3>
           <Link
             href={`/${workspaceSlug}/fees/plans`}
-            className="flex items-center gap-1 text-ve-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-ve-primary/5 transition-colors"
+            className="flex items-center gap-1 text-ve-primary text-[11px] font-bold px-2 py-1.5 rounded-lg hover:bg-ve-primary/5 transition-colors"
           >
-            <Settings2 size={14} />
+            <Settings2 size={12} />
             Manage Plans
           </Link>
         </div>
 
         {/* Payment Cards */}
-        <div className="flex flex-col gap-3 pb-4">
+        <div className="flex flex-col gap-2 pb-4">
           {filtered.length === 0 ? (
-            <div className="rounded-[1rem] bg-ve-surface-container p-8 text-center text-sm text-ve-on-surface-variant">
+            <div className="rounded-2xl bg-ve-surface-container p-8 text-center text-[13px] text-ve-on-surface-variant">
               No members match this filter.
             </div>
           ) : (
@@ -256,46 +260,46 @@ export function FeesDashboardView({
               return (
               <div
                 key={member.id}
-                className={`flex items-center justify-between rounded-[1rem] bg-white p-4 shadow-sm border transition-shadow hover:shadow-md ${
+                className={`flex items-center justify-between rounded-2xl bg-white p-3 shadow-sm border transition-shadow hover:shadow-md ${
                   feeStatus === 'overdue'
                     ? 'border-ve-error/20'
                     : feeStatus === 'no_plan'
                     ? 'border-dashed border-ve-outline-variant'
-                    : 'border-ve-outline-variant/30'
+                    : 'border-ve-outline-variant/20'
                 }`}
               >
                 <Link
                   href={`/${workspaceSlug}/members/${member.id}/fees`}
                   className="flex min-w-0 flex-1 items-center gap-3"
                 >
-                  <div className="h-12 w-12 rounded-full overflow-hidden bg-ve-surface-container-high border-2 border-white shadow-sm shrink-0 flex items-center justify-center">
+                  <div className="h-11 w-11 rounded-full overflow-hidden bg-ve-surface-container-high shrink-0 flex items-center justify-center">
                     {feeStatus === 'no_plan' ? (
-                      <UserX size={20} className="text-ve-outline" />
+                      <UserX size={18} className="text-ve-outline" />
                     ) : (
                       <MemberAvatar
                         name={member.name}
                         avatarUrl={member.avatar_url}
-                        size={48}
+                        size={44}
                         fallbackClassName="bg-ve-secondary-container text-ve-on-secondary-container"
                       />
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-ve-on-surface truncate">{member.name}</p>
-                    <p className="text-[11px] text-ve-outline truncate">
+                    <p className="text-[13.5px] font-bold text-ve-on-surface truncate">{member.name}</p>
+                    <p className="text-[10px] text-ve-outline truncate">
                       {planName ?? 'No active subscription'} {amount ? `• ${fmt(amount)}` : ''}
                     </p>
                     {feeStatus !== 'paid' && paidAmount > 0 && pendingOnRow != null && (
-                      <p className="text-[11px] font-semibold text-amber-600 truncate">
+                      <p className="text-[10px] font-semibold text-amber-600 truncate">
                         Paid {fmt(paidAmount)} · Pending {fmt(pendingOnRow)}
                       </p>
                     )}
                   </div>
                 </Link>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="text-right">
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${CHIP_COLORS[feeStatus]}`}>
+                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${CHIP_COLORS[feeStatus]}`}>
                       {feeStatus === 'no_plan' ? 'No Plan' : feeStatus === 'overdue' ? 'Overdue' : feeStatus === 'due' ? `Due ${fmtDate(dueDate)}` : 'Paid'}
                     </span>
                     {(feeStatus === 'overdue' || feeStatus === 'due') && payableFeeId && (

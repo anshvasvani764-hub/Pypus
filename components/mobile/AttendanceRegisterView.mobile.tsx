@@ -121,34 +121,34 @@ export function AttendanceRegisterView({
         action={<PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />}
       />
 
-      <main className="px-5 pt-6 space-y-6">
+      <main className="px-4 pt-4 space-y-4">
         {/* Stat Cards Section */}
-        <section className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <section className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
           {/* Present Today */}
-          <div className="col-span-1 bg-ve-primary text-white p-5 rounded-[1.5rem] shadow-lg relative overflow-hidden flex flex-col justify-between h-32">
+          <div className="col-span-1 bg-ve-primary text-white p-3.5 rounded-2xl shadow-md relative overflow-hidden flex flex-col justify-between h-[88px]">
             <div className="z-10">
-              <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Present Today</p>
-              <h2 className="text-3xl font-black mt-1">{presentCount}</h2>
+              <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">Present Today</p>
+              <h2 className="text-[22px] font-black mt-0.5">{presentCount}</h2>
             </div>
-            <CheckCircle2 size={56} className="absolute -bottom-2 -right-2 opacity-20 pointer-events-none" fill="white" />
+            <CheckCircle2 size={40} className="absolute -bottom-1.5 -right-1.5 opacity-20 pointer-events-none" fill="white" />
           </div>
 
           {/* Absent */}
-          <div className="col-span-1 bg-ve-secondary text-white p-5 rounded-[1.5rem] shadow-lg relative overflow-hidden flex flex-col justify-between h-32">
+          <div className="col-span-1 bg-ve-secondary text-white p-3.5 rounded-2xl shadow-md relative overflow-hidden flex flex-col justify-between h-[88px]">
             <div className="z-10">
-              <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Absent</p>
-              <h2 className="text-3xl font-black mt-1">{absentCount}</h2>
+              <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">Absent</p>
+              <h2 className="text-[22px] font-black mt-0.5">{absentCount}</h2>
             </div>
-            <XCircle size={56} className="absolute -bottom-2 -right-2 opacity-20 pointer-events-none" fill="white" />
+            <XCircle size={40} className="absolute -bottom-1.5 -right-1.5 opacity-20 pointer-events-none" fill="white" />
           </div>
 
           {/* Attendance Rate */}
-          <div className="col-span-2 md:col-span-1 bg-ve-surface-container-highest p-5 rounded-[1.5rem] border border-ve-outline-variant/30 flex flex-col justify-between h-32">
+          <div className="col-span-2 md:col-span-1 bg-ve-surface-container-highest p-3.5 rounded-2xl border border-ve-outline-variant/30 flex flex-col justify-between h-[88px]">
             <div>
-              <p className="text-xs font-bold text-ve-on-surface-variant uppercase tracking-wider">Attendance Rate</p>
-              <h2 className="text-3xl font-black text-ve-primary mt-1">{attendanceRate}%</h2>
+              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Attendance Rate</p>
+              <h2 className="text-[22px] font-black text-ve-primary mt-0.5">{attendanceRate}%</h2>
             </div>
-            <div className="w-full bg-ve-outline-variant/30 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-ve-outline-variant/30 h-1.5 rounded-full overflow-hidden">
               <div className="bg-ve-primary h-full transition-all duration-500" style={{ width: `${attendanceRate}%` }} />
             </div>
           </div>
@@ -157,21 +157,21 @@ export function AttendanceRegisterView({
         {/* Search Bar */}
         <section>
           <div className="relative">
-            <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-ve-outline" size={20} />
+            <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ve-outline" size={17} />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name or ID..."
-              className="w-full pl-12 pr-4 py-4 bg-white border-2 border-ve-outline-variant/30 rounded-xl focus:outline-none focus:border-ve-primary transition-all text-sm font-medium text-ve-on-surface placeholder:text-ve-outline"
+              className="w-full pl-10 pr-3.5 py-3 bg-white border border-ve-outline-variant/30 rounded-xl focus:outline-none focus:border-ve-primary transition-all text-[13px] font-medium text-ve-on-surface placeholder:text-ve-outline"
             />
           </div>
         </section>
 
         {/* Member List */}
-        <section className="space-y-3 pb-8">
-          <h3 className="text-xs font-bold text-ve-on-surface-variant flex items-center gap-2 tracking-wider uppercase">
-            <SortAsc size={16} />
+        <section className="space-y-2 pb-6">
+          <h3 className="text-[11px] font-bold text-ve-on-surface-variant flex items-center gap-1.5 tracking-wider uppercase">
+            <SortAsc size={14} />
             MEMBERS REGISTRY ({filteredMembers.length})
           </h3>
 
@@ -185,28 +185,28 @@ export function AttendanceRegisterView({
               return (
                 <div
                   key={member.id}
-                  className="bg-white p-4 rounded-[1.25rem] border-2 border-ve-error/20 shadow-sm flex items-center gap-4 relative overflow-hidden"
+                  className="bg-white p-3 rounded-2xl border border-ve-error/20 shadow-sm flex items-center gap-3 relative overflow-hidden"
                 >
-                  <div className="absolute top-0 right-0 px-2.5 py-0.5 bg-ve-error text-white font-bold text-[8px] tracking-widest rounded-bl-lg uppercase">
+                  <div className="absolute top-0 right-0 px-2 py-0.5 bg-ve-error text-white font-bold text-[7px] tracking-widest rounded-bl-lg uppercase">
                     OVERDUE
                   </div>
-                  <div className="h-14 w-14 rounded-full overflow-hidden bg-ve-surface-container shrink-0 border-2 border-ve-error/30 flex items-center justify-center">
+                  <div className="h-11 w-11 rounded-full overflow-hidden bg-ve-surface-container shrink-0 border-2 border-ve-error/30 flex items-center justify-center">
                     <MemberAvatar
                       name={member.name}
                       avatarUrl={member.avatar_url}
-                      size={56}
+                      size={44}
                       fallbackClassName="bg-ve-error-container text-ve-on-error-container"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-base text-ve-on-surface truncate">{member.name}</h4>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ve-error-container text-ve-on-error-container font-bold text-[10px]">
+                    <h4 className="font-bold text-[13.5px] text-ve-on-surface truncate">{member.name}</h4>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-ve-error-container text-ve-on-error-container font-bold text-[9px]">
                       {planBadge.toUpperCase()}
                     </span>
                   </div>
                   <button
                     onClick={() => openOverdueAlert(member, summary)}
-                    className="bg-ve-error text-white font-bold text-xs px-4 py-2.5 rounded-full shadow-md active:scale-95 transition-transform"
+                    className="bg-ve-error text-white font-bold text-[11px] px-3 py-2 rounded-full shadow-md active:scale-95 transition-transform"
                   >
                     View Alert
                   </button>
@@ -217,17 +217,17 @@ export function AttendanceRegisterView({
             return (
               <div
                 key={member.id}
-                className="bg-white p-4 rounded-[1.25rem] border border-ve-outline-variant/20 shadow-sm flex items-center gap-4 hover:border-ve-primary/40 transition-all cursor-pointer"
+                className="bg-white p-3 rounded-2xl border border-ve-outline-variant/20 shadow-sm flex items-center gap-3 hover:border-ve-primary/40 transition-all cursor-pointer"
               >
                 <MemberAvatar
                   name={member.name}
                   avatarUrl={member.avatar_url}
-                  size={56}
+                  size={44}
                   fallbackClassName="bg-ve-primary-container text-ve-on-primary-container"
                 />
                 <Link href={`/${workspaceSlug}/members/${member.id}`} className="flex-1 min-w-0">
-                  <h4 className="font-bold text-base text-ve-on-surface truncate">{member.name}</h4>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                  <h4 className="font-bold text-[13.5px] text-ve-on-surface truncate">{member.name}</h4>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full font-bold text-[9px] ${
                     summary?.status === 'paid'
                       ? 'bg-ve-secondary-container text-ve-on-secondary-container'
                       : 'bg-ve-surface-container-high text-ve-on-surface-variant'
@@ -237,14 +237,14 @@ export function AttendanceRegisterView({
                 </Link>
 
                 {isCheckedIn ? (
-                  <span className="bg-ve-primary/10 text-ve-primary font-bold text-xs px-4 py-2.5 rounded-full flex items-center gap-1">
-                    <CheckCircle2 size={14} /> Done
+                  <span className="bg-ve-primary/10 text-ve-primary font-bold text-[11px] px-3 py-2 rounded-full flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Done
                   </span>
                 ) : (
                   <button
                     onClick={() => handleCheckIn(member.id)}
                     disabled={pendingId === member.id}
-                    className="bg-ve-primary-container text-ve-on-primary-container font-bold text-xs px-4 py-2.5 rounded-full shadow-[0_4px_14px_rgba(0,230,57,0.3)] active:scale-95 transition-transform disabled:opacity-50"
+                    className="bg-ve-primary-container text-ve-on-primary-container font-bold text-[11px] px-3 py-2 rounded-full shadow-[0_4px_14px_rgba(0,230,57,0.3)] active:scale-95 transition-transform disabled:opacity-50"
                   >
                     {pendingId === member.id ? '...' : 'Check-in'}
                   </button>

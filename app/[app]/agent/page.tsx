@@ -1,6 +1,8 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { AgentPendingView } from "@/components/agent/AgentPendingView";
+import { AgentPendingView as AgentPendingViewMobile } from "@/components/mobile/AgentPendingView.mobile";
 import { getAgentDashboard } from "@/app/actions/agent";
+import { getDevice } from "@/lib/device";
 
 export default async function AgentPage({
   params,
@@ -19,6 +21,17 @@ export default async function AgentPage({
   const workspaceName = wsData?.name ?? "Your Gym";
 
   const { activity, receiptsPending } = await getAgentDashboard(workspaceId);
+
+  if ((await getDevice()) === "mobile") {
+    return (
+      <AgentPendingViewMobile
+        workspaceSlug={workspaceSlug}
+        workspaceName={workspaceName}
+        activity={activity}
+        receiptsPending={receiptsPending}
+      />
+    );
+  }
 
   return (
     <AgentPendingView

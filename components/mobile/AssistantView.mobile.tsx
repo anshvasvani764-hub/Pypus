@@ -111,7 +111,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
       />
 
       {/* Chat Canvas */}
-      <main className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-48">
+      <main className="flex-1 overflow-y-auto px-5 py-6 space-y-4 pb-56">
         {messages.map((m) =>
           m.role === 'assistant' ? (
             <div key={m.id} className="flex items-end gap-3 max-w-[85%]">
@@ -153,7 +153,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
       </main>
 
       {/* Floating Bottom Input Area */}
-      <div className="fixed bottom-[72px] left-0 w-full z-40 bg-gradient-to-t from-ve-surface via-ve-surface/95 to-transparent pt-4">
+      <div className="fixed left-0 w-full z-40 bg-gradient-to-t from-ve-surface via-ve-surface/95 to-transparent pt-4" style={{ bottom: 'calc(72px + max(1rem, env(safe-area-inset-bottom)))' }}>
         {/* Quick Prompts */}
         <div className="flex gap-2 px-5 overflow-x-auto no-scrollbar pb-2">
           {QUICK_PROMPTS.map((prompt) => (

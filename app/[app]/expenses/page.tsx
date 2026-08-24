@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { ExpensesDashboard } from "@/components/expenses/ExpensesDashboard";
+import { ExpensesDashboardMobile } from "@/components/expenses/ExpensesDashboard.mobile";
 import { getExpenses, getExpenseCategories, getExpenseTemplates } from "@/lib/expenses/queries";
 import { getDevice } from "@/lib/device";
 
@@ -27,13 +28,11 @@ export default async function ExpensesPage({
 
   if ((await getDevice()) === "mobile") {
     return (
-      <ExpensesDashboard
+      <ExpensesDashboardMobile
         workspaceId={workspaceId}
         workspaceSlug={workspaceSlug}
-        workspaceName={workspaceName}
         expenses={expenses}
         categories={categories}
-        templates={templates}
       />
     );
   }

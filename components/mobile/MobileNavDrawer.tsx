@@ -52,6 +52,7 @@ export function MobileNavDrawer({ workspaceSlug }: { workspaceSlug: string }) {
         { href: `${base}/members`, label: 'Members' },
         { href: `${base}/attendance`, label: 'Attendance' },
         { href: `${base}/fees`, label: 'Fees' },
+        { href: `${base}/expenses`, label: 'Expenses' },
         { href: `${base}/team`, label: 'Team' },
       ],
     },

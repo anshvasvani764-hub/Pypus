@@ -1,0 +1,1574 @@
+diff --git a/app/[app]/expenses/page.tsx b/app/[app]/expenses/page.tsx
+index d81b2f1..2fc6bc2 100644
+--- a/app/[app]/expenses/page.tsx
++++ b/app/[app]/expenses/page.tsx
+@@ -1,5 +1,6 @@
+ import { createServiceClient } from "@/lib/supabase/service";
+ import { ExpensesDashboard } from "@/components/expenses/ExpensesDashboard";
++import { ExpensesDashboardMobile } from "@/components/expenses/ExpensesDashboard.mobile";
+ import { getExpenses, getExpenseCategories, getExpenseTemplates } from "@/lib/expenses/queries";
+ import { getDevice } from "@/lib/device";
+ 
+@@ -27,13 +28,11 @@ export default async function ExpensesPage({
+ 
+   if ((await getDevice()) === "mobile") {
+     return (
+-      <ExpensesDashboard
++      <ExpensesDashboardMobile
+         workspaceId={workspaceId}
+         workspaceSlug={workspaceSlug}
+-        workspaceName={workspaceName}
+         expenses={expenses}
+         categories={categories}
+-        templates={templates}
+       />
+     );
+   }
+diff --git a/components/expenses/AddCategoryModal.mobile.tsx b/components/expenses/AddCategoryModal.mobile.tsx
+new file mode 100644
+index 0000000..2e18034
+--- /dev/null
++++ b/components/expenses/AddCategoryModal.mobile.tsx
+@@ -0,0 +1,93 @@
++"use client";
++
++import { useState } from "react";
++import { X } from "lucide-react";
++import { createExpenseCategory } from "@/app/actions/expense-admin";
++
++interface AddCategoryModalMobileProps {
++  isOpen: boolean;
++  onClose: () => void;
++  workspaceId: string;
++  onCategoryAdded: () => void;
++}
++
++export function AddCategoryModalMobile({ isOpen, onClose, workspaceId, onCategoryAdded }: AddCategoryModalMobileProps) {
++  if (!isOpen) return null;
++  return <CategoryDialogMobile onClose={onClose} workspaceId={workspaceId} onCategoryAdded={onCategoryAdded} />;
++}
++
++function CategoryDialogMobile({
++  onClose,
++  workspaceId,
++  onCategoryAdded,
++}: Pick<AddCategoryModalMobileProps, "onClose" | "workspaceId" | "onCategoryAdded">) {
++  const [name, setName] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    setBusy(true);
++    setError(null);
++    const result = await createExpenseCategory(workspaceId, name);
++    setBusy(false);
++    if (result.success) {
++      onCategoryAdded();
++      onClose();
++    } else {
++      setError(result.error ?? "Could not add category. Please try again.");
++    }
++  }
++
++  return (
++    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-5">
++      <div className="w-full max-w-[320px] rounded-2xl bg-white shadow-xl">
++        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
++          <h2 className="text-[15px] font-semibold text-gray-900">Add Category</h2>
++          <button
++            onClick={onClose}
++            className="h-7 w-7 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
++            aria-label="Close modal"
++          >
++            <X className="h-4 w-4" />
++          </button>
++        </div>
++
++        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3.5">
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">Category Name</label>
++            <input
++              type="text"
++              value={name}
++              onChange={(e) => setName(e.target.value)}
++              required
++              autoFocus
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="e.g. Rent, Utilities"
++            />
++          </div>
++
++          {error && <p className="text-[12.5px] text-red-600">{error}</p>}
++
++          <div className="flex items-center justify-end gap-2.5 pt-1">
++            <button
++              type="button"
++              onClick={onClose}
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium text-gray-600 border border-gray-200 bg-white active:bg-gray-50 disabled:opacity-50"
++            >
++              Cancel
++            </button>
++            <button
++              type="submit"
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50"
++            >
++              {busy ? "Adding…" : "Add Category"}
++            </button>
++          </div>
++        </form>
++      </div>
++    </div>
++  );
++}
+diff --git a/components/expenses/AddExpenseModal.mobile.tsx b/components/expenses/AddExpenseModal.mobile.tsx
+new file mode 100644
+index 0000000..44ae484
+--- /dev/null
++++ b/components/expenses/AddExpenseModal.mobile.tsx
+@@ -0,0 +1,196 @@
++"use client";
++
++import { useState } from "react";
++import { X } from "lucide-react";
++import type { ExpenseCategory, ExpenseStatus } from "@/lib/expenses/types";
++
++interface AddExpenseModalMobileProps {
++  isOpen: boolean;
++  onClose: () => void;
++  onSave: (data: {
++    title: string;
++    amount: number;
++    categoryId: string;
++    type: "one_time" | "fixed" | "monthly_variable";
++    status: "paid" | "pending" | "overdue";
++    dueDate: string;
++    notes: string | null;
++  }) => Promise<{ success: boolean; error?: string }>;
++  categories: ExpenseCategory[];
++  onRequestNewCategory?: () => void;
++  defaultCategoryId?: string;
++}
++
++export function AddExpenseModalMobile({
++  isOpen,
++  onClose,
++  onSave,
++  categories,
++  onRequestNewCategory,
++  defaultCategoryId,
++}: AddExpenseModalMobileProps) {
++  if (!isOpen) return null;
++  return (
++    <ExpenseDialogMobile
++      onClose={onClose}
++      onSave={onSave}
++      categories={categories}
++      onRequestNewCategory={onRequestNewCategory}
++      defaultCategoryId={defaultCategoryId}
++    />
++  );
++}
++
++function ExpenseDialogMobile({
++  onClose,
++  onSave,
++  categories,
++  onRequestNewCategory,
++  defaultCategoryId,
++}: Pick<AddExpenseModalMobileProps, "onClose" | "onSave" | "categories" | "onRequestNewCategory" | "defaultCategoryId">) {
++  const [title, setTitle] = useState("");
++  const [amount, setAmount] = useState("");
++  const [categoryId, setCategoryId] = useState(defaultCategoryId ?? "");
++  const [status, setStatus] = useState<ExpenseStatus>("paid");
++  const [dueDate, setDueDate] = useState(() => new Date().toISOString().slice(0, 10));
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    setBusy(true);
++    setError(null);
++    const result = await onSave({
++      title,
++      amount: Number(amount),
++      categoryId,
++      type: "one_time",
++      status,
++      dueDate,
++      notes: null,
++    });
++    setBusy(false);
++    if (result.success) {
++      onClose();
++    } else {
++      setError(result.error ?? "Could not add expense. Please try again.");
++    }
++  }
++
++  return (
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
++      <div className="w-full max-w-[340px] max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
++        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
++          <h2 className="text-[15px] font-semibold text-gray-900">Add Expense</h2>
++          <button
++            onClick={onClose}
++            className="h-7 w-7 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
++            aria-label="Close modal"
++          >
++            <X className="h-4 w-4" />
++          </button>
++        </div>
++
++        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3.5">
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">Title</label>
++            <input
++              type="text"
++              value={title}
++              onChange={(e) => setTitle(e.target.value)}
++              required
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="e.g. Electricity bill"
++            />
++          </div>
++
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">Amount (₹)</label>
++            <input
++              type="number"
++              value={amount}
++              onChange={(e) => setAmount(e.target.value)}
++              required
++              min="0"
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="5000"
++            />
++          </div>
++
++          <div>
++            <div className="flex items-center justify-between mb-1">
++              <label className="block text-[13px] font-medium text-gray-700">Category</label>
++              {onRequestNewCategory && (
++                <button
++                  type="button"
++                  onClick={onRequestNewCategory}
++                  className="text-[11.5px] font-medium text-emerald-600 active:text-emerald-700"
++                >
++                  + New
++                </button>
++              )}
++            </div>
++            <select
++              value={categoryId}
++              onChange={(e) => setCategoryId(e.target.value)}
++              required
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++            >
++              <option value="">Select category</option>
++              {categories.map((c) => (
++                <option key={c.id} value={c.id}>
++                  {c.name}
++                </option>
++              ))}
++            </select>
++          </div>
++
++          <div className="grid grid-cols-2 gap-2.5">
++            <div>
++              <label className="block text-[13px] font-medium text-gray-700 mb-1">Status</label>
++              <select
++                value={status}
++                onChange={(e) => setStatus(e.target.value as ExpenseStatus)}
++                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              >
++                <option value="paid">Paid</option>
++                <option value="pending">Pending</option>
++                <option value="overdue">Overdue</option>
++              </select>
++            </div>
++            <div>
++              <label className="block text-[13px] font-medium text-gray-700 mb-1">Date</label>
++              <input
++                type="date"
++                value={dueDate}
++                onChange={(e) => setDueDate(e.target.value)}
++                required
++                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              />
++            </div>
++          </div>
++
++          {error && <p className="text-[12.5px] text-red-600">{error}</p>}
++
++          <div className="flex items-center justify-end gap-2.5 pt-1">
++            <button
++              type="button"
++              onClick={onClose}
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium text-gray-600 border border-gray-200 bg-white active:bg-gray-50 disabled:opacity-50"
++            >
++              Cancel
++            </button>
++            <button
++              type="submit"
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50"
++            >
++              {busy ? "Adding…" : "Add Expense"}
++            </button>
++          </div>
++        </form>
++      </div>
++    </div>
++  );
++}
+diff --git a/components/expenses/EditExpenseModal.tsx b/components/expenses/EditExpenseModal.tsx
+index f16f24b..8a76cf7 100644
+--- a/components/expenses/EditExpenseModal.tsx
++++ b/components/expenses/EditExpenseModal.tsx
+@@ -79,8 +79,8 @@ function ExpenseDialog({
+   }
+ 
+   return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
++      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+           <h2 className="text-base font-semibold text-gray-900">Edit Expense</h2>
+           <button
+diff --git a/components/expenses/ExpensesDashboard.mobile.tsx b/components/expenses/ExpensesDashboard.mobile.tsx
+new file mode 100644
+index 0000000..b179611
+--- /dev/null
++++ b/components/expenses/ExpensesDashboard.mobile.tsx
+@@ -0,0 +1,299 @@
++'use client'
++
++import { useState, useCallback, useMemo } from 'react'
++import { useRouter } from 'next/navigation'
++import { Plus, Wallet, Clock, TrendingUp, FolderPlus, Trash2, Edit3 } from 'lucide-react'
++import type { Expense, ExpenseCategory } from '@/lib/expenses/types'
++import { MobileTopBar } from '@/components/mobile/MobileTopBar'
++import { AddExpenseModalMobile } from './AddExpenseModal.mobile'
++import { AddCategoryModalMobile } from './AddCategoryModal.mobile'
++import { EditExpenseModal } from './EditExpenseModal'
++import { createExpense, updateExpense, deleteExpense, markExpensePaid } from '@/app/actions/expense-admin'
++
++interface Props {
++  workspaceId: string
++  workspaceSlug: string
++  expenses: Expense[]
++  categories: ExpenseCategory[]
++}
++
++function fmt(n: number) {
++  return `₹${n.toLocaleString('en-IN')}`
++}
++
++export function ExpensesDashboardMobile({ workspaceId, workspaceSlug, expenses: initialExpenses, categories }: Props) {
++  const router = useRouter()
++  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
++  const [filterCategory, setFilterCategory] = useState<string>('')
++  const [showAddModal, setShowAddModal] = useState(false)
++  const [showCategoryModal, setShowCategoryModal] = useState(false)
++  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
++  const [busy, setBusy] = useState(false)
++
++  const filteredExpenses = useMemo(() => {
++    if (!filterCategory) return expenses
++    return expenses.filter((e) => e.category_id === filterCategory)
++  }, [expenses, filterCategory])
++
++  const categoryTotals = useMemo(() => {
++    const map = new Map<string, number>()
++    for (const e of expenses) {
++      const key = e.category_id ?? 'uncategorized'
++      map.set(key, (map.get(key) ?? 0) + 1)
++    }
++    return map
++  }, [expenses])
++
++  const totalPaid = expenses.filter((e) => e.status === 'paid').reduce((s, e) => s + (e.amount ?? 0), 0)
++  const totalPending = expenses.filter((e) => e.status === 'pending').reduce((s, e) => s + (e.amount ?? 0), 0)
++  const totalOverdue = expenses.filter((e) => e.status === 'overdue').reduce((s, e) => s + (e.amount ?? 0), 0)
++
++  const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? 'Uncategorized'
++
++  const handleAddExpense = useCallback(
++    async (data: {
++      title: string
++      amount: number
++      categoryId: string
++      type: 'one_time' | 'fixed' | 'monthly_variable'
++      status: 'paid' | 'pending' | 'overdue'
++      dueDate: string
++      notes: string | null
++    }) => {
++      const result = await createExpense(workspaceId, data)
++      if (result.success && result.expense) {
++        setExpenses((prev) => [result.expense!, ...prev])
++        setShowAddModal(false)
++        router.refresh()
++      }
++      return result
++    },
++    [workspaceId, router]
++  )
++
++  const handleUpdateExpense = useCallback(
++    async (data: {
++      title: string
++      amount: number
++      categoryId: string
++      type: 'one_time' | 'fixed' | 'monthly_variable'
++      status: 'paid' | 'pending' | 'overdue'
++      dueDate: string
++      notes: string | null
++    }) => {
++      if (!editingExpense) return { success: false, error: 'No expense selected' }
++      const result = await updateExpense(workspaceId, editingExpense.id, data)
++      if (result.success && result.expense) {
++        setExpenses((prev) => prev.map((e) => (e.id === editingExpense.id ? result.expense! : e)))
++        setEditingExpense(null)
++        router.refresh()
++      }
++      return result
++    },
++    [workspaceId, editingExpense, router]
++  )
++
++  const handleMarkPaid = useCallback(
++    async (expenseId: string) => {
++      if (busy) return
++      setBusy(true)
++      const result = await markExpensePaid(workspaceId, expenseId)
++      setBusy(false)
++      if (result.success && result.expense) {
++        setExpenses((prev) => prev.map((e) => (e.id === expenseId ? result.expense! : e)))
++        router.refresh()
++      }
++    },
++    [workspaceId, busy, router]
++  )
++
++  const handleDelete = useCallback(
++    async (expenseId: string) => {
++      if (busy) return
++      if (!confirm('Delete this expense?')) return
++      setBusy(true)
++      const result = await deleteExpense(workspaceId, expenseId)
++      setBusy(false)
++      if (result.success) {
++        setExpenses((prev) => prev.filter((e) => e.id !== expenseId))
++        router.refresh()
++      }
++    },
++    [workspaceId, busy, router]
++  )
++
++  return (
++    <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
++      <MobileTopBar
++        title="Expenses"
++        label="Pypus"
++        workspaceSlug={workspaceSlug}
++        backHref={`/${workspaceSlug}/workspace`}
++        action={
++          <div className="-mr-1.5 flex shrink-0 items-center">
++            <button
++              onClick={() => setShowCategoryModal(true)}
++              aria-label="Add category"
++              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
++            >
++              <FolderPlus size={17} />
++            </button>
++            <button
++              onClick={() => setShowAddModal(true)}
++              aria-label="Add expense"
++              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
++            >
++              <Plus size={18} />
++            </button>
++          </div>
++        }
++      />
++
++      <main className="px-4 pt-4">
++        {/* Snapshot Cards */}
++        <div className="grid grid-cols-3 gap-2 mb-4">
++          <div className="rounded-2xl bg-white border border-ve-outline-variant/25 p-2.5 flex flex-col items-center text-center">
++            <Wallet size={15} className="text-emerald-600 mb-1" />
++            <p className="text-[8.5px] font-bold text-ve-on-surface-variant uppercase tracking-wide">Paid</p>
++            <p className="text-[13px] font-black text-ve-on-surface mt-0.5">{fmt(totalPaid)}</p>
++          </div>
++          <div className="rounded-2xl bg-white border border-ve-outline-variant/25 p-2.5 flex flex-col items-center text-center">
++            <Clock size={15} className="text-amber-600 mb-1" />
++            <p className="text-[8.5px] font-bold text-ve-on-surface-variant uppercase tracking-wide">Pending</p>
++            <p className="text-[13px] font-black text-ve-on-surface mt-0.5">{fmt(totalPending)}</p>
++          </div>
++          <div className="rounded-2xl bg-white border border-ve-outline-variant/25 p-2.5 flex flex-col items-center text-center">
++            <TrendingUp size={15} className="text-red-600 mb-1" />
++            <p className="text-[8.5px] font-bold text-ve-on-surface-variant uppercase tracking-wide">Overdue</p>
++            <p className="text-[13px] font-black text-ve-on-surface mt-0.5">{fmt(totalOverdue)}</p>
++          </div>
++        </div>
++
++        {/* Category filter chips */}
++        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mb-4">
++          <button
++            onClick={() => setFilterCategory('')}
++            className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
++              !filterCategory ? 'bg-ve-primary text-white shadow-sm' : 'bg-ve-surface-container-high text-ve-on-surface-variant'
++            }`}
++          >
++            All ({expenses.length})
++          </button>
++          {categories.map((cat) => (
++            <button
++              key={cat.id}
++              onClick={() => setFilterCategory(cat.id)}
++              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
++                filterCategory === cat.id ? 'bg-ve-primary text-white shadow-sm' : 'bg-ve-surface-container-high text-ve-on-surface-variant'
++              }`}
++            >
++              {cat.name} ({categoryTotals.get(cat.id) ?? 0})
++            </button>
++          ))}
++        </div>
++
++        {/* Header */}
++        <div className="flex items-center justify-between mb-2.5">
++          <h2 className="text-[14.5px] font-bold text-ve-on-surface">
++            {filterCategory ? categoryName(filterCategory) : 'All Expenses'} ({filteredExpenses.length})
++          </h2>
++        </div>
++
++        {/* Expense list */}
++        <div className="flex flex-col gap-2 pb-4">
++          {filteredExpenses.length === 0 ? (
++            <div className="rounded-2xl bg-ve-surface-container p-6 text-center text-[13px] text-ve-on-surface-variant">
++              {categories.length === 0
++                ? 'Add a category first, then log an expense.'
++                : filterCategory
++                ? 'No expenses in this category.'
++                : 'No expenses yet. Tap + to add one.'}
++            </div>
++          ) : (
++            filteredExpenses.map((expense) => (
++              <div
++                key={expense.id}
++                className={`flex items-center justify-between rounded-2xl bg-white p-3 shadow-sm border ${
++                  expense.status === 'overdue' ? 'border-ve-error/20' : 'border-ve-outline-variant/25'
++                }`}
++              >
++                <div className="min-w-0 flex-1">
++                  <p className="text-[13px] font-bold text-ve-on-surface truncate">{expense.title}</p>
++                  <p className="text-[10px] text-ve-outline truncate">
++                    {categoryName(expense.category_id)} • {expense.due_date ?? '—'}
++                  </p>
++                  <p className="text-[12px] font-bold text-ve-on-surface mt-0.5">{fmt(expense.amount)}</p>
++                </div>
++
++                <div className="flex items-center gap-1.5 shrink-0">
++                  <span
++                    className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${
++                      expense.status === 'paid'
++                        ? 'bg-emerald-50 text-emerald-600'
++                        : expense.status === 'overdue'
++                        ? 'bg-red-50 text-red-600'
++                        : 'bg-amber-50 text-amber-600'
++                    }`}
++                  >
++                    {expense.status}
++                  </span>
++                  {expense.status !== 'paid' && (
++                    <button
++                      onClick={() => handleMarkPaid(expense.id)}
++                      disabled={busy}
++                      className="bg-emerald-600 text-white font-bold text-[9px] px-2 py-1 rounded-full active:scale-95 disabled:opacity-40"
++                    >
++                      Paid
++                    </button>
++                  )}
++                  <button
++                    onClick={() => setEditingExpense(expense)}
++                    disabled={busy}
++                    className="h-6 w-6 flex items-center justify-center rounded-full text-ve-outline active:bg-ve-surface-container-high disabled:opacity-40"
++                    aria-label="Edit expense"
++                  >
++                    <Edit3 size={12} />
++                  </button>
++                  <button
++                    onClick={() => handleDelete(expense.id)}
++                    disabled={busy}
++                    className="h-6 w-6 flex items-center justify-center rounded-full text-ve-outline active:bg-red-50 active:text-red-600 disabled:opacity-40"
++                    aria-label="Delete expense"
++                  >
++                    <Trash2 size={12} />
++                  </button>
++                </div>
++              </div>
++            ))
++          )}
++        </div>
++      </main>
++
++      <AddExpenseModalMobile
++        isOpen={showAddModal}
++        onClose={() => setShowAddModal(false)}
++        onSave={handleAddExpense}
++        categories={categories}
++        onRequestNewCategory={() => {
++          setShowAddModal(false)
++          setShowCategoryModal(true)
++        }}
++      />
++
++      <AddCategoryModalMobile
++        isOpen={showCategoryModal}
++        onClose={() => setShowCategoryModal(false)}
++        workspaceId={workspaceId}
++        onCategoryAdded={() => router.refresh()}
++      />
++
++      <EditExpenseModal
++        isOpen={!!editingExpense}
++        onClose={() => setEditingExpense(null)}
++        onSave={handleUpdateExpense}
++        expense={editingExpense}
++        categories={categories}
++      />
++    </div>
++  )
++}
+diff --git a/components/members/AddMemberModal.mobile.tsx b/components/members/AddMemberModal.mobile.tsx
+new file mode 100644
+index 0000000..55ab767
+--- /dev/null
++++ b/components/members/AddMemberModal.mobile.tsx
+@@ -0,0 +1,118 @@
++"use client";
++
++import { useState } from "react";
++import { X } from "lucide-react";
++
++interface AddMemberModalMobileProps {
++  isOpen: boolean;
++  onClose: () => void;
++  onSave: (data: { name: string; phone: string; email?: string }) => Promise<{ success: boolean; error?: string }>;
++}
++
++export function AddMemberModalMobile({ isOpen, onClose, onSave }: AddMemberModalMobileProps) {
++  if (!isOpen) return null;
++  return <MemberDialogMobile onClose={onClose} onSave={onSave} />;
++}
++
++function MemberDialogMobile({
++  onClose,
++  onSave,
++}: Pick<AddMemberModalMobileProps, "onClose" | "onSave">) {
++  const [name, setName] = useState("");
++  const [phone, setPhone] = useState("");
++  const [email, setEmail] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    setBusy(true);
++    setError(null);
++    const result = await onSave({ name, phone, email: email || undefined });
++    setBusy(false);
++    if (result.success) {
++      onClose();
++    } else {
++      setError(result.error ?? "Could not add member. Please try again.");
++    }
++  }
++
++  return (
++    // Small centered card, sized purely to its content — no vh/dvh tricks.
++    // A generous max-height + inner scroll is only a safety net for tiny
++    // screens or when the keyboard is open, it never forces full height.
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5">
++      <div className="w-full max-w-[340px] max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-xl">
++        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
++          <h2 className="text-[15px] font-semibold text-gray-900">Add Member</h2>
++          <button
++            onClick={onClose}
++            className="h-7 w-7 flex items-center justify-center rounded-full text-gray-400 active:bg-gray-100"
++            aria-label="Close modal"
++          >
++            <X className="h-4 w-4" />
++          </button>
++        </div>
++
++        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-3.5">
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">Name</label>
++            <input
++              type="text"
++              value={name}
++              onChange={(e) => setName(e.target.value)}
++              required
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="e.g. Rahul Sharma"
++            />
++          </div>
++
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">Phone</label>
++            <input
++              type="tel"
++              value={phone}
++              onChange={(e) => setPhone(e.target.value)}
++              required
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="+91 98765 43210"
++            />
++          </div>
++
++          <div>
++            <label className="block text-[13px] font-medium text-gray-700 mb-1">
++              Email <span className="text-gray-400 font-normal">(optional)</span>
++            </label>
++            <input
++              type="email"
++              value={email}
++              onChange={(e) => setEmail(e.target.value)}
++              className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-[13.5px] text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
++              placeholder="rahul@example.com"
++            />
++          </div>
++
++          {error && <p className="text-[12.5px] text-red-600">{error}</p>}
++
++          <div className="flex items-center justify-end gap-2.5 pt-1">
++            <button
++              type="button"
++              onClick={onClose}
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium text-gray-600 border border-gray-200 bg-white active:bg-gray-50 disabled:opacity-50"
++            >
++              Cancel
++            </button>
++            <button
++              type="submit"
++              disabled={busy}
++              className="px-3.5 py-2 rounded-full text-[13px] font-medium bg-emerald-600 text-white active:bg-emerald-700 disabled:opacity-50"
++            >
++              {busy ? "Adding…" : "Add Member"}
++            </button>
++          </div>
++        </form>
++      </div>
++    </div>
++  );
++}
+diff --git a/components/members/AddMemberModal.tsx b/components/members/AddMemberModal.tsx
+index 9a14871..98b82db 100644
+--- a/components/members/AddMemberModal.tsx
++++ b/components/members/AddMemberModal.tsx
+@@ -1,117 +1,117 @@
+-"use client";
+-
+-import { useState } from "react";
+-import { X } from "lucide-react";
+-
+-interface AddMemberModalProps {
+-  isOpen: boolean;
+-  onClose: () => void;
+-  onSave: (data: { name: string; phone: string; email?: string }) => Promise<{ success: boolean; error?: string }>;
+-}
+-
+-export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps) {
+-  if (!isOpen) return null;
+-  return <MemberDialog onClose={onClose} onSave={onSave} />;
+-}
+-
+-function MemberDialog({
+-  onClose,
+-  onSave,
+-}: Pick<AddMemberModalProps, "onClose" | "onSave">) {
+-  const [name, setName] = useState("");
+-  const [phone, setPhone] = useState("");
+-  const [email, setEmail] = useState("");
+-  const [busy, setBusy] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-
+-  async function handleSubmit(e: React.FormEvent) {
+-    e.preventDefault();
+-    setBusy(true);
+-    setError(null);
+-    const result = await onSave({ name, phone, email: email || undefined });
+-    setBusy(false);
+-    if (result.success) {
+-      onClose();
+-    } else {
+-      setError(result.error ?? "Could not add member. Please try again.");
+-    }
+-  }
+-
+-  return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+-          <h2 className="text-base font-semibold text-gray-900">Add Member</h2>
+-          <button
+-            onClick={onClose}
+-            className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+-            aria-label="Close modal"
+-          >
+-            <X className="h-4 w-4" />
+-          </button>
+-        </div>
+-
+-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+-          <div>
+-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+-            <input
+-              type="text"
+-              value={name}
+-              onChange={(e) => setName(e.target.value)}
+-              required
+-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+-              placeholder="e.g. Rahul Sharma"
+-            />
+-          </div>
+-
+-          <div>
+-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+-            <input
+-              type="tel"
+-              value={phone}
+-              onChange={(e) => setPhone(e.target.value)}
+-              required
+-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+-              placeholder="+91 98765 43210"
+-            />
+-          </div>
+-
+-          <div>
+-            <label className="block text-sm font-medium text-gray-700 mb-1">
+-              Email <span className="text-gray-400 font-normal">(optional)</span>
+-            </label>
+-            <input
+-              type="email"
+-              value={email}
+-              onChange={(e) => setEmail(e.target.value)}
+-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+-              placeholder="rahul@example.com"
+-            />
+-          </div>
+-
+-          {error && (
+-            <p className="text-sm text-red-600">{error}</p>
+-          )}
+-
+-          <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/60">
+-            <button
+-              type="button"
+-              onClick={onClose}
+-              disabled={busy}
+-              className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+-            >
+-              Cancel
+-            </button>
+-            <button
+-              type="submit"
+-              disabled={busy}
+-              className="px-4 py-2 rounded-full text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+-            >
+-              {busy ? "Adding…" : "Add Member"}
+-            </button>
+-          </div>
+-        </form>
+-      </div>
+-    </div>
+-  );
++"use client";
++
++import { useState } from "react";
++import { X } from "lucide-react";
++
++interface AddMemberModalProps {
++  isOpen: boolean;
++  onClose: () => void;
++  onSave: (data: { name: string; phone: string; email?: string }) => Promise<{ success: boolean; error?: string }>;
++}
++
++export function AddMemberModal({ isOpen, onClose, onSave }: AddMemberModalProps) {
++  if (!isOpen) return null;
++  return <MemberDialog onClose={onClose} onSave={onSave} />;
++}
++
++function MemberDialog({
++  onClose,
++  onSave,
++}: Pick<AddMemberModalProps, "onClose" | "onSave">) {
++  const [name, setName] = useState("");
++  const [phone, setPhone] = useState("");
++  const [email, setEmail] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [error, setError] = useState<string | null>(null);
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    setBusy(true);
++    setError(null);
++    const result = await onSave({ name, phone, email: email || undefined });
++    setBusy(false);
++    if (result.success) {
++      onClose();
++    } else {
++      setError(result.error ?? "Could not add member. Please try again.");
++    }
++  }
++
++  return (
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
++      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
++        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
++          <h2 className="text-base font-semibold text-gray-900">Add Member</h2>
++          <button
++            onClick={onClose}
++            className="h-8 w-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
++            aria-label="Close modal"
++          >
++            <X className="h-4 w-4" />
++          </button>
++        </div>
++
++        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
++          <div>
++            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
++            <input
++              type="text"
++              value={name}
++              onChange={(e) => setName(e.target.value)}
++              required
++              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
++              placeholder="e.g. Rahul Sharma"
++            />
++          </div>
++
++          <div>
++            <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
++            <input
++              type="tel"
++              value={phone}
++              onChange={(e) => setPhone(e.target.value)}
++              required
++              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
++              placeholder="+91 98765 43210"
++            />
++          </div>
++
++          <div>
++            <label className="block text-sm font-medium text-gray-700 mb-1">
++              Email <span className="text-gray-400 font-normal">(optional)</span>
++            </label>
++            <input
++              type="email"
++              value={email}
++              onChange={(e) => setEmail(e.target.value)}
++              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
++              placeholder="rahul@example.com"
++            />
++          </div>
++
++          {error && (
++            <p className="text-sm text-red-600">{error}</p>
++          )}
++
++          <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/60">
++            <button
++              type="button"
++              onClick={onClose}
++              disabled={busy}
++              className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
++            >
++              Cancel
++            </button>
++            <button
++              type="submit"
++              disabled={busy}
++              className="px-4 py-2 rounded-full text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
++            >
++              {busy ? "Adding…" : "Add Member"}
++            </button>
++          </div>
++        </form>
++      </div>
++    </div>
++  );
+ }
+\ No newline at end of file
+diff --git a/components/members/MemberRegistryView.mobile.tsx b/components/members/MemberRegistryView.mobile.tsx
+index ef26164..d63a5bc 100644
+--- a/components/members/MemberRegistryView.mobile.tsx
++++ b/components/members/MemberRegistryView.mobile.tsx
+@@ -2,10 +2,13 @@
+ 
+ import { useState, useMemo } from 'react'
+ import Link from 'next/link'
+-import { Search, ChevronRight, Users } from 'lucide-react'
++import { useRouter } from 'next/navigation'
++import { Search, ChevronRight, Users, UserPlus, FileSpreadsheet } from 'lucide-react'
+ import type { Member } from '@/lib/members/types'
+ import type { DerivedFeeStatus } from '@/lib/members/fee-status'
+ import { MobileTopBar } from '@/components/mobile/MobileTopBar'
++import { AddMemberModalMobile } from '@/components/members/AddMemberModal.mobile'
++import { createMember } from '@/app/actions/member-admin'
+ 
+ const STATUS_CHIP: Record<DerivedFeeStatus, { label: string; classes: string; ring: string }> = {
+   paid: { label: 'Paid', classes: 'bg-ve-primary-container text-ve-on-primary-container', ring: 'border-ve-primary-container' },
+@@ -62,18 +65,22 @@ function filterMembers(
+ export function MemberRegistryViewMobile({
+   members,
+   workspaceSlug,
++  workspaceId,
+   attendanceMap,
+   feeStatusMap,
+   planNameMap,
+ }: {
+   members: Member[]
+   workspaceSlug: string
++  workspaceId: string
+   attendanceMap: Record<string, { total: number; percentage: number }>
+   feeStatusMap: Record<string, DerivedFeeStatus>
+   planNameMap: Record<string, string | null>
+ }) {
++  const router = useRouter()
+   const [query, setQuery] = useState('')
+   const [activeFilter, setActiveFilter] = useState('all')
++  const [showAddModal, setShowAddModal] = useState(false)
+ 
+   const filtered = useMemo(
+     () => filterMembers(members, activeFilter, query, attendanceMap, feeStatusMap),
+@@ -86,14 +93,31 @@ export function MemberRegistryViewMobile({
+         title="Members"
+         workspaceSlug={workspaceSlug}
+         backHref={`/${workspaceSlug}/workspace`}
+-        action={<span className="size-10" />}
++        action={
++          <div className="-mr-1.5 flex shrink-0 items-center">
++            <button
++              onClick={() => router.push(`/${workspaceSlug}/members/import`)}
++              aria-label="Import from Excel"
++              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
++            >
++              <FileSpreadsheet size={18} />
++            </button>
++            <button
++              onClick={() => setShowAddModal(true)}
++              aria-label="Add member"
++              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
++            >
++              <UserPlus size={18} />
++            </button>
++          </div>
++        }
+       />
+ 
+       <div className="px-ve-margin">
+-        <div className="relative">
++        <div className="relative mt-1">
+           <Search
+-            size={20}
+-            className="absolute top-1/2 left-4 -translate-y-1/2 text-ve-on-surface-variant/60"
++            size={16}
++            className="absolute top-1/2 left-3 -translate-y-1/2 text-ve-on-surface-variant/50"
+           />
+           <input
+             type="search"
+@@ -101,19 +125,19 @@ export function MemberRegistryViewMobile({
+             onChange={(e) => setQuery(e.target.value)}
+             onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+             placeholder="Search by name, phone or email"
+-            className="h-14 w-full rounded-ve border-2 border-ve-outline-variant/30 bg-ve-surface-container-lowest pr-4 pl-12 text-ve-body text-ve-on-surface outline-none focus:border-ve-primary [&::-webkit-search-cancel-button]:hidden"
++            className="h-10 w-full rounded-ve-md border border-ve-outline-variant/25 bg-ve-surface-container-lowest pr-3 pl-9 text-[13px] text-ve-on-surface outline-none focus:border-ve-primary [&::-webkit-search-cancel-button]:hidden"
+           />
+         </div>
+ 
+-        <div className="-mx-ve-margin mt-ve-md mb-ve-lg flex gap-ve-sm overflow-x-auto px-ve-margin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
++        <div className="-mx-ve-margin mt-2.5 mb-3 flex gap-1.5 overflow-x-auto px-ve-margin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+           {FILTERS.map((f) => (
+             <button
+               key={f.key}
+               onClick={() => setActiveFilter(f.key)}
+               className={
+                 activeFilter === f.key
+-                  ? 'text-ve-label shrink-0 rounded-full bg-ve-primary px-5 py-2.5 text-ve-on-primary shadow-md shadow-ve-primary/20'
+-                  : 'text-ve-label shrink-0 rounded-full bg-ve-surface-container-high px-5 py-2.5 text-ve-on-surface-variant'
++                  ? 'shrink-0 rounded-full bg-ve-primary px-3.5 py-1.5 text-[11.5px] font-semibold text-ve-on-primary'
++                  : 'shrink-0 rounded-full bg-ve-surface-container-high px-3.5 py-1.5 text-[11.5px] font-semibold text-ve-on-surface-variant'
+               }
+             >
+               {f.label}
+@@ -121,32 +145,32 @@ export function MemberRegistryViewMobile({
+           ))}
+         </div>
+ 
+-        <div className="mb-ve-md flex items-end justify-between">
+-          <h2 className="text-ve-headline-mobile text-ve-on-surface">Registry</h2>
+-          <span className="text-ve-label text-ve-on-surface-variant/60 uppercase">
++        <div className="mb-2 flex items-end justify-between">
++          <h2 className="text-[15px] font-semibold text-ve-on-surface">Registry</h2>
++          <span className="text-[10.5px] font-semibold text-ve-on-surface-variant/60 uppercase">
+             {filtered.length} {filtered.length === 1 ? 'Member' : 'Members'}
+           </span>
+         </div>
+ 
+         {filtered.length === 0 ? (
+-          <div className="flex flex-col items-center py-16 text-center">
+-            <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-ve-surface-container">
+-              <Users size={22} className="text-ve-on-surface-variant" />
++          <div className="flex flex-col items-center py-14 text-center">
++            <span className="mb-3 flex size-11 items-center justify-center rounded-full bg-ve-surface-container">
++              <Users size={19} className="text-ve-on-surface-variant" />
+             </span>
+-            <p className="font-semibold text-ve-on-surface">No members found</p>
+-            <p className="mt-1 text-sm text-ve-on-surface-variant">
++            <p className="text-[13.5px] font-semibold text-ve-on-surface">No members found</p>
++            <p className="mt-1 text-[12px] text-ve-on-surface-variant">
+               {query ? `No results for "${query}"` : 'Try a different filter'}
+             </p>
+           </div>
+         ) : (
+-          <ul className="grid gap-ve-md">
++          <ul className="grid gap-1.5 pb-4">
+             {filtered.map((m) => {
+               const chip = STATUS_CHIP[feeStatusMap[m.id] ?? 'no_plan']
+               return (
+                 <li key={m.id}>
+                   <Link
+                     href={`/${workspaceSlug}/members/${m.id}`}
+-                    className="flex items-center gap-ve-md rounded-ve-lg border border-ve-outline-variant/10 bg-ve-surface-container-lowest p-ve-md shadow-sm active:scale-[0.98]"
++                    className="flex items-center gap-2.5 rounded-ve-md border border-ve-outline-variant/10 bg-ve-surface-container-lowest p-2.5 active:scale-[0.98]"
+                   >
+                     {m.avatar_url ? (
+                       // eslint-disable-next-line @next/next/no-img-element
+@@ -154,29 +178,29 @@ export function MemberRegistryViewMobile({
+                         src={m.avatar_url}
+                         alt=""
+                         referrerPolicy="no-referrer"
+-                        className={`size-14 shrink-0 rounded-full border-2 object-cover ${chip.ring}`}
++                        className={`size-10 shrink-0 rounded-full border-2 object-cover ${chip.ring}`}
+                       />
+                     ) : (
+                       <span
+-                        className={`flex size-14 shrink-0 items-center justify-center rounded-full border-2 bg-ve-surface-container text-lg font-bold text-ve-on-surface ${chip.ring}`}
++                        className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 bg-ve-surface-container text-[13px] font-bold text-ve-on-surface ${chip.ring}`}
+                       >
+                         {m.name.charAt(0).toUpperCase()}
+                       </span>
+                     )}
+ 
+                     <span className="min-w-0 flex-1">
+-                      <span className="block truncate font-bold text-ve-on-surface">{m.name}</span>
+-                      <span className="block truncate text-sm text-ve-on-surface-variant/70">
++                      <span className="block truncate text-[13.5px] font-bold text-ve-on-surface">{m.name}</span>
++                      <span className="block truncate text-[11.5px] text-ve-on-surface-variant/70">
+                         {planNameMap[m.id] ?? m.phone}
+                       </span>
+                     </span>
+ 
+                     <span
+-                      className={`text-ve-label shrink-0 rounded-full px-3 py-1 text-[10px] uppercase ${chip.classes}`}
++                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase ${chip.classes}`}
+                     >
+                       {chip.label}
+                     </span>
+-                    <ChevronRight size={18} className="shrink-0 text-ve-on-surface-variant/40" />
++                    <ChevronRight size={15} className="shrink-0 text-ve-on-surface-variant/40" />
+                   </Link>
+                 </li>
+               )
+@@ -184,6 +208,18 @@ export function MemberRegistryViewMobile({
+           </ul>
+         )}
+       </div>
++
++      <AddMemberModalMobile
++        isOpen={showAddModal}
++        onClose={() => setShowAddModal(false)}
++        onSave={async (data) => {
++          const result = await createMember(workspaceId, data)
++          if (result.success) {
++            router.refresh()
++          }
++          return result
++        }}
++      />
+     </div>
+   )
+-}
++}
+\ No newline at end of file
+diff --git a/components/mobile/AttendanceRegisterView.mobile.tsx b/components/mobile/AttendanceRegisterView.mobile.tsx
+index d03478a..91c7e8c 100644
+--- a/components/mobile/AttendanceRegisterView.mobile.tsx
++++ b/components/mobile/AttendanceRegisterView.mobile.tsx
+@@ -121,34 +121,34 @@ export function AttendanceRegisterView({
+         action={<PrintQrButton workspaceId={workspaceId} workspaceName={workspaceName} />}
+       />
+ 
+-      <main className="px-5 pt-6 space-y-6">
++      <main className="px-4 pt-4 space-y-4">
+         {/* Stat Cards Section */}
+-        <section className="grid grid-cols-2 md:grid-cols-3 gap-3">
++        <section className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+           {/* Present Today */}
+-          <div className="col-span-1 bg-ve-primary text-white p-5 rounded-[1.5rem] shadow-lg relative overflow-hidden flex flex-col justify-between h-32">
++          <div className="col-span-1 bg-ve-primary text-white p-3.5 rounded-2xl shadow-md relative overflow-hidden flex flex-col justify-between h-[88px]">
+             <div className="z-10">
+-              <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Present Today</p>
+-              <h2 className="text-3xl font-black mt-1">{presentCount}</h2>
++              <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">Present Today</p>
++              <h2 className="text-[22px] font-black mt-0.5">{presentCount}</h2>
+             </div>
+-            <CheckCircle2 size={56} className="absolute -bottom-2 -right-2 opacity-20 pointer-events-none" fill="white" />
++            <CheckCircle2 size={40} className="absolute -bottom-1.5 -right-1.5 opacity-20 pointer-events-none" fill="white" />
+           </div>
+ 
+           {/* Absent */}
+-          <div className="col-span-1 bg-ve-secondary text-white p-5 rounded-[1.5rem] shadow-lg relative overflow-hidden flex flex-col justify-between h-32">
++          <div className="col-span-1 bg-ve-secondary text-white p-3.5 rounded-2xl shadow-md relative overflow-hidden flex flex-col justify-between h-[88px]">
+             <div className="z-10">
+-              <p className="text-xs font-bold opacity-80 uppercase tracking-wider">Absent</p>
+-              <h2 className="text-3xl font-black mt-1">{absentCount}</h2>
++              <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">Absent</p>
++              <h2 className="text-[22px] font-black mt-0.5">{absentCount}</h2>
+             </div>
+-            <XCircle size={56} className="absolute -bottom-2 -right-2 opacity-20 pointer-events-none" fill="white" />
++            <XCircle size={40} className="absolute -bottom-1.5 -right-1.5 opacity-20 pointer-events-none" fill="white" />
+           </div>
+ 
+           {/* Attendance Rate */}
+-          <div className="col-span-2 md:col-span-1 bg-ve-surface-container-highest p-5 rounded-[1.5rem] border border-ve-outline-variant/30 flex flex-col justify-between h-32">
++          <div className="col-span-2 md:col-span-1 bg-ve-surface-container-highest p-3.5 rounded-2xl border border-ve-outline-variant/30 flex flex-col justify-between h-[88px]">
+             <div>
+-              <p className="text-xs font-bold text-ve-on-surface-variant uppercase tracking-wider">Attendance Rate</p>
+-              <h2 className="text-3xl font-black text-ve-primary mt-1">{attendanceRate}%</h2>
++              <p className="text-[10px] font-bold text-ve-on-surface-variant uppercase tracking-wider">Attendance Rate</p>
++              <h2 className="text-[22px] font-black text-ve-primary mt-0.5">{attendanceRate}%</h2>
+             </div>
+-            <div className="w-full bg-ve-outline-variant/30 h-2 rounded-full overflow-hidden">
++            <div className="w-full bg-ve-outline-variant/30 h-1.5 rounded-full overflow-hidden">
+               <div className="bg-ve-primary h-full transition-all duration-500" style={{ width: `${attendanceRate}%` }} />
+             </div>
+           </div>
+@@ -157,21 +157,21 @@ export function AttendanceRegisterView({
+         {/* Search Bar */}
+         <section>
+           <div className="relative">
+-            <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-ve-outline" size={20} />
++            <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ve-outline" size={17} />
+             <input
+               type="text"
+               value={query}
+               onChange={(e) => setQuery(e.target.value)}
+               placeholder="Search members by name or ID..."
+-              className="w-full pl-12 pr-4 py-4 bg-white border-2 border-ve-outline-variant/30 rounded-xl focus:outline-none focus:border-ve-primary transition-all text-sm font-medium text-ve-on-surface placeholder:text-ve-outline"
++              className="w-full pl-10 pr-3.5 py-3 bg-white border border-ve-outline-variant/30 rounded-xl focus:outline-none focus:border-ve-primary transition-all text-[13px] font-medium text-ve-on-surface placeholder:text-ve-outline"
+             />
+           </div>
+         </section>
+ 
+         {/* Member List */}
+-        <section className="space-y-3 pb-8">
+-          <h3 className="text-xs font-bold text-ve-on-surface-variant flex items-center gap-2 tracking-wider uppercase">
+-            <SortAsc size={16} />
++        <section className="space-y-2 pb-6">
++          <h3 className="text-[11px] font-bold text-ve-on-surface-variant flex items-center gap-1.5 tracking-wider uppercase">
++            <SortAsc size={14} />
+             MEMBERS REGISTRY ({filteredMembers.length})
+           </h3>
+ 
+@@ -185,28 +185,28 @@ export function AttendanceRegisterView({
+               return (
+                 <div
+                   key={member.id}
+-                  className="bg-white p-4 rounded-[1.25rem] border-2 border-ve-error/20 shadow-sm flex items-center gap-4 relative overflow-hidden"
++                  className="bg-white p-3 rounded-2xl border border-ve-error/20 shadow-sm flex items-center gap-3 relative overflow-hidden"
+                 >
+-                  <div className="absolute top-0 right-0 px-2.5 py-0.5 bg-ve-error text-white font-bold text-[8px] tracking-widest rounded-bl-lg uppercase">
++                  <div className="absolute top-0 right-0 px-2 py-0.5 bg-ve-error text-white font-bold text-[7px] tracking-widest rounded-bl-lg uppercase">
+                     OVERDUE
+                   </div>
+-                  <div className="h-14 w-14 rounded-full overflow-hidden bg-ve-surface-container shrink-0 border-2 border-ve-error/30 flex items-center justify-center">
++                  <div className="h-11 w-11 rounded-full overflow-hidden bg-ve-surface-container shrink-0 border-2 border-ve-error/30 flex items-center justify-center">
+                     <MemberAvatar
+                       name={member.name}
+                       avatarUrl={member.avatar_url}
+-                      size={56}
++                      size={44}
+                       fallbackClassName="bg-ve-error-container text-ve-on-error-container"
+                     />
+                   </div>
+                   <div className="flex-1 min-w-0">
+-                    <h4 className="font-bold text-base text-ve-on-surface truncate">{member.name}</h4>
+-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-ve-error-container text-ve-on-error-container font-bold text-[10px]">
++                    <h4 className="font-bold text-[13.5px] text-ve-on-surface truncate">{member.name}</h4>
++                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-ve-error-container text-ve-on-error-container font-bold text-[9px]">
+                       {planBadge.toUpperCase()}
+                     </span>
+                   </div>
+                   <button
+                     onClick={() => openOverdueAlert(member, summary)}
+-                    className="bg-ve-error text-white font-bold text-xs px-4 py-2.5 rounded-full shadow-md active:scale-95 transition-transform"
++                    className="bg-ve-error text-white font-bold text-[11px] px-3 py-2 rounded-full shadow-md active:scale-95 transition-transform"
+                   >
+                     View Alert
+                   </button>
+@@ -217,17 +217,17 @@ export function AttendanceRegisterView({
+             return (
+               <div
+                 key={member.id}
+-                className="bg-white p-4 rounded-[1.25rem] border border-ve-outline-variant/20 shadow-sm flex items-center gap-4 hover:border-ve-primary/40 transition-all cursor-pointer"
++                className="bg-white p-3 rounded-2xl border border-ve-outline-variant/20 shadow-sm flex items-center gap-3 hover:border-ve-primary/40 transition-all cursor-pointer"
+               >
+                 <MemberAvatar
+                   name={member.name}
+                   avatarUrl={member.avatar_url}
+-                  size={56}
++                  size={44}
+                   fallbackClassName="bg-ve-primary-container text-ve-on-primary-container"
+                 />
+                 <Link href={`/${workspaceSlug}/members/${member.id}`} className="flex-1 min-w-0">
+-                  <h4 className="font-bold text-base text-ve-on-surface truncate">{member.name}</h4>
+-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-[10px] ${
++                  <h4 className="font-bold text-[13.5px] text-ve-on-surface truncate">{member.name}</h4>
++                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full font-bold text-[9px] ${
+                     summary?.status === 'paid'
+                       ? 'bg-ve-secondary-container text-ve-on-secondary-container'
+                       : 'bg-ve-surface-container-high text-ve-on-surface-variant'
+@@ -237,14 +237,14 @@ export function AttendanceRegisterView({
+                 </Link>
+ 
+                 {isCheckedIn ? (
+-                  <span className="bg-ve-primary/10 text-ve-primary font-bold text-xs px-4 py-2.5 rounded-full flex items-center gap-1">
+-                    <CheckCircle2 size={14} /> Done
++                  <span className="bg-ve-primary/10 text-ve-primary font-bold text-[11px] px-3 py-2 rounded-full flex items-center gap-1">
++                    <CheckCircle2 size={12} /> Done
+                   </span>
+                 ) : (
+                   <button
+                     onClick={() => handleCheckIn(member.id)}
+                     disabled={pendingId === member.id}
+-                    className="bg-ve-primary-container text-ve-on-primary-container font-bold text-xs px-4 py-2.5 rounded-full shadow-[0_4px_14px_rgba(0,230,57,0.3)] active:scale-95 transition-transform disabled:opacity-50"
++                    className="bg-ve-primary-container text-ve-on-primary-container font-bold text-[11px] px-3 py-2 rounded-full shadow-[0_4px_14px_rgba(0,230,57,0.3)] active:scale-95 transition-transform disabled:opacity-50"
+                   >
+                     {pendingId === member.id ? '...' : 'Check-in'}
+                   </button>
+diff --git a/components/mobile/FeesDashboardView.mobile.tsx b/components/mobile/FeesDashboardView.mobile.tsx
+index e36dc80..ad996a4 100644
+--- a/components/mobile/FeesDashboardView.mobile.tsx
++++ b/components/mobile/FeesDashboardView.mobile.tsx
+@@ -159,53 +159,53 @@ export function FeesDashboardView({
+         backHref={`/${workspaceSlug}/workspace`}
+       />
+ 
+-      <main className="px-5 pt-5">
++      <main className="px-4 pt-4">
+         {/* Snapshot Cards */}
+-        <div className="flex flex-col gap-3 mb-6">
++        <div className="flex flex-col gap-2.5 mb-4">
+           {/* Monthly Collection */}
+-          <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-primary-container text-ve-on-primary-container p-5 shadow-[0_8px_24px_-8px_rgba(0,110,22,0.3)] group hover:scale-[1.02] transition-transform duration-200">
++          <div className="relative overflow-hidden rounded-2xl bg-ve-primary-container text-ve-on-primary-container p-3.5 shadow-[0_6px_18px_-8px_rgba(0,110,22,0.3)]">
+             <div className="flex items-start justify-between z-10">
+-              <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Monthly Collection</span>
+-              <Wallet size={20} />
++              <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">Monthly Collection</span>
++              <Wallet size={16} />
+             </div>
+-            <div className="text-3xl font-black mt-2 z-10">{fmt(monthlyCollection)}</div>
+-            <div className="flex items-center gap-1 mt-1 z-10">
+-              <TrendingUp size={14} />
+-              <span className="text-[11px] font-bold">{collectionRate}% Collection Rate</span>
++            <div className="text-[22px] font-black mt-1.5 z-10">{fmt(monthlyCollection)}</div>
++            <div className="flex items-center gap-1 mt-0.5 z-10">
++              <TrendingUp size={12} />
++              <span className="text-[10px] font-bold">{collectionRate}% Collection Rate</span>
+             </div>
+-            <div className="absolute -right-4 -bottom-4 h-24 w-24 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
++            <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/20 rounded-full blur-2xl" />
+           </div>
+ 
+-          <div className="grid grid-cols-2 gap-3">
++          <div className="grid grid-cols-2 gap-2.5">
+             {/* Pending Dues */}
+-            <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-secondary-container text-ve-on-secondary-container p-5 shadow-[0_8px_24px_-8px_rgba(70,72,212,0.3)] group hover:scale-[1.02] transition-transform duration-200">
++            <div className="relative overflow-hidden rounded-2xl bg-ve-secondary-container text-ve-on-secondary-container p-3.5 shadow-[0_6px_18px_-8px_rgba(70,72,212,0.3)]">
+               <div className="flex items-start justify-between">
+-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Pending</span>
+-                <Clock size={16} />
++                <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">Pending</span>
++                <Clock size={14} />
+               </div>
+-              <div className="text-2xl font-black mt-2">{fmt(pendingDues)}</div>
+-              <div className="text-[11px] font-bold mt-1 opacity-80">{overdueCount} overdue</div>
+-              <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
++              <div className="text-[17px] font-black mt-1.5">{fmt(pendingDues)}</div>
++              <div className="text-[10px] font-bold mt-0.5 opacity-80">{overdueCount} overdue</div>
++              <div className="absolute -right-4 -bottom-4 h-16 w-16 bg-white/10 rounded-full blur-2xl" />
+             </div>
+ 
+             {/* Expected */}
+-            <div className="relative overflow-hidden rounded-[1.5rem] bg-ve-tertiary-container text-ve-on-tertiary-container p-5 shadow-[0_8px_24px_-8px_rgba(133,83,0,0.2)] group hover:scale-[1.02] transition-transform duration-200">
++            <div className="relative overflow-hidden rounded-2xl bg-ve-tertiary-container text-ve-on-tertiary-container p-3.5 shadow-[0_6px_18px_-8px_rgba(133,83,0,0.2)]">
+               <div className="flex items-start justify-between">
+-                <span className="text-[10px] font-bold uppercase tracking-wider opacity-80">Expected</span>
+-                <TrendingUp size={16} />
++                <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">Expected</span>
++                <TrendingUp size={14} />
+               </div>
+-              <div className="text-2xl font-black mt-2">{fmt(expectedTotal)}</div>
+-              <div className="text-[11px] font-bold mt-1 opacity-80">This month</div>
+-              <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
++              <div className="text-[17px] font-black mt-1.5">{fmt(expectedTotal)}</div>
++              <div className="text-[10px] font-bold mt-0.5 opacity-80">This month</div>
++              <div className="absolute -right-4 -bottom-4 h-16 w-16 bg-white/20 rounded-full blur-2xl" />
+             </div>
+           </div>
+         </div>
+ 
+         {/* Search */}
+-        <div className="flex items-center gap-3 rounded-xl bg-ve-surface-container px-4 py-3 mb-4 border-2 border-transparent focus-within:border-ve-primary transition-all">
+-          <Search size={18} className="text-ve-outline shrink-0" />
++        <div className="flex items-center gap-2.5 rounded-xl bg-ve-surface-container px-3.5 py-2.5 mb-3 border border-transparent focus-within:border-ve-primary transition-all">
++          <Search size={16} className="text-ve-outline shrink-0" />
+           <input
+-            className="bg-transparent border-none focus:ring-0 w-full text-sm text-ve-on-surface placeholder:text-ve-outline outline-none"
++            className="bg-transparent border-none focus:ring-0 w-full text-[13px] text-ve-on-surface placeholder:text-ve-outline outline-none"
+             placeholder="Search members…"
+             value={query}
+             onChange={(e) => setQuery(e.target.value)}
+@@ -213,15 +213,15 @@ export function FeesDashboardView({
+         </div>
+ 
+         {/* Filter Chips */}
+-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 mb-5">
++        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 mb-4">
+           {FILTERS.map((f) => (
+             <button
+               key={f}
+               onClick={() => setFilter(f)}
+-              className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-bold transition-all active:scale-95 ${
++              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
+                 filter === f
+-                  ? 'bg-ve-primary text-white shadow-md'
+-                  : 'bg-ve-surface-container-high text-ve-on-surface-variant hover:bg-ve-surface-container-highest'
++                  ? 'bg-ve-primary text-white shadow-sm'
++                  : 'bg-ve-surface-container-high text-ve-on-surface-variant'
+               }`}
+             >
+               {f}
+@@ -230,23 +230,23 @@ export function FeesDashboardView({
+         </div>
+ 
+         {/* Header */}
+-        <div className="flex items-center justify-between mb-3">
+-          <h2 className="text-lg font-bold text-ve-on-surface">
++        <div className="flex items-center justify-between mb-2.5">
++          <h2 className="text-[14.5px] font-bold text-ve-on-surface">
+             {filter === 'All' ? 'All Members' : filter} ({filtered.length})
+           </h2>
+           <Link
+             href={`/${workspaceSlug}/fees/plans`}
+-            className="flex items-center gap-1 text-ve-primary text-xs font-bold px-3 py-2 rounded-lg hover:bg-ve-primary/5 transition-colors"
++            className="flex items-center gap-1 text-ve-primary text-[11px] font-bold px-2 py-1.5 rounded-lg"
+           >
+-            <Settings2 size={14} />
++            <Settings2 size={12} />
+             Manage Plans
+           </Link>
+         </div>
+ 
+         {/* Payment Cards */}
+-        <div className="flex flex-col gap-3 pb-4">
++        <div className="flex flex-col gap-2 pb-4">
+           {filtered.length === 0 ? (
+-            <div className="rounded-[1rem] bg-ve-surface-container p-8 text-center text-sm text-ve-on-surface-variant">
++            <div className="rounded-2xl bg-ve-surface-container p-6 text-center text-[13px] text-ve-on-surface-variant">
+               No members match this filter.
+             </div>
+           ) : (
+@@ -256,7 +256,7 @@ export function FeesDashboardView({
+               return (
+               <div
+                 key={member.id}
+-                className={`flex items-center justify-between rounded-[1rem] bg-white p-4 shadow-sm border transition-shadow hover:shadow-md ${
++                className={`flex items-center justify-between rounded-2xl bg-white p-3 shadow-sm border ${
+                   feeStatus === 'overdue'
+                     ? 'border-ve-error/20'
+                     : feeStatus === 'no_plan'
+@@ -266,43 +266,43 @@ export function FeesDashboardView({
+               >
+                 <Link
+                   href={`/${workspaceSlug}/members/${member.id}/fees`}
+-                  className="flex min-w-0 flex-1 items-center gap-3"
++                  className="flex min-w-0 flex-1 items-center gap-2.5"
+                 >
+-                  <div className="h-12 w-12 rounded-full overflow-hidden bg-ve-surface-container-high border-2 border-white shadow-sm shrink-0 flex items-center justify-center">
++                  <div className="h-10 w-10 rounded-full overflow-hidden bg-ve-surface-container-high border-2 border-white shadow-sm shrink-0 flex items-center justify-center">
+                     {feeStatus === 'no_plan' ? (
+-                      <UserX size={20} className="text-ve-outline" />
++                      <UserX size={16} className="text-ve-outline" />
+                     ) : (
+                       <MemberAvatar
+                         name={member.name}
+                         avatarUrl={member.avatar_url}
+-                        size={48}
++                        size={40}
+                         fallbackClassName="bg-ve-secondary-container text-ve-on-secondary-container"
+                       />
+                     )}
+                   </div>
+                   <div className="min-w-0">
+-                    <p className="text-sm font-bold text-ve-on-surface truncate">{member.name}</p>
+-                    <p className="text-[11px] text-ve-outline truncate">
++                    <p className="text-[13px] font-bold text-ve-on-surface truncate">{member.name}</p>
++                    <p className="text-[10px] text-ve-outline truncate">
+                       {planName ?? 'No active subscription'} {amount ? `• ${fmt(amount)}` : ''}
+                     </p>
+                     {feeStatus !== 'paid' && paidAmount > 0 && pendingOnRow != null && (
+-                      <p className="text-[11px] font-semibold text-amber-600 truncate">
++                      <p className="text-[10px] font-semibold text-amber-600 truncate">
+                         Paid {fmt(paidAmount)} · Pending {fmt(pendingOnRow)}
+                       </p>
+                     )}
+                   </div>
+                 </Link>
+ 
+-                <div className="flex items-center gap-3 shrink-0">
++                <div className="flex items-center gap-2 shrink-0">
+                   <div className="text-right">
+-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${CHIP_COLORS[feeStatus]}`}>
++                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full ${CHIP_COLORS[feeStatus]}`}>
+                       {feeStatus === 'no_plan' ? 'No Plan' : feeStatus === 'overdue' ? 'Overdue' : feeStatus === 'due' ? `Due ${fmtDate(dueDate)}` : 'Paid'}
+                     </span>
+                     {(feeStatus === 'overdue' || feeStatus === 'due') && payableFeeId && (
+                       <button
+                         onClick={() => setMarkPaidRow(row)}
+                         disabled={busy}
+-                        className="mt-1.5 block w-full bg-ve-primary text-white font-bold text-[10px] px-3 py-1.5 rounded-full text-center active:scale-95 transition-all disabled:opacity-40"
++                        className="mt-1 block w-full bg-ve-primary text-white font-bold text-[9px] px-2.5 py-1 rounded-full text-center active:scale-95 transition-all disabled:opacity-40"
+                       >
+                         Mark Paid
+                       </button>
+@@ -311,7 +311,7 @@ export function FeesDashboardView({
+                       <button
+                         onClick={() => setPlanRow(row)}
+                         disabled={busy}
+-                        className="mt-1.5 block w-full bg-ve-secondary text-white font-bold text-[10px] px-3 py-1.5 rounded-full text-center active:scale-95 transition-all disabled:opacity-40"
++                        className="mt-1 block w-full bg-ve-secondary text-white font-bold text-[9px] px-2.5 py-1 rounded-full text-center active:scale-95 transition-all disabled:opacity-40"
+                       >
+                         Assign Plan
+                       </button>

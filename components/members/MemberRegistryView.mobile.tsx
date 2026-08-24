@@ -2,10 +2,13 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Search, ChevronRight, Users } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, ChevronRight, Users, UserPlus, FileSpreadsheet } from 'lucide-react'
 import type { Member } from '@/lib/members/types'
 import type { DerivedFeeStatus } from '@/lib/members/fee-status'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
+import { AddMemberModalMobile } from '@/components/members/AddMemberModal.mobile'
+import { createMember } from '@/app/actions/member-admin'
 
 const STATUS_CHIP: Record<DerivedFeeStatus, { label: string; classes: string; ring: string }> = {
   paid: { label: 'Paid', classes: 'bg-ve-primary-container text-ve-on-primary-container', ring: 'border-ve-primary-container' },
@@ -62,18 +65,22 @@ function filterMembers(
 export function MemberRegistryViewMobile({
   members,
   workspaceSlug,
+  workspaceId,
   attendanceMap,
   feeStatusMap,
   planNameMap,
 }: {
   members: Member[]
   workspaceSlug: string
+  workspaceId: string
   attendanceMap: Record<string, { total: number; percentage: number }>
   feeStatusMap: Record<string, DerivedFeeStatus>
   planNameMap: Record<string, string | null>
 }) {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState('all')
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const filtered = useMemo(
     () => filterMembers(members, activeFilter, query, attendanceMap, feeStatusMap),
@@ -86,14 +93,31 @@ export function MemberRegistryViewMobile({
         title="Members"
         workspaceSlug={workspaceSlug}
         backHref={`/${workspaceSlug}/workspace`}
-        action={<span className="size-10" />}
+        action={
+          <div className="-mr-1.5 flex shrink-0 items-center">
+            <button
+              onClick={() => router.push(`/${workspaceSlug}/members/import`)}
+              aria-label="Import from Excel"
+              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
+            >
+              <FileSpreadsheet size={18} />
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              aria-label="Add member"
+              className="flex size-8 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
+            >
+              <UserPlus size={18} />
+            </button>
+          </div>
+        }
       />
 
       <div className="px-ve-margin">
-        <div className="relative">
+        <div className="relative mt-1">
           <Search
-            size={20}
-            className="absolute top-1/2 left-4 -translate-y-1/2 text-ve-on-surface-variant/60"
+            size={16}
+            className="absolute top-1/2 left-3 -translate-y-1/2 text-ve-on-surface-variant/50"
           />
           <input
             type="search"
@@ -101,19 +125,19 @@ export function MemberRegistryViewMobile({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
             placeholder="Search by name, phone or email"
-            className="h-14 w-full rounded-ve border-2 border-ve-outline-variant/30 bg-ve-surface-container-lowest pr-4 pl-12 text-ve-body text-ve-on-surface outline-none focus:border-ve-primary [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-ve-md border border-ve-outline-variant/25 bg-ve-surface-container-lowest pr-3 pl-9 text-[13px] text-ve-on-surface outline-none focus:border-ve-primary [&::-webkit-search-cancel-button]:hidden"
           />
         </div>
 
-        <div className="-mx-ve-margin mt-ve-md mb-ve-lg flex gap-ve-sm overflow-x-auto px-ve-margin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="-mx-ve-margin mt-2.5 mb-3 flex gap-1.5 overflow-x-auto px-ve-margin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => setActiveFilter(f.key)}
               className={
                 activeFilter === f.key
-                  ? 'text-ve-label shrink-0 rounded-full bg-ve-primary px-5 py-2.5 text-ve-on-primary shadow-md shadow-ve-primary/20'
-                  : 'text-ve-label shrink-0 rounded-full bg-ve-surface-container-high px-5 py-2.5 text-ve-on-surface-variant'
+                  ? 'shrink-0 rounded-full bg-ve-primary px-3.5 py-1.5 text-[11.5px] font-semibold text-ve-on-primary'
+                  : 'shrink-0 rounded-full bg-ve-surface-container-high px-3.5 py-1.5 text-[11.5px] font-semibold text-ve-on-surface-variant'
               }
             >
               {f.label}
@@ -121,32 +145,32 @@ export function MemberRegistryViewMobile({
           ))}
         </div>
 
-        <div className="mb-ve-md flex items-end justify-between">
-          <h2 className="text-ve-headline-mobile text-ve-on-surface">Registry</h2>
-          <span className="text-ve-label text-ve-on-surface-variant/60 uppercase">
+        <div className="mb-2 flex items-end justify-between">
+          <h2 className="text-[15px] font-semibold text-ve-on-surface">Registry</h2>
+          <span className="text-[10.5px] font-semibold text-ve-on-surface-variant/60 uppercase">
             {filtered.length} {filtered.length === 1 ? 'Member' : 'Members'}
           </span>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-center">
-            <span className="mb-3 flex size-12 items-center justify-center rounded-full bg-ve-surface-container">
-              <Users size={22} className="text-ve-on-surface-variant" />
+          <div className="flex flex-col items-center py-14 text-center">
+            <span className="mb-3 flex size-11 items-center justify-center rounded-full bg-ve-surface-container">
+              <Users size={19} className="text-ve-on-surface-variant" />
             </span>
-            <p className="font-semibold text-ve-on-surface">No members found</p>
-            <p className="mt-1 text-sm text-ve-on-surface-variant">
+            <p className="text-[13.5px] font-semibold text-ve-on-surface">No members found</p>
+            <p className="mt-1 text-[12px] text-ve-on-surface-variant">
               {query ? `No results for "${query}"` : 'Try a different filter'}
             </p>
           </div>
         ) : (
-          <ul className="grid gap-ve-md">
+          <ul className="grid gap-1.5 pb-4">
             {filtered.map((m) => {
               const chip = STATUS_CHIP[feeStatusMap[m.id] ?? 'no_plan']
               return (
                 <li key={m.id}>
                   <Link
                     href={`/${workspaceSlug}/members/${m.id}`}
-                    className="flex items-center gap-ve-md rounded-ve-lg border border-ve-outline-variant/10 bg-ve-surface-container-lowest p-ve-md shadow-sm active:scale-[0.98]"
+                    className="flex items-center gap-2.5 rounded-ve-md border border-ve-outline-variant/10 bg-ve-surface-container-lowest p-2.5 active:scale-[0.98]"
                   >
                     {m.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -154,29 +178,29 @@ export function MemberRegistryViewMobile({
                         src={m.avatar_url}
                         alt=""
                         referrerPolicy="no-referrer"
-                        className={`size-14 shrink-0 rounded-full border-2 object-cover ${chip.ring}`}
+                        className={`size-10 shrink-0 rounded-full border-2 object-cover ${chip.ring}`}
                       />
                     ) : (
                       <span
-                        className={`flex size-14 shrink-0 items-center justify-center rounded-full border-2 bg-ve-surface-container text-lg font-bold text-ve-on-surface ${chip.ring}`}
+                        className={`flex size-10 shrink-0 items-center justify-center rounded-full border-2 bg-ve-surface-container text-[13px] font-bold text-ve-on-surface ${chip.ring}`}
                       >
                         {m.name.charAt(0).toUpperCase()}
                       </span>
                     )}
 
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-bold text-ve-on-surface">{m.name}</span>
-                      <span className="block truncate text-sm text-ve-on-surface-variant/70">
+                      <span className="block truncate text-[13.5px] font-bold text-ve-on-surface">{m.name}</span>
+                      <span className="block truncate text-[11.5px] text-ve-on-surface-variant/70">
                         {planNameMap[m.id] ?? m.phone}
                       </span>
                     </span>
 
                     <span
-                      className={`text-ve-label shrink-0 rounded-full px-3 py-1 text-[10px] uppercase ${chip.classes}`}
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase ${chip.classes}`}
                     >
                       {chip.label}
                     </span>
-                    <ChevronRight size={18} className="shrink-0 text-ve-on-surface-variant/40" />
+                    <ChevronRight size={15} className="shrink-0 text-ve-on-surface-variant/40" />
                   </Link>
                 </li>
               )
@@ -184,6 +208,18 @@ export function MemberRegistryViewMobile({
           </ul>
         )}
       </div>
+
+      <AddMemberModalMobile
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={async (data) => {
+          const result = await createMember(workspaceId, data)
+          if (result.success) {
+            router.refresh()
+          }
+          return result
+        }}
+      />
     </div>
   )
 }
