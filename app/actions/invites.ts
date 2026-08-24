@@ -137,19 +137,14 @@ const { data: existing } = await service
   .maybeSingle();
 
 if (existing) {
-  // seedha success return, koi insert nahi
+  const { data: ws } = await service
+    .from('workspaces')
+    .select('slug')
+    .eq('id', invite.workspace_id)
+    .single();
+
   return { success: true, workspaceSlug: ws?.slug };
 }
-
-  if (existing) {
-    const { data: ws } = await service
-      .from('workspaces')
-      .select('slug')
-      .eq('id', invite.workspace_id)
-      .single();
-
-    return { success: true, workspaceSlug: ws?.slug };
-  }
 
   const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val);
 
