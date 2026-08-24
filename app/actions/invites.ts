@@ -128,12 +128,18 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
     return { success: false, error: 'This invite has expired' };
   }
 
-  const { data: existing } = await service
+const { data: existing } = await service
   .from('workspace_members')
   .select('id')
   .eq('workspace_id', invite.workspace_id)
   .eq('user_id', user.id)
+  .eq('is_active', true)
   .maybeSingle();
+
+if (existing) {
+  // seedha success return, koi insert nahi
+  return { success: true, workspaceSlug: ws?.slug };
+}
 
   if (existing) {
     const { data: ws } = await service
