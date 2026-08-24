@@ -129,12 +129,11 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
   }
 
   const { data: existing } = await service
-    .from('workspace_members')
-    .select('id')
-    .eq('workspace_id', invite.workspace_id)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle();
+  .from('workspace_members')
+  .select('id')
+  .eq('workspace_id', invite.workspace_id)
+  .eq('user_id', user.id)
+  .maybeSingle();
 
   if (existing) {
     const { data: ws } = await service
@@ -171,14 +170,17 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
     .eq('id', sanitizedRoleId)
     .single();
 
-  const { error: memberError } = await service.from('workspace_members').insert({
+const { error: memberError } = await service.from('workspace_members').upsert(
+  {
     workspace_id: sanitizedWorkspaceId,
     user_id: sanitizedUserId,
     role_id: sanitizedRoleId,
     invited_by: sanitizedInvitedBy,
     role: roleData?.name ?? 'staff',
     is_active: true,
-  });
+  },
+  { onConflict: 'workspace_id,user_id' }
+);
 
   if (memberError) {
     console.error('acceptInvite member insert error:', memberError);
