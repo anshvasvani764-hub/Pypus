@@ -50,8 +50,8 @@ export async function generateInvite({
     throw new Error('Workspace ID is required to generate an invite');
   }
 
-  if (!sanitizedRoleId) {
-    throw new Error('Role ID is required to generate an invite');
+  if (!sanitizedRoleId && !resolvedRoleName) {
+  throw new Error('Role ID or role name is required to generate an invite');
   }
 
   if (!resolvedRoleId && resolvedRoleName) {
