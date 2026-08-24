@@ -43,7 +43,7 @@ export default async function AppLayout({
   if (device === 'mobile') {
     return (
       <MobileNavProvider>
-        <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface">
+        <div className="font-ve min-h-screen w-full overflow-x-hidden bg-ve-surface text-ve-on-surface">
           <MobileNavDrawer workspaceSlug={workspaceSlug} />
           <main className="pb-6">{children}</main>
         </div>

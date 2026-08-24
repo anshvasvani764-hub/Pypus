@@ -163,7 +163,7 @@ export function MemberRegistryViewMobile({
             </p>
           </div>
         ) : (
-          <ul className="grid gap-1.5 pb-4">
+          <ul className="grid gap-1.5 pb-24">
             {filtered.map((m) => {
               const chip = STATUS_CHIP[feeStatusMap[m.id] ?? 'no_plan']
               return (
