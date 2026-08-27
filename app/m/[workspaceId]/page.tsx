@@ -4,7 +4,7 @@
  * Server component that:
  * 1. Reads the Supabase session.
  * 2. No session  → renders MemberLoginScreen (Google OAuth).
- * 3. Session found, no member row → renders MemberOnboardingForm (phone only).
+ * 3. Session found, no member row → renders MemberOnboardingForm (asks for name + phone).
  * 4. Session found, member row exists → redirects to /m/[workspaceId]/checkin.
  */
 import { redirect } from 'next/navigation'
@@ -63,12 +63,6 @@ export default async function MemberEntryPage({
     <MemberOnboardingForm
       workspaceId={workspaceId}
       workspaceName={workspaceName}
-      userName={
-        user.user_metadata?.full_name ??
-        user.user_metadata?.name ??
-        user.email?.split('@')[0] ??
-        'there'
-      }
       userEmail={user.email ?? ''}
       userAvatar={user.user_metadata?.avatar_url ?? null}
     />

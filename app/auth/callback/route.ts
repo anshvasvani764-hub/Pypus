@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
         }
       }
 
-      const { data: memberRow } = await supabase
+      const { data: memberRow } = await createServiceClient()
         .from('members')
         .select('workspace_id')
         .eq('auth_user_id', user.id)

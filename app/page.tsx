@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import LandingPage from '@/components/landing/LandingPage'
 
 export default async function RootPage() {
@@ -35,7 +36,7 @@ export default async function RootPage() {
     }
   }
 
-  const { data: memberRow } = await supabase
+  const { data: memberRow } = await createServiceClient()
     .from('members')
     .select('workspace_id')
     .eq('auth_user_id', user.id)

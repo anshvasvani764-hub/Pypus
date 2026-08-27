@@ -25,6 +25,7 @@ async function requireSession() {
 // ---------------------------------------------------------------------------
 export async function registerMember(
   workspaceId: string,
+  name: string,
   phone: string
 ): Promise<{ error?: string }> {
   // 1. Validate session
@@ -35,7 +36,13 @@ export async function registerMember(
     return { error: 'Not signed in. Please refresh and try again.' }
   }
 
-  // 2. Validate phone (must have at least 7 digits)
+  // 2. Validate name (user-entered, not pulled from Google profile)
+  const trimmedName = name.trim()
+  if (trimmedName.length < 2) {
+    return { error: 'Please enter your name.' }
+  }
+
+  // 3. Validate phone (must have at least 7 digits)
   const digits = phone.replace(/\D/g, '')
   if (digits.length < 7) {
     return { error: 'Please enter a valid phone number.' }
@@ -43,7 +50,7 @@ export async function registerMember(
 
   const service = createServiceClient()
 
-  // 3. Verify the workspace exists
+  // 4. Verify the workspace exists
   const { data: ws, error: wsErr } = await service
     .from('workspaces')
     .select('id')
@@ -54,7 +61,7 @@ export async function registerMember(
     return { error: 'Workspace not found.' }
   }
 
-  // 4. Guard: prevent duplicate member rows (race-condition safety)
+  // 5. Guard: prevent duplicate member rows (race-condition safety)
   const { data: existing } = await service
     .from('members')
     .select('id')
@@ -67,18 +74,14 @@ export async function registerMember(
     return {}
   }
 
-  // 5. Insert the new member row using Google profile data
-  const name =
-    user.user_metadata?.full_name ??
-    user.user_metadata?.name ??
-    user.email?.split('@')[0] ??
-    'Member'
+  // 6. Insert the new member row using the name the member typed in,
+  // NOT the Google account name (avatar/email still come from the account).
   const email = user.email ?? ''
   const avatarUrl = user.user_metadata?.avatar_url ?? null
 
   const { error: insertErr } = await service.from('members').insert({
     workspace_id: workspaceId,
-    name,
+    name: trimmedName,
     email,
     phone,
     avatar_url: avatarUrl,
