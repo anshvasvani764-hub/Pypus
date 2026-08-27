@@ -50,8 +50,8 @@ export async function generateInvite({
     throw new Error('Workspace ID is required to generate an invite');
   }
 
-  if (!sanitizedRoleId) {
-    throw new Error('Role ID is required to generate an invite');
+  if (!sanitizedRoleId && !resolvedRoleName) {
+  throw new Error('Role ID or role name is required to generate an invite');
   }
 
   if (!resolvedRoleId && resolvedRoleName) {
@@ -128,23 +128,23 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
     return { success: false, error: 'This invite has expired' };
   }
 
-  const { data: existing } = await service
-    .from('workspace_members')
-    .select('id')
-    .eq('workspace_id', invite.workspace_id)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .maybeSingle();
+const { data: existing } = await service
+  .from('workspace_members')
+  .select('id')
+  .eq('workspace_id', invite.workspace_id)
+  .eq('user_id', user.id)
+  .eq('is_active', true)
+  .maybeSingle();
 
-  if (existing) {
-    const { data: ws } = await service
-      .from('workspaces')
-      .select('slug')
-      .eq('id', invite.workspace_id)
-      .single();
+if (existing) {
+  const { data: ws } = await service
+    .from('workspaces')
+    .select('slug')
+    .eq('id', invite.workspace_id)
+    .single();
 
-    return { success: true, workspaceSlug: ws?.slug };
-  }
+  return { success: true, workspaceSlug: ws?.slug };
+}
 
   const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val);
 
@@ -171,14 +171,17 @@ export async function acceptInvite(token: string): Promise<{ success: boolean; w
     .eq('id', sanitizedRoleId)
     .single();
 
-  const { error: memberError } = await service.from('workspace_members').insert({
+const { error: memberError } = await service.from('workspace_members').upsert(
+  {
     workspace_id: sanitizedWorkspaceId,
     user_id: sanitizedUserId,
     role_id: sanitizedRoleId,
     invited_by: sanitizedInvitedBy,
     role: roleData?.name ?? 'staff',
     is_active: true,
-  });
+  },
+  { onConflict: 'workspace_id,user_id' }
+);
 
   if (memberError) {
     console.error('acceptInvite member insert error:', memberError);
