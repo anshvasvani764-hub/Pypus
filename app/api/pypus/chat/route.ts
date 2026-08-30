@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { callLLMWithTools } from "@/lib/llm";
+import { callLLMWithTools, type LLMChatMessage } from "@/lib/llm";
 import { PYPUS_TOOLS, runPypusTool } from "@/lib/pypus/tools";
 import { PYPUS_SYSTEM_PROMPT } from "@/lib/pypus/prompt";
 import { getISTDateString } from "@/lib/utils/date";
+
+/** Only the last few turns are needed to carry a pending confirmation — keeps the request small. */
+const MAX_HISTORY_TURNS = 8;
+
+function sanitizeHistory(raw: unknown): LLMChatMessage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (m): m is LLMChatMessage =>
+        !!m &&
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        m.content.trim().length > 0
+    )
+    .slice(-MAX_HISTORY_TURNS);
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -18,8 +34,9 @@ export async function POST(request: Request) {
 
   let workspaceId: unknown;
   let message: unknown;
+  let history: unknown;
   try {
-    ({ workspaceId, message } = await request.json());
+    ({ workspaceId, message, history } = await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -35,7 +52,8 @@ export async function POST(request: Request) {
       PYPUS_SYSTEM_PROMPT,
       userMessage,
       PYPUS_TOOLS.map(({ name, description, parameters }) => ({ name, description, parameters })),
-      (name, args) => runPypusTool(name, args, { supabase, workspaceId })
+      (name, args) => runPypusTool(name, args, { supabase, workspaceId }),
+      sanitizeHistory(history)
     );
     return NextResponse.json({ reply });
   } catch (err) {

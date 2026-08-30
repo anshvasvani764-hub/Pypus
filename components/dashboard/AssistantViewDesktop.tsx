@@ -64,10 +64,14 @@ export function AssistantViewDesktop() {
 
     let reply: string
     try {
+      // Last few turns only — just enough for the assistant to remember a
+      // pending "please confirm this payment" from its previous reply.
+      const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }))
+
       const res = await fetch('/api/pypus/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: workspace?.id, message: text }),
+        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history }),
       })
       const data = await res.json()
       reply =

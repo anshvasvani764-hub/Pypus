@@ -6,6 +6,12 @@ export interface LLMToolSpec {
 
 export type LLMToolRunner = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
+/** Prior turns in the conversation, oldest first. Does not include the current userMessage. */
+export interface LLMChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 const MAX_TOOL_ROUNDS = 4;
 
 /**
@@ -37,7 +43,8 @@ export async function callLLMWithTools(
   systemPrompt: string,
   userMessage: string,
   tools: LLMToolSpec[],
-  runTool: LLMToolRunner
+  runTool: LLMToolRunner,
+  history: LLMChatMessage[] = []
 ): Promise<string> {
   const apiKey = process.env.LLM_API_KEY;
   const provider = process.env.LLM_PROVIDER || "openai";
@@ -48,9 +55,9 @@ export async function callLLMWithTools(
 
   switch (provider) {
     case "gemini":
-      return geminiToolLoop(apiKey, systemPrompt, userMessage, tools, runTool);
+      return geminiToolLoop(apiKey, systemPrompt, userMessage, tools, runTool, history);
     case "openai":
-      return openAIToolLoop(apiKey, systemPrompt, userMessage, tools, runTool);
+      return openAIToolLoop(apiKey, systemPrompt, userMessage, tools, runTool, history);
     default:
       throw new Error(`LLM_PROVIDER "${provider}" is not implemented in lib/llm.ts yet`);
   }
@@ -138,9 +145,14 @@ async function geminiToolLoop(
   systemPrompt: string,
   userMessage: string,
   tools: LLMToolSpec[],
-  runTool: LLMToolRunner
+  runTool: LLMToolRunner,
+  history: LLMChatMessage[] = []
 ): Promise<string> {
   const contents: { role: "user" | "model"; parts: GeminiPart[] }[] = [
+    ...history.map((m) => ({
+      role: (m.role === "assistant" ? "model" : "user") as "user" | "model",
+      parts: [{ text: m.content }],
+    })),
     { role: "user", parts: [{ text: userMessage }] },
   ];
 
@@ -199,10 +211,12 @@ async function openAIToolLoop(
   systemPrompt: string,
   userMessage: string,
   tools: LLMToolSpec[],
-  runTool: LLMToolRunner
+  runTool: LLMToolRunner,
+  history: LLMChatMessage[] = []
 ): Promise<string> {
   const messages: Record<string, unknown>[] = [
     { role: "system", content: systemPrompt },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
   ];
 
