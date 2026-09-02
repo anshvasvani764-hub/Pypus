@@ -5,14 +5,11 @@ import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/context/OnboardingContext'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Dumbbell, Scissors, GraduationCap, Utensils,
+  Dumbbell, Scissors, GraduationCap, Utensils, Briefcase,
   Building2, Smartphone, MapPin, CheckCircle2,
-  ArrowLeft, Check, Sparkles, Loader2,
-  Briefcase, LucideIcon
+  ArrowLeft, Check, Sparkles, Loader2, LucideIcon
 } from 'lucide-react'
 
-// Maps a template's `icon` column (a string key) to its Lucide icon component.
-// Kept local to this file on purpose — do not import from the desktop onboarding component.
 const TMPL_ICON_MAP: Record<string, LucideIcon> = {
   dumbbell: Dumbbell,
   scissors: Scissors,
@@ -20,17 +17,15 @@ const TMPL_ICON_MAP: Record<string, LucideIcon> = {
   utensils: Utensils,
   briefcase: Briefcase,
 }
+
 const DEFAULT_TMPL_ICON = Briefcase
 
-// Short taglines shown under each template's name. Not stored in Supabase, so
-// they're kept here for the known slugs; anything else falls back to the
-// template's own `description` column (or an empty string).
-const TMPL_TAGLINES: Record<string, string> = {
+const TEMPLATE_TAGLINES: Record<string, string> = {
   gym: 'Membership management & schedules',
   salon: 'Appointments & client history',
   coaching: '1-on-1 sessions & progress tracking',
   restaurant: 'Orders, tables & inventory',
-  agency: 'Clients, projects & invoicing',
+  agency: 'Clients, projects & billing in one place',
 }
 
 export function OnboardingViewMobile() {
@@ -179,8 +174,8 @@ export function OnboardingViewMobile() {
               
               <div className="space-y-3 mt-6">
                 {templates.map((tmpl) => {
-                  const IconComponent = TMPL_ICON_MAP[tmpl.icon as string] || DEFAULT_TMPL_ICON
-                  const tagline = TMPL_TAGLINES[tmpl.slug] ?? tmpl.description ?? ''
+                  const Icon = TMPL_ICON_MAP[tmpl.icon || ''] || DEFAULT_TMPL_ICON
+                  const tagline = TEMPLATE_TAGLINES[tmpl.slug] || tmpl.description || ''
 
                   if (tmpl.is_active) {
                     return (
@@ -191,7 +186,7 @@ export function OnboardingViewMobile() {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-12 rounded-full bg-ve-primary-container flex items-center justify-center text-ve-on-primary-container shrink-0">
-                            <IconComponent size={24} />
+                            <Icon size={24} />
                           </div>
                           <div>
                             <h3 className="text-base font-bold text-ve-on-surface">{tmpl.name}</h3>
@@ -211,7 +206,7 @@ export function OnboardingViewMobile() {
                       className="p-4 bg-ve-surface-container-low border-2 border-ve-outline-variant/30 rounded-2xl opacity-60 flex items-center gap-4"
                     >
                       <div className="w-12 h-12 rounded-full bg-ve-surface-container-high flex items-center justify-center text-ve-on-surface-variant shrink-0">
-                        <IconComponent size={24} />
+                        <Icon size={24} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">

@@ -25,6 +25,11 @@ export async function performWorkspaceCreation(
   if (!userId) {
     throw new Error('User ID is required to create a workspace')
   }
+  if (!selectedTemplate.modules?.length) {
+    throw new Error(
+      `The "${selectedTemplate.name}" industry isn't fully set up yet. Please choose a different one or contact support.`
+    )
+  }
   const cleanUUID = (val: string | undefined | null) => (val === '' || val == null ? null : val)
 
   const baseSlug = bizName
