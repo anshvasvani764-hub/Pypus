@@ -61,6 +61,7 @@ export interface FeeRecord {
   paid_date: string | null; // ISO date
   payment_method: string | null; // "UPI" | "Cash" | "Bank Transfer" | null
   status: SubscriptionStatus;
+  created_at?: string; // ISO timestamp — when this row was inserted (always present on live rows)
 }
 
 export interface PaymentReminder {

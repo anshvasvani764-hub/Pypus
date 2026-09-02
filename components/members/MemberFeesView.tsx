@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Wallet, AlertCircle, CheckCircle2, Clock, MessageCircle, CreditCard, Pencil, Receipt as ReceiptIcon, Check, Loader2 } from "lucide-react";
 import MemberAvatar from "@/components/shared/MemberAvatar";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +83,7 @@ function PaymentStatusBadge({ status }: { status: FeeRecord["status"] }) {
 }
 
 export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesViewProps) {
+  const router = useRouter();
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [planId, setPlanId] = useState<string | null>(member.plan_id ?? null);
   const [loading, setLoading] = useState(true);
@@ -155,6 +157,10 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
       setPlanId(newPlanId);
       setFees((prev) => [...prev, result.fee!]);
       flashToast("Plan assigned successfully");
+      // Header badge/plan-name up top is server-rendered from the initial
+      // page load — nudge it to refetch so it doesn't sit stale until a
+      // manual page reload.
+      router.refresh();
     } else {
       flashToast(result.error || "Failed to assign plan");
     }
@@ -193,6 +199,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
             ? "Payment recorded — fully paid"
             : "Partial payment recorded"
       );
+      router.refresh();
     } else {
       flashToast(result.error || "Failed to mark as paid");
     }
@@ -279,8 +286,12 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
     );
   }
 
+  // "Last" record = most recently created, not soonest/latest due — a newly
+  // assigned short plan can land an earlier due date than an older row.
   const sorted = [...fees].sort(
-    (a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime()
+    (a, b) =>
+      new Date(b.created_at ?? b.due_date).getTime() -
+      new Date(a.created_at ?? a.due_date).getTime()
   );
 
   return (
@@ -297,6 +308,7 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         onSubmit={handlePlanSubmit}
         workspaceId={workspaceId}
         memberName={member.name}
+        hasExistingPlan={Boolean(summary.currentPlanName)}
       />
 
       <MarkPaidModal
@@ -322,6 +334,12 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
         onSaved={(updated) => {
           setFees((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
           flashToast("Fee record updated");
+          router.refresh();
+        }}
+        onDeleted={(recordId) => {
+          setFees((prev) => prev.filter((f) => f.id !== recordId));
+          flashToast("Fee record deleted");
+          router.refresh();
         }}
       />
 
@@ -416,28 +434,41 @@ export function MemberFeesView({ memberId, workspaceId, member }: MemberFeesView
       {/* Summary stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center">
-              <Wallet className="h-5 w-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Current Plan</p>
-              <p className="text-sm font-bold text-gray-900 mt-0.5">
-                {summary.planName ?? (
-                  <button
-                    onClick={() => setPlanModalOpen(true)}
-                    className="text-emerald-600 underline underline-offset-2"
-                  >
-                    Assign plan
-                  </button>
-                )}
-              </p>
-              {summary.planName && summary.amount != null && (
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {formatCurrency(summary.amount)}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                <Wallet className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-gray-400 font-medium">Current Plan</p>
+                <p className="text-sm font-bold text-gray-900 mt-0.5 truncate">
+                  {summary.currentPlanName ?? (
+                    <button
+                      onClick={() => setPlanModalOpen(true)}
+                      className="text-emerald-600 underline underline-offset-2"
+                    >
+                      Assign plan
+                    </button>
+                  )}
                 </p>
-              )}
+                {summary.currentPlanName && summary.currentPlanAmount != null && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {formatCurrency(summary.currentPlanAmount)}
+                  </p>
+                )}
+              </div>
             </div>
+            {summary.currentPlanName && (
+              <button
+                onClick={() => setPlanModalOpen(true)}
+                aria-label="Change plan"
+                title="Change plan"
+                className="flex items-center gap-1 shrink-0 h-8 px-2.5 rounded-full text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Change
+              </button>
+            )}
           </div>
         </div>
 

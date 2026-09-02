@@ -14,9 +14,11 @@ interface PlanSelectorModalProps {
     planName: string,
     amount: number,
     dueDate: string
-  ) => void;
+  ) => void | Promise<void>;
   workspaceId: string;
   memberName?: string;
+  /** True when the member already has a plan — swaps copy to "Change Plan". */
+  hasExistingPlan?: boolean;
 }
 
 function addDays(days: number): string {
@@ -36,6 +38,7 @@ function PlanSelectorDialog({
   onSubmit,
   workspaceId,
   memberName,
+  hasExistingPlan,
 }: Omit<PlanSelectorModalProps, "isOpen">) {
   const [mode, setMode] = useState<"existing" | "custom">("existing");
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -94,14 +97,14 @@ function PlanSelectorDialog({
   );
 
   async function handleSubmit() {
-    if (!canSubmit) return;
+    if (!canSubmit || submitting) return;
 
     setSubmitting(true);
     try {
       if (mode === "existing" && selectedPlan) {
-        onSubmit(selectedPlan.id, selectedPlan.name, selectedPlan.price, dueDate);
+        await onSubmit(selectedPlan.id, selectedPlan.name, selectedPlan.price, dueDate);
       } else {
-        onSubmit(
+        await onSubmit(
           null,
           customName.trim() || "Custom plan",
           Number(customAmount),
@@ -119,7 +122,9 @@ function PlanSelectorDialog({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Assign Plan</h2>
+            <h2 className="text-base font-semibold text-gray-900">
+              {hasExistingPlan ? "Change Plan" : "Assign Plan"}
+            </h2>
             {memberName && (
               <p className="text-xs text-gray-400 mt-0.5">{memberName}</p>
             )}
@@ -263,7 +268,7 @@ function PlanSelectorDialog({
             disabled={submitting || !canSubmit}
             className="px-4 py-2 rounded-full text-sm font-medium transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed bg-emerald-600 text-white hover:bg-emerald-700"
           >
-            {submitting ? "Saving..." : "Assign Plan"}
+            {submitting ? "Saving..." : hasExistingPlan ? "Change Plan" : "Assign Plan"}
           </button>
         </div>
       </div>

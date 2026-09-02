@@ -71,6 +71,46 @@ export async function updateFeeRecord({
 }
 
 /**
+ * Delete a fee record permanently.
+ * Guards by workspace_id + member_id so records can't be tampered with cross-workspace.
+ * Use for cleaning up mistaken/duplicate rows (e.g. a plan re-assigned twice by accident).
+ */
+export async function deleteFeeRecord({
+  workspaceId,
+  memberId,
+  recordId,
+}: {
+  workspaceId: string;
+  memberId: string;
+  recordId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = createServiceClient();
+
+  const { error, count } = await supabase
+    .from("fees")
+    .delete({ count: "exact" })
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
+    .eq("member_id", memberId);
+
+  if (error) {
+    console.error("deleteFeeRecord error:", error);
+    return { success: false, error: error.message };
+  }
+
+  if (!count) {
+    return { success: false, error: "Fee record not found" };
+  }
+
+  revalidatePath(`/[app]/members/${memberId}/fees`, "page");
+  revalidatePath(`/[app]/members/${memberId}`, "page");
+  revalidatePath(`/[app]/fees`, "page");
+  revalidatePath(`/[app]/members`, "page");
+
+  return { success: true };
+}
+
+/**
  * Update an existing attendance record.
  * Guards by workspace_id + member_id so records can't be tampered with cross-workspace.
  *

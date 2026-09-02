@@ -16,6 +16,13 @@ export interface MemberFeeSummary {
   /** Plan price normalised to a 30-day month, so quarterly/yearly plans don't
    *  inflate a single month's expected revenue. */
   monthlyValue: number;
+  /** The plan actually assigned right now (most recently created fee row) —
+   *  distinct from `planName` above, which reflects whatever is oldest and
+   *  still unpaid. Right after a plan change, an older plan's unpaid fee can
+   *  still be the thing billing-wise due next, while this always tracks what
+   *  the member is currently on. Use this for "Current Plan" displays. */
+  currentPlanName: string | null;
+  currentPlanAmount: number | null;
 }
 
 /** @deprecated kept for backward compatibility — use daysForDuration() from
@@ -43,6 +50,19 @@ function latestByDueDate(fees: FeeRecord[]): FeeRecord | null {
   )[0];
 }
 
+/** The fee row from the most recent plan assignment/change, by insert time —
+ *  due_date can't be used for this since a newly-assigned short plan can land
+ *  an earlier due date than an older plan's still-unpaid row. Falls back to
+ *  due_date for any row missing created_at (only mock/demo data lacks it). */
+function mostRecentlyAssigned(fees: FeeRecord[]): FeeRecord | null {
+  if (fees.length === 0) return null;
+  return [...fees].sort(
+    (a, b) =>
+      new Date(b.created_at ?? b.due_date).getTime() -
+      new Date(a.created_at ?? a.due_date).getTime()
+  )[0];
+}
+
 /**
  * A paid row stays "paid" only until its due_date arrives — on that day the
  * membership period ends and the member owes the next cycle, so the derived
@@ -62,6 +82,9 @@ export function deriveFeeSummary(
   );
 
   const latest = latestByDueDate(fees);
+  const mostRecent = mostRecentlyAssigned(fees);
+  const currentPlanName = mostRecent?.plan_name_snapshot ?? null;
+  const currentPlanAmount = mostRecent?.amount_snapshot ?? null;
   const hasPlan = member?.plan_id != null || latest != null;
 
   if (!hasPlan) {
@@ -74,6 +97,8 @@ export function deriveFeeSummary(
       totalPaid,
       totalPending,
       monthlyValue: 0,
+      currentPlanName,
+      currentPlanAmount,
     };
   }
 
@@ -95,6 +120,8 @@ export function deriveFeeSummary(
       totalPaid,
       totalPending,
       monthlyValue: 0,
+      currentPlanName,
+      currentPlanAmount,
     };
   }
 
@@ -114,6 +141,8 @@ export function deriveFeeSummary(
       totalPaid,
       totalPending,
       monthlyValue,
+      currentPlanName,
+      currentPlanAmount,
     };
   }
 
@@ -127,6 +156,8 @@ export function deriveFeeSummary(
     totalPaid,
     totalPending,
     monthlyValue,
+    currentPlanName,
+    currentPlanAmount,
   };
 }
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, CalendarDays, Wallet, Save } from "lucide-react";
+import { X, CalendarDays, Wallet, Save, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import type { FeeRecord, SubscriptionStatus } from "@/lib/members/types";
-import { updateFeeRecord } from "@/app/actions/edit-records";
+import { updateFeeRecord, deleteFeeRecord } from "@/app/actions/edit-records";
 
 interface EditFeeModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface EditFeeModalProps {
   workspaceId: string;
   memberId: string;
   onSaved?: (updated: FeeRecord) => void;
+  onDeleted?: (recordId: string) => void;
 }
 
 const PAYMENT_METHODS = ["UPI", "Cash"] as const;
@@ -27,6 +28,7 @@ export function EditFeeModal({
   workspaceId,
   memberId,
   onSaved,
+  onDeleted,
 }: EditFeeModalProps) {
   const [planName, setPlanName] = useState("");
   const [amount, setAmount] = useState("");
@@ -37,6 +39,8 @@ export function EditFeeModal({
   const [status, setStatus] = useState<SubscriptionStatus>("due");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [lastRecordId, setLastRecordId] = useState<string | null>(null);
   if (record && record.id !== lastRecordId) {
@@ -49,6 +53,7 @@ export function EditFeeModal({
     setPaymentMethod(record.payment_method ?? "");
     setStatus(record.status);
     setError(null);
+    setConfirmingDelete(false);
   }
 
   if (!isOpen || !record) return null;
@@ -93,6 +98,28 @@ export function EditFeeModal({
       onClose();
     } else {
       setError(result.error || "Failed to update record");
+    }
+  }
+
+  async function handleDelete() {
+    if (!record) return;
+    setDeleting(true);
+    setError(null);
+
+    const result = await deleteFeeRecord({
+      workspaceId,
+      memberId,
+      recordId: record.id,
+    });
+
+    setDeleting(false);
+
+    if (result.success) {
+      onDeleted?.(record.id);
+      onClose();
+    } else {
+      setError(result.error || "Failed to delete record");
+      setConfirmingDelete(false);
     }
   }
 
@@ -225,23 +252,62 @@ export function EditFeeModal({
           {error && (
             <p className="text-xs font-medium text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
           )}
+
+          {confirmingDelete && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3">
+              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-red-700">Delete this fee record?</p>
+                <p className="text-xs text-red-600 mt-0.5">
+                  This permanently removes it from payment history. This can't be undone.
+                </p>
+                <div className="flex items-center gap-2 mt-2.5">
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {deleting && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {deleting ? "Deleting..." : "Yes, delete"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 sticky bottom-0 bg-white">
+        <div className="flex items-center justify-between gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50 sticky bottom-0 bg-white">
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            onClick={() => setConfirmingDelete(true)}
+            disabled={saving || deleting || confirmingDelete}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Cancel
+            <Trash2 className="h-4 w-4" />
+            Delete
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || deleting}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
