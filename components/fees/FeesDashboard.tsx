@@ -47,16 +47,18 @@ export function FeesDashboard({
   const [period, setPeriod] = useState<RevenuePeriod>("month");
   const [customStart, setCustomStart] = useState(todayStr);
   const [customEnd, setCustomEnd] = useState(todayStr);
+  const [customDate, setCustomDate] = useState(todayStr);
 
   const revenueRange = useMemo(
-    () => getPeriodRange(period, customStart, customEnd),
-    [period, customStart, customEnd]
+    () => getPeriodRange(period, customStart, customEnd, customDate),
+    [period, customStart, customEnd, customDate]
   );
 
   // For the default "month" period we reuse the server-computed revenue
   // (which already accounts for live payments via handlePaid below).
-  // For every other period we derive the total client-side from `fees`,
-  // which already holds the full, unfiltered fee history for this workspace.
+  // For every other period (including "day") we derive the total client-side
+  // from `fees`, which already holds the full, unfiltered fee history for
+  // this workspace.
   const filteredRevenue = useMemo(() => {
     if (period === "month") return revenue;
     return calculateCollectedRevenue(fees, revenueRange);
@@ -129,7 +131,7 @@ export function FeesDashboard({
         subtitle="Track memberships, payments and pending collections."
         backHref={`/${workspaceSlug}/workspace`}
         actions={
-          <a
+          
             href={`/${workspaceSlug}/fees/plans`}
             className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
@@ -144,9 +146,11 @@ export function FeesDashboard({
           period={period}
           customStart={customStart}
           customEnd={customEnd}
+          customDate={customDate}
           onPeriodChange={setPeriod}
           onCustomStartChange={setCustomStart}
           onCustomEndChange={setCustomEnd}
+          onCustomDateChange={setCustomDate}
         />
       </div>
 
