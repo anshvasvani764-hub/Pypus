@@ -1,0 +1,53 @@
+diff --git a/components/mobile/onboarding/OnboardingView.mobile.tsx b/components/mobile/onboarding/OnboardingView.mobile.tsx
+index 0141cac..b960d3e 100644
+--- a/components/mobile/onboarding/OnboardingView.mobile.tsx
++++ b/components/mobile/onboarding/OnboardingView.mobile.tsx
+@@ -58,13 +58,42 @@ export function OnboardingViewMobile() {
+ 
+   useEffect(() => {
+     const supabase = createClient()
+-    supabase
+-      .from('templates')
+-      .select('*')
+-      .order('created_at', { ascending: true })
+-      .then(({ data }) => {
+-        if (data) setTemplates(data)
++
++    async function fetchTemplates() {
++      const { data, error } = await supabase
++        .from('templates')
++        .select('*')
++        .order('created_at', { ascending: true })
++
++      if (error || !data) return
++
++      // `templates` rows don't carry a `modules` column — modules live in
++      // the `template_modules` join table. Without this fetch,
++      // template.modules stays undefined -> [] and workspace creation
++      // fails for EVERY industry (see performWorkspaceCreation's
++      // `!selectedTemplate.modules?.length` guard).
++      const ids = data.map((t: any) => t.id)
++      const { data: tmData } = await supabase
++        .from('template_modules')
++        .select('template_id, module_id, is_required, modules(id, slug, name)')
++        .in('template_id', ids)
++
++      const modulesByTemplate: Record<string, any[]> = {}
++      ;(tmData || []).forEach((tm: any) => {
++        if (!tm.modules) return
++        if (!modulesByTemplate[tm.template_id]) modulesByTemplate[tm.template_id] = []
++        modulesByTemplate[tm.template_id].push(tm.modules)
+       })
++
++      const withModules = data.map((t: any) => ({
++        ...t,
++        modules: modulesByTemplate[t.id] || [],
++      }))
++
++      setTemplates(withModules)
++    }
++
++    fetchTemplates()
+   }, [])
+ 
+   // Redirect to dashboard after successful workspace creation

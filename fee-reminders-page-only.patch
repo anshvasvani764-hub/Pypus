@@ -1,0 +1,51 @@
+diff --git a/app/[app]/automations/fee-reminders/page.tsx b/app/[app]/automations/fee-reminders/page.tsx
+new file mode 100644
+index 0000000..2335115
+--- /dev/null
++++ b/app/[app]/automations/fee-reminders/page.tsx
+@@ -0,0 +1,44 @@
++import { createServiceClient } from "@/lib/supabase/service";
++import { AgentPendingView } from "@/components/agent/AgentPendingView";
++import { AgentPendingView as AgentPendingViewMobile } from "@/components/mobile/AgentPendingView.mobile";
++import { getAgentDashboard } from "@/app/actions/agent";
++import { getDevice } from "@/lib/device";
++
++export default async function FeeRemindersPage({
++  params,
++}: {
++  params: Promise<{ app: string }>;
++}) {
++  const { app: workspaceSlug } = await params;
++
++  const supabase = createServiceClient();
++  const { data: wsData } = await supabase
++    .from("workspaces")
++    .select("id, name")
++    .eq("slug", workspaceSlug)
++    .single();
++  const workspaceId = wsData?.id ?? "";
++  const workspaceName = wsData?.name ?? "Your Gym";
++
++  const { activity, receiptsPending } = await getAgentDashboard(workspaceId);
++
++  if ((await getDevice()) === "mobile") {
++    return (
++      <AgentPendingViewMobile
++        workspaceSlug={workspaceSlug}
++        workspaceName={workspaceName}
++        activity={activity}
++        receiptsPending={receiptsPending}
++      />
++    );
++  }
++
++  return (
++    <AgentPendingView
++      workspaceSlug={workspaceSlug}
++      workspaceName={workspaceName}
++      activity={activity}
++      receiptsPending={receiptsPending}
++    />
++  );
++}
+\ No newline at end of file
