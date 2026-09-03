@@ -1,7 +1,7 @@
 import type { FeeRecord } from "@/lib/members/types";
 import { getISTDateString } from "@/lib/utils/date";
 
-export type RevenuePeriod = "today" | "week" | "month" | "custom";
+export type RevenuePeriod = "today" | "week" | "month" | "day" | "custom";
 
 export interface DateRange {
   start: string; // ISO date (YYYY-MM-DD), inclusive
@@ -11,17 +11,24 @@ export interface DateRange {
 /**
  * Resolves a RevenuePeriod into a concrete [start, end] IST date range.
  * "week" = current calendar week starting Monday.
+ * "day" requires customDate to already be a YYYY-MM-DD string.
  * "custom" requires customStart/customEnd to already be YYYY-MM-DD strings.
  */
 export function getPeriodRange(
   period: RevenuePeriod,
   customStart?: string,
-  customEnd?: string
+  customEnd?: string,
+  customDate?: string
 ): DateRange {
   const todayStr = getISTDateString();
 
   if (period === "today") {
     return { start: todayStr, end: todayStr };
+  }
+
+  if (period === "day") {
+    const d = customDate || todayStr;
+    return { start: d, end: d };
   }
 
   if (period === "custom") {
@@ -86,6 +93,8 @@ export function periodLabel(
       return "this week";
     case "month":
       return "this month";
+    case "day":
+      return formatShort(range.start);
     case "custom":
       return range.start === range.end
         ? formatShort(range.start)
