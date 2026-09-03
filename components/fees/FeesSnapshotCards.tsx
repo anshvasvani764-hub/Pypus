@@ -6,6 +6,7 @@ interface FeesSnapshotCardsProps {
   feesCollected: number;
   pendingCollection: number;
   expectedRevenue: number;
+  feesCollectedLabel?: string;
 }
 
 function formatCurrency(amount: number) {
@@ -20,6 +21,7 @@ export function FeesSnapshotCards({
   feesCollected,
   pendingCollection,
   expectedRevenue,
+  feesCollectedLabel = "this month",
 }: FeesSnapshotCardsProps) {
   const cards = [
     {
@@ -33,7 +35,7 @@ export function FeesSnapshotCards({
     {
       label: "Fees Collected",
       value: formatCurrency(feesCollected),
-      context: "this month",
+      context: feesCollectedLabel,
       icon: Wallet,
       iconColor: "text-emerald-600",
       iconBg: "bg-emerald-50",

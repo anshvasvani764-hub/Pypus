@@ -55,52 +55,93 @@ export default function StepBusinessDetails() {
   const [nameError, setNameError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function fetchTemplates() {
       try {
         setLoading(true)
         const supabase = createClient()
+
+        // Lightweight query first — no joins — so pills paint immediately.
         const { data, error } = await supabase
           .from('templates')
-          .select(
-            'id, slug, name, description, icon, is_active, template_modules(module_id, is_required, modules(id, slug, name))'
-          )
+          .select('id, slug, name, description, icon, is_active')
           .order('created_at', { ascending: true })
 
         if (error) {
           console.error('Error fetching templates:', error)
-          setFetchError(error.message)
-        } else if (data && data.length > 0) {
-          const parsed: ParsedTemplate[] = (data as any[]).map((t: any) => ({
-            id: t.id,
-            slug: t.slug,
-            name: t.name,
-            icon: t.icon,
-            is_active: !!t.is_active,
-            modules: Array.isArray(t.template_modules)
-              ? t.template_modules.map((tm: any) => tm.modules).filter(Boolean)
-              : [],
-          }))
-
-          const active = parsed.filter((t) => t.is_active === true)
-          const comingSoon = parsed.filter((t) => t.is_active === false)
-
-          setActiveTemplates(active)
-          setComingSoonTemplates(comingSoon)
-
-          // Auto-select first active template if none selected yet
-          if (!selectedTemplate && active.length > 0) {
-            setSelectedTemplate(active[0])
-          }
+          if (!cancelled) setFetchError(error.message)
+          return
         }
-      } catch (err: any) {
-        setFetchError(err.message)
-      } finally {
+        if (!data || data.length === 0 || cancelled) return
+
+        const parsed: ParsedTemplate[] = (data as any[]).map((t: any) => ({
+          id: t.id,
+          slug: t.slug,
+          name: t.name,
+          icon: t.icon,
+          is_active: !!t.is_active,
+          modules: [],
+        }))
+
+        const active = parsed.filter((t) => t.is_active === true)
+        const comingSoon = parsed.filter((t) => t.is_active === false)
+
+        setActiveTemplates(active)
+        setComingSoonTemplates(comingSoon)
         setLoading(false)
+
+        // Auto-select first active template if none selected yet
+        if (!selectedTemplate && active.length > 0) {
+          setSelectedTemplate(active[0])
+        }
+
+        // Modules aren't needed to render the pills — fetch them in the
+        // background and backfill once they arrive (needed before final
+        // submit, not before the pills show).
+        const ids = parsed.map((t) => t.id)
+        const { data: tmData, error: tmError } = await supabase
+          .from('template_modules')
+          .select('template_id, module_id, is_required, modules(id, slug, name)')
+          .in('template_id', ids)
+
+        if (tmError || !tmData || cancelled) return
+
+        const modulesByTemplate: Record<string, any[]> = {}
+        tmData.forEach((tm: any) => {
+          if (!tm.modules) return
+          if (!modulesByTemplate[tm.template_id]) modulesByTemplate[tm.template_id] = []
+          modulesByTemplate[tm.template_id].push(tm.modules)
+        })
+
+        const withModules = (list: ParsedTemplate[]) =>
+          list.map((t) => ({ ...t, modules: modulesByTemplate[t.id] || t.modules }))
+
+        setActiveTemplates((prev) => withModules(prev))
+        setComingSoonTemplates((prev) => withModules(prev))
+      } catch (err: any) {
+        if (!cancelled) setFetchError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchTemplates()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  // Once background module data lands on activeTemplates, backfill it onto
+  // the already-selected template too (it may have been auto-selected
+  // before modules arrived).
+  useEffect(() => {
+    if (!selectedTemplate || selectedTemplate.modules?.length) return
+    const match = activeTemplates.find((t) => t.id === selectedTemplate.id)
+    if (match?.modules?.length) {
+      setSelectedTemplate(match)
+    }
+  }, [activeTemplates, selectedTemplate])
 
   const entityTitle = selectedTemplate?.name ? selectedTemplate.name.toLowerCase() : 'business'
 
