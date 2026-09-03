@@ -42,6 +42,7 @@ export interface ReceiptWorklistItem {
 export interface AgentActivityItem {
   id: string;
   kind: "reminder" | "receipt";
+  reason: "fees" | "attendance" | null; // set for kind "reminder", null for "receipt"
   memberName: string;
   detail: string;
   at: string; // formatted IST datetime (display only — don't sort on this)
@@ -274,8 +275,12 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
   const reminderItems: AgentActivityItem[] = (remindersRes.data ?? []).map((r) => ({
     id: `reminder-${r.id}`,
     kind: "reminder",
+    reason: (r.reason as "fees" | "attendance" | null) ?? null,
     memberName: nameById.get(r.member_id) ?? "Unknown member",
-    detail: r.reason === "fees" ? "Fee reminder will be sent on WhatsApp soon" : "Attendance nudge will be sent on WhatsApp soon",
+    // Reminders are logged the instant they go out (wa.me link opened, or
+    // the WhatsApp API call succeeded) — never a "will send later" queue —
+    // so the log should say sent, not promise a future send.
+    detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
     at: formatISTDateTime(r.sent_at),
     atRaw: r.sent_at,
   }));
@@ -283,6 +288,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
   const receiptItems: AgentActivityItem[] = (receiptsRes.data ?? []).map((r) => ({
     id: `receipt-${r.id}`,
     kind: "receipt",
+    reason: null,
     memberName: nameById.get(r.member_id) ?? "Unknown member",
     detail: `Receipt #${r.receipt_number} generated — ₹${Number(r.amount).toLocaleString("en-IN")}`,
     at: formatISTDateTime(r.generated_at),
