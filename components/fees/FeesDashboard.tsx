@@ -7,6 +7,14 @@ import { deriveFeeSummary } from "@/lib/members/fee-status";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FeesSnapshotCards } from "@/components/fees/FeesSnapshotCards";
 import { FeesPaymentsTable } from "@/components/fees/FeesPaymentsTable";
+import { RevenueFilterBar } from "@/components/fees/RevenueFilterBar";
+import {
+  type RevenuePeriod,
+  getPeriodRange,
+  calculateCollectedRevenue,
+  periodLabel,
+} from "@/lib/fees/revenue-filter";
+import { getISTDateString } from "@/lib/utils/date";
 
 interface FeesDashboardProps {
   workspaceSlug: string;
@@ -34,6 +42,27 @@ export function FeesDashboard({
     Object.fromEntries(members.map((m) => [m.id, m.plan_id ?? null]))
   );
   const [revenue, setRevenue] = useState(initialRevenue);
+
+  const todayStr = getISTDateString();
+  const [period, setPeriod] = useState<RevenuePeriod>("month");
+  const [customStart, setCustomStart] = useState(todayStr);
+  const [customEnd, setCustomEnd] = useState(todayStr);
+
+  const revenueRange = useMemo(
+    () => getPeriodRange(period, customStart, customEnd),
+    [period, customStart, customEnd]
+  );
+
+  // For the default "month" period we reuse the server-computed revenue
+  // (which already accounts for live payments via handlePaid below).
+  // For every other period we derive the total client-side from `fees`,
+  // which already holds the full, unfiltered fee history for this workspace.
+  const filteredRevenue = useMemo(() => {
+    if (period === "month") return revenue;
+    return calculateCollectedRevenue(fees, revenueRange);
+  }, [period, revenue, fees, revenueRange]);
+
+  const revenueLabel = periodLabel(period, revenueRange);
 
   const summaries = useMemo(() => {
     const map = new Map<string, ReturnType<typeof deriveFeeSummary>>();
@@ -111,10 +140,22 @@ export function FeesDashboard({
       />
 
       <div className="mt-6">
+        <RevenueFilterBar
+          period={period}
+          customStart={customStart}
+          customEnd={customEnd}
+          onPeriodChange={setPeriod}
+          onCustomStartChange={setCustomStart}
+          onCustomEndChange={setCustomEnd}
+        />
+      </div>
+
+      <div className="mt-4">
         <FeesSnapshotCards
-          feesCollected={revenue}
+          feesCollected={filteredRevenue}
           pendingCollection={snapshot.pendingCollection}
           expectedRevenue={snapshot.expectedRevenue}
+          feesCollectedLabel={revenueLabel}
         />
       </div>
 
