@@ -8,6 +8,8 @@ import { GlobalHeader } from '@/components/layout/GlobalHeader'
 import { getDevice } from '@/lib/device'
 import { createServiceClient } from '@/lib/supabase/service'
 import { getSubscriptionState } from '@/lib/subscriptions/get-subscription-status'
+import { AssistantPanelProvider } from '@/context/AssistantPanelContext'
+import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 
 export default async function AppLayout({
   children,
@@ -43,10 +45,13 @@ export default async function AppLayout({
   if (device === 'mobile') {
     return (
       <MobileNavProvider>
-        <div className="font-ve min-h-screen w-full overflow-x-hidden bg-ve-surface text-ve-on-surface">
-          <MobileNavDrawer workspaceSlug={workspaceSlug} />
-          <main className="pb-6">{children}</main>
-        </div>
+        <AssistantPanelProvider>
+          <div className="font-ve min-h-screen w-full overflow-x-hidden bg-ve-surface text-ve-on-surface">
+            <MobileNavDrawer workspaceSlug={workspaceSlug} />
+            <main className="pb-6">{children}</main>
+            <AssistantPanel />
+          </div>
+        </AssistantPanelProvider>
       </MobileNavProvider>
     )
   }
@@ -56,13 +61,16 @@ export default async function AppLayout({
   return (
     <SidebarProvider>
       <SearchProvider>
-        <div className="flex min-h-screen bg-[#FAFAF7]">
-          <Sidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <GlobalHeader workspaceName={workspaceName} />
-            <main className="flex-1 overflow-y-auto">{children}</main>
+        <AssistantPanelProvider>
+          <div className="flex min-h-screen bg-[#FAFAF7]">
+            <Sidebar />
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <GlobalHeader workspaceName={workspaceName} />
+              <main className="flex-1 overflow-y-auto">{children}</main>
+            </div>
+            <AssistantPanel />
           </div>
-        </div>
+        </AssistantPanelProvider>
       </SearchProvider>
     </SidebarProvider>
   )

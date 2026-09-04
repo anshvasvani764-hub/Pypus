@@ -33,7 +33,7 @@ const MODE_OPTIONS: { value: SidebarMode; label: string }[] = [
 // Hover state is only ever read in 'hover' mode, and we only bother updating it in that mode too.
 
 export default function Sidebar() {
-  const { isCollapsed, mode, setMode, setHovered } = useSidebar()
+  const { isCollapsed, mode, setMode, setHovered, autoCollapsed } = useSidebar()
   const [controlOpen, setControlOpen] = useState(false)
   const controlRef = useRef<HTMLDivElement>(null)
 
@@ -52,7 +52,10 @@ export default function Sidebar() {
   const { displayName, avatarUrl, isLoading: userLoading } = useUser()
   const { workspaceName, isLoading: workspaceLoading } = useWorkspace(app)
 
-  const restingCollapsed = mode !== 'expanded'
+  // Hover-mode's ephemeral expand-on-hover is intentionally excluded here —
+  // that's a temporary overlay and shouldn't reflow the page. autoCollapsed
+  // is a real layout change (assistant panel docked open), so it must.
+  const restingCollapsed = mode !== 'expanded' || autoCollapsed
   const isHoverOverlay = mode === 'hover' && !isCollapsed
 
   useEffect(() => {

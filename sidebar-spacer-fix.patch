@@ -1,0 +1,53 @@
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index 0a25b46..42a41c5 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -33,7 +33,7 @@ const MODE_OPTIONS: { value: SidebarMode; label: string }[] = [
+ // Hover state is only ever read in 'hover' mode, and we only bother updating it in that mode too.
+ 
+ export default function Sidebar() {
+-  const { isCollapsed, mode, setMode, setHovered } = useSidebar()
++  const { isCollapsed, mode, setMode, setHovered, autoCollapsed } = useSidebar()
+   const [controlOpen, setControlOpen] = useState(false)
+   const controlRef = useRef<HTMLDivElement>(null)
+ 
+@@ -52,7 +52,10 @@ export default function Sidebar() {
+   const { displayName, avatarUrl, isLoading: userLoading } = useUser()
+   const { workspaceName, isLoading: workspaceLoading } = useWorkspace(app)
+ 
+-  const restingCollapsed = mode !== 'expanded'
++  // Hover-mode's ephemeral expand-on-hover is intentionally excluded here —
++  // that's a temporary overlay and shouldn't reflow the page. autoCollapsed
++  // is a real layout change (assistant panel docked open), so it must.
++  const restingCollapsed = mode !== 'expanded' || autoCollapsed
+   const isHoverOverlay = mode === 'hover' && !isCollapsed
+ 
+   useEffect(() => {
+diff --git a/context/SidebarContext.tsx b/context/SidebarContext.tsx
+index 2cdec9d..b9f054e 100644
+--- a/context/SidebarContext.tsx
++++ b/context/SidebarContext.tsx
+@@ -12,6 +12,14 @@ type SidebarContextType = {
+   setMode: (mode: SidebarMode) => void
+   isHovered: boolean
+   setHovered: (hovered: boolean) => void
++  /**
++   * Whether something (e.g. the AI assistant panel) is currently forcing the
++   * sidebar collapsed. Unlike the ephemeral 'hover' mode expansion, this is a
++   * real layout change — components that reserve space for the sidebar
++   * (like its own spacer div) need to read this too, or the page content
++   * won't reflow into the freed-up width.
++   */
++  autoCollapsed: boolean
+   /**
+    * Temporary override that collapses the sidebar (e.g. while the AI
+    * assistant panel is docked open) without touching the user's chosen
+@@ -37,7 +45,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
+ 
+   return (
+     <SidebarContext.Provider
+-      value={{ isCollapsed, mode, setMode, isHovered, setHovered, setAutoCollapsed }}
++      value={{ isCollapsed, mode, setMode, isHovered, setHovered, autoCollapsed, setAutoCollapsed }}
+     >
+       {children}
+     </SidebarContext.Provider>
