@@ -27,13 +27,16 @@ const MODE_OPTIONS: { value: SidebarMode; label: string }[] = [
 ]
 
 // --- Explicit hover rules ---
-// 'expanded'  -> always w-64. Hover is ignored entirely.
-// 'collapsed' -> always w-20. Hover is ignored entirely.
+// 'expanded'  -> always w-64 (assistant closed). Hover is ignored entirely.
+// 'collapsed' -> always w-20 (assistant closed). Hover is ignored entirely.
 // 'hover'     -> w-20 at rest, w-64 only while the pointer is over the sidebar.
-// Hover state is only ever read in 'hover' mode, and we only bother updating it in that mode too.
+// While the AI assistant is auto-collapsing the sidebar, ALL modes behave
+// like 'hover' as a temporary default: w-20 at rest, w-64 on hover — so
+// navigating never requires closing the assistant first. See
+// SidebarContext's `autoLocked` for the full resolution.
 
 export default function Sidebar() {
-  const { isCollapsed, mode, setMode, setHovered, autoCollapsed } = useSidebar()
+  const { isCollapsed, isReflowCollapsed, mode, setMode, setHovered } = useSidebar()
   const [controlOpen, setControlOpen] = useState(false)
   const controlRef = useRef<HTMLDivElement>(null)
 
@@ -52,11 +55,11 @@ export default function Sidebar() {
   const { displayName, avatarUrl, isLoading: userLoading } = useUser()
   const { workspaceName, isLoading: workspaceLoading } = useWorkspace(app)
 
-  // Hover-mode's ephemeral expand-on-hover is intentionally excluded here —
-  // that's a temporary overlay and shouldn't reflow the page. autoCollapsed
-  // is a real layout change (assistant panel docked open), so it must.
-  const restingCollapsed = mode !== 'expanded' || autoCollapsed
-  const isHoverOverlay = mode === 'hover' && !isCollapsed
+  // Expanded-but-not-reflowed (hover mode's ephemeral expand, or the
+  // assistant's auto-collapse hover escape hatch) always gets the floating
+  // shadow treatment — a real reflow-expand (mode 'expanded', or a manual
+  // control click overriding auto-collapse) never needs it.
+  const isHoverOverlay = !isCollapsed && isReflowCollapsed
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -68,12 +71,16 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Tracked unconditionally: harmless when nothing reads it (static
+  // 'expanded'/'collapsed' modes with the assistant closed ignore hover
+  // entirely), and it's exactly what lets 'hover' mode *and* the
+  // assistant's auto-collapse escape hatch expand-on-hover.
   function handleMouseEnter() {
-    if (mode === 'hover') setHovered(true)
+    setHovered(true)
   }
 
   function handleMouseLeave() {
-    if (mode === 'hover') setHovered(false)
+    setHovered(false)
   }
 
   return (
@@ -81,7 +88,7 @@ export default function Sidebar() {
       {/* Spacer — reserves layout width equal to the RESTING state, so page content never shifts. */}
       <div
         className={`shrink-0 h-screen transition-[width] duration-300 ease-in-out ${
-          restingCollapsed ? 'w-20' : 'w-64'
+          isReflowCollapsed ? 'w-20' : 'w-64'
         }`}
       />
 

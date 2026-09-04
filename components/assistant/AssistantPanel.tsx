@@ -13,11 +13,13 @@ import { AssistantChat } from './AssistantChat'
  *
  * - Mobile: a bottom-sheet overlay (screen is too narrow to show both the
  *   page and the assistant at once, so it dims the page behind it).
- * - Desktop: a real docked split pane — a flex sibling of the page content,
- *   not a `fixed` layer over it. Opening it shrinks the sidebar to icons and
- *   the main content area to make room, so both the page and the assistant
- *   stay visible and usable side by side. Never navigates or reloads the
- *   route underneath it.
+ * - Desktop: a fixed, right-anchored panel whose width animates between
+ *   three states — closed (0), open (420px docked, page content pushed
+ *   over via a spacer), and maximized (full screen up to the sidebar's
+ *   edge, page content behind it free to go full-width since it's hidden
+ *   under the overlay). Opening (open or maximized) auto-collapses the nav
+ *   sidebar to icon-only, and hands control back the moment it closes.
+ *   Never navigates or reloads the route underneath it.
  */
 export function AssistantPanel() {
   const params = useParams<{ app: string }>()
@@ -57,8 +59,8 @@ export function AssistantPanel() {
         </button>
         <button
           onClick={toggleMaximize}
-          title={isMaximized ? 'Shrink panel' : 'Widen panel'}
-          aria-label={isMaximized ? 'Shrink panel' : 'Widen panel'}
+          title={isMaximized ? 'Minimize' : 'Maximize'}
+          aria-label={isMaximized ? 'Minimize' : 'Maximize'}
           className="hidden rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 md:inline-flex"
         >
           {isMaximized ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -110,16 +112,32 @@ export function AssistantPanel() {
         </div>
       </div>
 
-      {/* Desktop: docked split pane — a real flex sibling that pushes the page
-          content over instead of covering it. Width transitions exactly like
-          the sidebar's own collapse animation. */}
+      {/* Desktop: the panel itself is ALWAYS `fixed`, right-anchored, full
+          viewport height — closed/open/maximized only ever change its
+          `width`, nothing else. That's what makes the animation smooth:
+          `position` can never be transitioned by CSS (it jumps instantly no
+          matter the duration), so keeping it fixed the whole time and only
+          ever tweening `width` is what makes every state change glide.
+          Maximized width stops exactly at the sidebar's live edge (via
+          `calc(100vw - <sidebar width>)`) so the nav stays visible on top
+          of it. A separate spacer (below) reserves layout space for the
+          docked 'open' width so the real page content gets pushed over;
+          it collapses to 0 when maximized since the panel then covers the
+          content anyway. */}
       <div
-        className={`hidden shrink-0 flex-col overflow-hidden bg-[#FAFAF7] transition-[width] duration-300 ease-in-out md:flex ${
-          isOpen
-            ? isMaximized
-              ? 'w-[min(70vw,900px)] border-l border-gray-200'
-              : 'w-[420px] border-l border-gray-200'
-            : 'w-0'
+        className={`hidden shrink-0 transition-[width] duration-300 ease-in-out md:block ${
+          isOpen && !isMaximized ? 'w-[420px]' : 'w-0'
+        }`}
+      />
+      <div
+        className={`hidden fixed inset-y-0 right-0 z-[100] flex-col overflow-hidden border-l border-gray-200 bg-[#FAFAF7] transition-[width] duration-300 ease-in-out md:flex ${
+          !isOpen
+            ? 'w-0 border-l-0'
+            : isMaximized
+              ? sidebar?.isCollapsed === false
+                ? 'w-[calc(100vw-16rem)]'
+                : 'w-[calc(100vw-5rem)]'
+              : 'w-[420px]'
         }`}
       >
         <div className="flex h-full min-w-[420px] flex-col">
