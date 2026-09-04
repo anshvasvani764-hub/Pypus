@@ -1,0 +1,622 @@
+diff --git a/app/[app]/automations/template-test/page.tsx b/app/[app]/automations/template-test/page.tsx
+new file mode 100644
+index 0000000..eecede3
+--- /dev/null
++++ b/app/[app]/automations/template-test/page.tsx
+@@ -0,0 +1,37 @@
++import { createServiceClient } from "@/lib/supabase/service";
++import { getApprovedTemplates } from "@/lib/whatsapp/templates";
++import { TemplateTestView } from "@/components/automations/TemplateTestView";
++
++export default async function TemplateTestPage({
++  params,
++}: {
++  params: Promise<{ app: string }>;
++}) {
++  const { app: workspaceSlug } = await params;
++
++  const supabase = createServiceClient();
++  const { data: wsData } = await supabase
++    .from("workspaces")
++    .select("id, name")
++    .eq("slug", workspaceSlug)
++    .single();
++  const workspaceId = wsData?.id ?? "";
++  const workspaceName = wsData?.name ?? "Your Gym";
++
++  const { data: members } = await supabase
++    .from("members")
++    .select("id, name, phone")
++    .eq("workspace_id", workspaceId)
++    .order("name");
++
++  const { templates, error: templatesError } = await getApprovedTemplates();
++
++  return (
++    <TemplateTestView
++      workspaceName={workspaceName}
++      members={members ?? []}
++      templates={templates}
++      templatesError={templatesError}
++    />
++  );
++}
+diff --git a/app/actions/template-test.ts b/app/actions/template-test.ts
+new file mode 100644
+index 0000000..9a209b5
+--- /dev/null
++++ b/app/actions/template-test.ts
+@@ -0,0 +1,48 @@
++"use server";
++
++import { sendWhatsAppTemplate, formatPhoneForWhatsApp } from "@/lib/whatsapp/client";
++
++export interface SendTestTemplateInput {
++  phone: string;
++  templateName: string;
++  languageCode: string;
++  bodyParams: string[];
++  headerImageLink?: string;
++}
++
++export interface SendTestTemplateResult {
++  success: boolean;
++  messageId?: string;
++  sentTo?: string;
++  error?: string;
++}
++
++/**
++ * Sends an approved template to a single member for preview purposes —
++ * lets a workspace owner see exactly how a template renders before
++ * wiring it into a real automation (fee reminders, receipts, etc).
++ */
++export async function sendTestTemplate(
++  input: SendTestTemplateInput
++): Promise<SendTestTemplateResult> {
++  if (!input.phone) return { success: false, error: "Member has no phone number" };
++  if (!input.templateName) return { success: false, error: "No template selected" };
++
++  const result = await sendWhatsAppTemplate(
++    input.phone,
++    input.templateName,
++    input.bodyParams,
++    input.languageCode || "en",
++    input.headerImageLink || undefined
++  );
++
++  if (!result.success) {
++    return { success: false, error: result.error };
++  }
++
++  return {
++    success: true,
++    messageId: result.messageId,
++    sentTo: formatPhoneForWhatsApp(input.phone),
++  };
++}
+diff --git a/app/api/whatsapp-test/route.ts b/app/api/whatsapp-test/route.ts
+deleted file mode 100644
+index 88d2e25..0000000
+--- a/app/api/whatsapp-test/route.ts
++++ /dev/null
+@@ -1,43 +0,0 @@
+-import { NextRequest, NextResponse } from "next/server"
+-import { sendWhatsAppTemplate, formatPhoneForWhatsApp } from "@/lib/whatsapp/client"
+-
+-/**
+- * Local-only test endpoint: sends Meta's pre-approved "hello_world"
+- * template to a given number. No custom template approval needed —
+- * use this to confirm WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID
+- * are wired correctly before your real template is approved.
+- *
+- * Remove this route (or gate it behind an env check) before deploying
+- * to production — it's a test/debug endpoint only.
+- */
+-export async function POST(req: NextRequest) {
+-  try {
+-    const { phone } = await req.json()
+-
+-    if (!phone || typeof phone !== "string") {
+-      return NextResponse.json({ error: "phone is required" }, { status: 400 })
+-    }
+-
+-    const result = await sendWhatsAppTemplate(
+-      phone,
+-      "hello_world",
+-      [],
+-      "en_US"
+-    )
+-
+-    if (!result.success) {
+-      return NextResponse.json({ error: result.error }, { status: 500 })
+-    }
+-
+-    return NextResponse.json({
+-      success: true,
+-      messageId: result.messageId,
+-      sentTo: formatPhoneForWhatsApp(phone),
+-    })
+-  } catch (err) {
+-    return NextResponse.json(
+-      { error: err instanceof Error ? err.message : "Unknown error" },
+-      { status: 500 }
+-    )
+-  }
+-}
+diff --git a/app/whatsapp-test/page.tsx b/app/whatsapp-test/page.tsx
+deleted file mode 100644
+index 8a87761..0000000
+--- a/app/whatsapp-test/page.tsx
++++ /dev/null
+@@ -1,96 +0,0 @@
+-"use client"
+-
+-import { useState } from "react"
+-
+-export default function WhatsAppTestPage() {
+-  const [phone, setPhone] = useState("")
+-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
+-  const [message, setMessage] = useState("")
+-
+-  async function handleSend() {
+-    if (!phone.trim()) {
+-      setStatus("error")
+-      setMessage("Number daalo pehle")
+-      return
+-    }
+-
+-    setStatus("sending")
+-    setMessage("")
+-
+-    try {
+-      const res = await fetch("/api/whatsapp-test", {
+-        method: "POST",
+-        headers: { "Content-Type": "application/json" },
+-        body: JSON.stringify({ phone }),
+-      })
+-      const data = await res.json()
+-
+-      if (!res.ok) {
+-        setStatus("error")
+-        setMessage(data.error || "Kuch gadbad ho gayi")
+-        return
+-      }
+-
+-      setStatus("sent")
+-      setMessage(`Sent to ${data.sentTo} (id: ${data.messageId})`)
+-    } catch (err) {
+-      setStatus("error")
+-      setMessage(err instanceof Error ? err.message : "Network error")
+-    }
+-  }
+-
+-  return (
+-    <div style={{ maxWidth: 420, margin: "60px auto", padding: 24, fontFamily: "sans-serif" }}>
+-      <h1 style={{ fontSize: 20, marginBottom: 4 }}>WhatsApp Number Test</h1>
+-      <p style={{ fontSize: 13, color: "#666", marginBottom: 20 }}>
+-        Sends Meta&apos;s pre-approved <code>hello_world</code> template — no template
+-        approval needed. Local test only.
+-      </p>
+-
+-      <input
+-        type="tel"
+-        placeholder="e.g. 9876543210"
+-        value={phone}
+-        onChange={(e) => setPhone(e.target.value)}
+-        style={{
+-          width: "100%",
+-          padding: "10px 12px",
+-          fontSize: 15,
+-          border: "1px solid #ccc",
+-          borderRadius: 6,
+-          marginBottom: 12,
+-        }}
+-      />
+-
+-      <button
+-        onClick={handleSend}
+-        disabled={status === "sending"}
+-        style={{
+-          width: "100%",
+-          padding: "10px 12px",
+-          fontSize: 15,
+-          fontWeight: 600,
+-          color: "#fff",
+-          background: status === "sending" ? "#94d3a2" : "#25D366",
+-          border: "none",
+-          borderRadius: 6,
+-          cursor: status === "sending" ? "not-allowed" : "pointer",
+-        }}
+-      >
+-        {status === "sending" ? "Sending..." : "Send hello_world"}
+-      </button>
+-
+-      {message && (
+-        <p
+-          style={{
+-            marginTop: 16,
+-            fontSize: 13,
+-            color: status === "error" ? "#c0392b" : "#1e824c",
+-          }}
+-        >
+-          {message}
+-        </p>
+-      )}
+-    </div>
+-  )
+-}
+diff --git a/components/automations/TemplateTestView.tsx b/components/automations/TemplateTestView.tsx
+new file mode 100644
+index 0000000..53edffc
+--- /dev/null
++++ b/components/automations/TemplateTestView.tsx
+@@ -0,0 +1,249 @@
++"use client";
++
++import { useMemo, useState } from "react";
++import { FlaskConical, Loader2, Send, ChevronDown, MessageCircle } from "lucide-react";
++import { PageHeader } from "@/components/layout/PageHeader";
++import { sendTestTemplate } from "@/app/actions/template-test";
++import type { TemplateSummary } from "@/lib/whatsapp/templates";
++
++interface Member {
++  id: string;
++  name: string;
++  phone: string | null;
++}
++
++interface TemplateTestViewProps {
++  workspaceName: string;
++  members: Member[];
++  templates: TemplateSummary[];
++  templatesError?: string;
++}
++
++type Status = "idle" | "sending" | "sent" | "error";
++
++const fieldClass =
++  "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400";
++const labelClass = "mb-1.5 block text-xs font-semibold text-gray-600";
++
++export function TemplateTestView({
++  workspaceName,
++  members,
++  templates,
++  templatesError,
++}: TemplateTestViewProps) {
++  const [memberId, setMemberId] = useState("");
++  const [templateKey, setTemplateKey] = useState("");
++  const [bodyValues, setBodyValues] = useState<string[]>([]);
++  const [headerImageLink, setHeaderImageLink] = useState("");
++  const [status, setStatus] = useState<Status>("idle");
++  const [message, setMessage] = useState("");
++
++  const selectedMember = members.find((m) => m.id === memberId);
++  const selectedTemplate = templates.find((t) => t.key === templateKey);
++
++  const previewText = useMemo(() => {
++    const text = selectedTemplate?.bodyText;
++    if (!text) return "";
++    let result = text;
++    bodyValues.forEach((val, i) => {
++      result = result.replace(new RegExp(`\\{\\{${i + 1}\\}\\}`, "g"), val || `{{${i + 1}}}`);
++    });
++    return result;
++  }, [selectedTemplate, bodyValues]);
++
++  function handleTemplateChange(key: string) {
++    setTemplateKey(key);
++    const tpl = templates.find((t) => t.key === key);
++    setBodyValues(new Array(tpl?.bodyVariableCount ?? 0).fill(""));
++    setHeaderImageLink("");
++    setStatus("idle");
++    setMessage("");
++  }
++
++  function updateBodyValue(index: number, value: string) {
++    setBodyValues((prev) => {
++      const next = [...prev];
++      next[index] = value;
++      return next;
++    });
++  }
++
++  async function handleSend() {
++    if (!selectedMember?.phone) {
++      setStatus("error");
++      setMessage("Select a member with a phone number");
++      return;
++    }
++    if (!selectedTemplate) {
++      setStatus("error");
++      setMessage("Select a template");
++      return;
++    }
++    if (selectedTemplate.needsHeaderImage && !headerImageLink.trim()) {
++      setStatus("error");
++      setMessage("This template needs a public header image URL");
++      return;
++    }
++
++    setStatus("sending");
++    setMessage("");
++
++    const result = await sendTestTemplate({
++      phone: selectedMember.phone,
++      templateName: selectedTemplate.name,
++      languageCode: selectedTemplate.language,
++      bodyParams: bodyValues,
++      headerImageLink: headerImageLink.trim() || undefined,
++    });
++
++    if (!result.success) {
++      setStatus("error");
++      setMessage(result.error || "Something went wrong");
++      return;
++    }
++
++    setStatus("sent");
++    setMessage(`Sent to ${selectedMember.name} (${result.sentTo})`);
++  }
++
++  return (
++    <div className="space-y-6 px-6 py-6 md:px-8">
++      <PageHeader
++        title="Template test"
++        subtitle={`Send an approved WhatsApp template to a ${workspaceName} member and see exactly how it'll look on their end.`}
++        actions={
++          <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
++            <FlaskConical className="h-3.5 w-3.5" />
++            Test only
++          </div>
++        }
++      />
++
++      {templatesError && (
++        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
++          Couldn&apos;t load templates: {templatesError}
++        </div>
++      )}
++
++      {!templatesError && templates.length === 0 && (
++        <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500">
++          No APPROVED templates found in this WABA yet.
++        </div>
++      )}
++
++      <div className="grid gap-6 lg:grid-cols-2">
++        {/* Form card */}
++        <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5">
++          <div>
++            <label className={labelClass}>Member</label>
++            <div className="relative">
++              <select
++                value={memberId}
++                onChange={(e) => setMemberId(e.target.value)}
++                className={`${fieldClass} appearance-none pr-9`}
++              >
++                <option value="">Select member</option>
++                {members.map((m) => (
++                  <option key={m.id} value={m.id} disabled={!m.phone}>
++                    {m.name} {m.phone ? `· ${m.phone}` : "(no phone)"}
++                  </option>
++                ))}
++              </select>
++              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
++            </div>
++            {members.length === 0 && (
++              <p className="mt-1.5 text-xs text-gray-400">No members in this workspace yet.</p>
++            )}
++          </div>
++
++          <div>
++            <label className={labelClass}>Template</label>
++            <div className="relative">
++              <select
++                value={templateKey}
++                onChange={(e) => handleTemplateChange(e.target.value)}
++                disabled={templates.length === 0}
++                className={`${fieldClass} appearance-none pr-9`}
++              >
++                <option value="">Select template</option>
++                {templates.map((t) => (
++                  <option key={t.key} value={t.key}>
++                    {t.name} [{t.language}] · {t.category}
++                  </option>
++                ))}
++              </select>
++              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
++            </div>
++          </div>
++
++          {selectedTemplate?.needsHeaderImage && (
++            <div>
++              <label className={labelClass}>Header image URL (public https link)</label>
++              <input
++                type="url"
++                placeholder="https://..."
++                value={headerImageLink}
++                onChange={(e) => setHeaderImageLink(e.target.value)}
++                className={fieldClass}
++              />
++            </div>
++          )}
++
++          {bodyValues.map((val, i) => (
++            <div key={i}>
++              <label className={labelClass}>{`Variable {{${i + 1}}}`}</label>
++              <input
++                type="text"
++                value={val}
++                onChange={(e) => updateBodyValue(i, e.target.value)}
++                className={fieldClass}
++              />
++            </div>
++          ))}
++
++          <button
++            type="button"
++            onClick={handleSend}
++            disabled={status === "sending" || !memberId || !templateKey}
++            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
++          >
++            {status === "sending" ? (
++              <Loader2 className="h-3.5 w-3.5 animate-spin" />
++            ) : (
++              <Send className="h-3.5 w-3.5" />
++            )}
++            {status === "sending" ? "Sending..." : "Send test message"}
++          </button>
++
++          {message && (
++            <p className={`text-xs ${status === "error" ? "text-red-600" : "text-emerald-700"}`}>
++              {message}
++            </p>
++          )}
++        </div>
++
++        {/* Preview card */}
++        <div className="rounded-2xl border border-gray-200 bg-white p-5">
++          <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
++            <MessageCircle className="h-3.5 w-3.5" />
++            HOW IT&apos;LL LOOK
++          </div>
++          {selectedTemplate ? (
++            <div className="rounded-2xl bg-[#DCF8C6] p-3.5 text-sm text-gray-800 shadow-sm">
++              {selectedTemplate.needsHeaderImage && (
++                <div className="mb-2 flex h-28 items-center justify-center rounded-lg bg-white/60 text-xs text-gray-500">
++                  {headerImageLink ? "Image header" : "Image header (add a URL)"}
++                </div>
++              )}
++              <p className="whitespace-pre-wrap">{previewText}</p>
++            </div>
++          ) : (
++            <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-gray-200 text-xs text-gray-400">
++              Pick a template to preview it here
++            </div>
++          )}
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/components/layout/Sidebar.tsx b/components/layout/Sidebar.tsx
+index 8b1b68b..ada62c8 100644
+--- a/components/layout/Sidebar.tsx
++++ b/components/layout/Sidebar.tsx
+@@ -14,6 +14,7 @@ import {
+   ChevronLeft,
+   Receipt,
+   Bell,
++  FlaskConical,
+ } from 'lucide-react'
+ import { useSidebar, SidebarMode } from '@/context/SidebarContext'
+ import { useUser } from '@/hooks/useUser'
+@@ -168,6 +169,7 @@ export default function Sidebar() {
+               </button>
+               <NavItem href={`${base}/automations/receipts`} icon={Receipt} label="Receipts" />
+               <NavItem href={`${base}/automations/fee-reminders`} icon={Bell} label="Fee reminders" />
++              <NavItem href={`${base}/automations/template-test`} icon={FlaskConical} label="Template test" />
+             </>
+           )}
+         </nav>
+diff --git a/lib/whatsapp/templates.ts b/lib/whatsapp/templates.ts
+new file mode 100644
+index 0000000..6b08395
+--- /dev/null
++++ b/lib/whatsapp/templates.ts
+@@ -0,0 +1,93 @@
++/**
++ * Fetches this WABA's APPROVED message templates from Meta, with the
++ * body text and {{1}}, {{2}}... variable count already parsed out so
++ * callers don't have to re-derive it. Server-only (uses WHATSAPP_ACCESS_TOKEN).
++ */
++
++const WHATSAPP_API_VERSION = "v21.0";
++
++export interface TemplateComponentSummary {
++  type: "HEADER" | "BODY" | "FOOTER" | "BUTTONS";
++  format?: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | "LOCATION";
++  text?: string;
++  variableCount: number;
++}
++
++export interface TemplateSummary {
++  /** Unique key for a <select> — same template name can exist per language. */
++  key: string;
++  name: string;
++  language: string;
++  category: string;
++  components: TemplateComponentSummary[];
++  bodyText: string;
++  bodyVariableCount: number;
++  needsHeaderImage: boolean;
++}
++
++function countVariables(text?: string): number {
++  if (!text) return 0;
++  const matches = text.match(/\{\{\d+\}\}/g);
++  return matches ? new Set(matches).size : 0;
++}
++
++export async function getApprovedTemplates(): Promise<{
++  templates: TemplateSummary[];
++  error?: string;
++}> {
++  const token = process.env.WHATSAPP_ACCESS_TOKEN;
++  const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
++
++  if (!token) return { templates: [], error: "WHATSAPP_ACCESS_TOKEN env var is not set" };
++  if (!wabaId) return { templates: [], error: "WHATSAPP_BUSINESS_ACCOUNT_ID env var is not set" };
++
++  try {
++    const url = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${wabaId}/message_templates?fields=name,status,language,category,components&limit=200`;
++    const res = await fetch(url, {
++      headers: { Authorization: `Bearer ${token}` },
++      cache: "no-store",
++    });
++    const data = await res.json();
++
++    if (!res.ok) {
++      const message = data?.error?.message || `Meta API error (${res.status})`;
++      return { templates: [], error: message };
++    }
++
++    const templates: TemplateSummary[] = (data?.data ?? [])
++      .filter((t: { status: string }) => t.status === "APPROVED")
++      .map(
++        (t: {
++          name: string;
++          language: string;
++          category: string;
++          components: Array<{ type: string; format?: string; text?: string }>;
++        }) => {
++          const components: TemplateComponentSummary[] = (t.components ?? []).map((c) => ({
++            type: c.type as TemplateComponentSummary["type"],
++            format: c.format as TemplateComponentSummary["format"],
++            text: c.text,
++            variableCount: countVariables(c.text),
++          }));
++
++          const body = components.find((c) => c.type === "BODY");
++          const header = components.find((c) => c.type === "HEADER");
++
++          return {
++            key: `${t.name}__${t.language}`,
++            name: t.name,
++            language: t.language,
++            category: t.category,
++            components,
++            bodyText: body?.text ?? "",
++            bodyVariableCount: body?.variableCount ?? 0,
++            needsHeaderImage: header?.format === "IMAGE",
++          };
++        }
++      );
++
++    return { templates };
++  } catch (err) {
++    return { templates: [], error: err instanceof Error ? err.message : "Unknown error" };
++  }
++}

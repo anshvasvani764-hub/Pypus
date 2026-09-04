@@ -203,14 +203,8 @@ export function AgentPendingView({
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
       <PageHeader
-        title="Agent"
+        title="Receipt Agent"
         subtitle="Payment receipts send themselves on WhatsApp — this is the live log."
-        actions={
-          <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
-            <MessageCircle className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
-            WhatsApp connected
-          </div>
-        }
       />
 
       {/* Toolbar */}
