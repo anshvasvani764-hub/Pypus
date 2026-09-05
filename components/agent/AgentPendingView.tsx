@@ -178,6 +178,20 @@ export function AgentPendingView({
           : r
       )
     );
+
+    // A sent receipt no longer belongs in the live Queue — it's moved to
+    // "Sent" server-side (getReceiptWorklist now excludes it). Leaving it
+    // sitting here forever showed a timestamp-less "Sent" row that looked
+    // like a second, duplicate entry next to the real one. Show the brief
+    // "Sent" confirmation, then drop it from the live list and refresh so
+    // it reappears once, correctly, in History with a real timestamp.
+    if (result.success) {
+      setTimeout(() => {
+        setRows((prev) => prev.filter((r) => r.key !== key));
+        router.refresh();
+      }, 1200);
+    }
+
     return result.success;
   }
 
