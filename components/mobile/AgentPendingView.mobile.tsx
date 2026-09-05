@@ -16,12 +16,14 @@ import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { sendAgentReceipt } from '@/app/actions/agent'
 import { AUTO_WHATSAPP_ENABLED } from '@/lib/config/messaging'
 import type { ReceiptWorklistItem, AgentActivityItem } from '@/lib/agent/queries'
+import type { ReceiptSendMode } from '@/app/actions/receipt-agent'
 
 interface Props {
   workspaceSlug: string
   workspaceName: string
   activity: AgentActivityItem[]
   receiptsPending: ReceiptWorklistItem[]
+  sendMode?: ReceiptSendMode
 }
 
 type RowStatus = 'queued' | 'sending' | 'sent' | 'failed'
@@ -85,6 +87,7 @@ export function AgentPendingView({
   workspaceName,
   activity,
   receiptsPending,
+  sendMode = 'manual',
 }: Props) {
   const router = useRouter()
   const [rows, setRows] = useState<LiveRow[]>([])
@@ -119,13 +122,13 @@ export function AgentPendingView({
     withDelays.forEach(({ item, delay }) => {
       const key = `rcpt-${item.receiptId}`
       queuedKeysRef.current.add(key)
-      if (AUTO_WHATSAPP_ENABLED) {
+      if (sendMode === 'auto' && AUTO_WHATSAPP_ENABLED) {
         const timer = setTimeout(() => void fireSend(key, item), delay * 1000)
         timersRef.current.set(key, timer)
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receiptsPending])
+  }, [receiptsPending, sendMode])
 
   useEffect(() => {
     const tick = setInterval(() => {
@@ -147,11 +150,7 @@ export function AgentPendingView({
     const result = await sendAgentReceipt({
       receiptId: item.receiptId,
       memberPhone: item.memberPhone,
-      memberName: item.memberName,
-      amount: item.amount,
-      workspaceName,
-      paymentMethod: item.paymentMethod,
-      validTillDate: item.validTillDate,
+      templateVars: item.templateVars,
       receiptImageUrl: item.receiptImageUrl,
     })
 
@@ -325,7 +324,7 @@ export function AgentPendingView({
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold whitespace-nowrap ${STATUS_CHIP[row.status]}`}
                   >
                     <StatusIcon status={row.status} />
-                    {row.status === 'queued' && AUTO_WHATSAPP_ENABLED
+                    {row.status === 'queued' && sendMode === 'auto' && AUTO_WHATSAPP_ENABLED
                       ? `${row.secondsLeft}s`
                       : STATUS_LABEL[row.status]}
                   </span>

@@ -35,6 +35,17 @@ export function formatReceiptDate(isoDate: string): string {
   });
 }
 
+export function formatReceiptShortDate(isoDate: string): string {
+  // Returns: "7 July" (no year, no time) — matches the approved
+  // "payment_receipt" WhatsApp template's Payment Date / Valid Till vars.
+  const date = new Date(isoDate);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Asia/Kolkata',
+  });
+}
+
 export function formatReceiptPeriod(dueDate: string, duration: 'monthly' | 'quarterly' | 'yearly' = 'monthly'): string {
   // Calculate start date based on due date and duration
   const due = new Date(dueDate);

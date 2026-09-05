@@ -5,7 +5,6 @@ import { X, Download, MessageCircle, Loader2, Check, RotateCcw } from "lucide-re
 import { generateReceiptImage, type ReceiptData } from "@/lib/utils/receipt-generator";
 import { downloadReceipt } from "@/lib/utils/whatsapp-share";
 import { saveReceipt, sendAgentReceipt } from "@/app/actions/agent";
-import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
 
 export type PaymentMethod = "Cash" | "UPI";
 
@@ -139,6 +138,8 @@ function MarkPaidDialog({
             feeId: result.fee.id,
             receiptNumber: receiptData.receiptNumber,
             amount: Number(amount),
+            planAmount: amountSnapshot,
+            remainingAmount: remainingAfterThisPayment,
             paymentMethod: method,
             paidDate: receiptData.paidDate,
             validTillDate: dueDate,
@@ -148,7 +149,9 @@ function MarkPaidDialog({
           setReceiptId(saved.receiptId ?? null);
           if (saved.whatsapp.success) {
             setWaStatus("sent");
-          } else if (!AUTO_WHATSAPP_ENABLED) {
+          } else if (saved.whatsapp.error === "queued") {
+            // Receipt Agent is set to Manual for this workspace — it waits
+            // in the queue (Automations > Receipts) for the owner to send.
             setWaStatus("queued");
           } else {
             setWaStatus("failed");
@@ -156,12 +159,8 @@ function MarkPaidDialog({
           }
         } catch (err) {
           console.error("saveReceipt failed:", err);
-          if (!AUTO_WHATSAPP_ENABLED) {
-            setWaStatus("queued");
-          } else {
-            setWaStatus("failed");
-            setWaError("Couldn't send automatically");
-          }
+          setWaStatus("failed");
+          setWaError("Couldn't send automatically");
         }
       } else {
         setError(result.error || "Failed to record payment");
@@ -181,11 +180,16 @@ function MarkPaidDialog({
     const result = await sendAgentReceipt({
       receiptId,
       memberPhone: memberPhone || null,
-      memberName,
-      amount: Number(amount),
-      workspaceName,
-      paymentMethod: method,
-      validTillDate: dueDate,
+      templateVars: {
+        name: memberName,
+        workspaceName,
+        planAmount: amountSnapshot,
+        amountPaid: Number(amount),
+        paymentMethod: method,
+        remainingAmount: pendingAfterPayment,
+        paymentDate: new Date().toISOString(),
+        validTillDate: dueDate,
+      },
       receiptImageUrl,
     });
 
@@ -281,7 +285,7 @@ function MarkPaidDialog({
               {waStatus === "queued" && (
                 <>
                   <MessageCircle className="h-4 w-4" />
-                  Will be sent to {memberName} on WhatsApp shortly
+                  Queued — send it from Automations &gt; Receipts (Manual mode)
                 </>
               )}
               {waStatus === "failed" && (

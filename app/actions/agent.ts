@@ -4,17 +4,18 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { revalidatePath } from "next/cache";
 import { sendWhatsAppText, sendWhatsAppTemplate } from "@/lib/whatsapp/client";
 import { notifyReceiptGenerated } from "@/lib/telegram/client";
-import { formatReceiptDate } from "@/lib/utils/date";
 import { getAgentActivity, getReceiptWorklist } from "@/lib/agent/queries";
 import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
+import { getReceiptAgentSettings } from "@/app/actions/receipt-agent";
+import { buildReceiptTemplateBodyParams, type ReceiptTemplateVars } from "@/lib/receipts/template-vars";
 
 // Fee/attendance nudges are hidden from the Agent tab for now — it's
 // receipts-only. getFeeWorklist / getAbsenteeWorklist still live in
 // lib/agent/queries.ts if this needs to come back.
-export async function getAgentDashboard(workspaceId: string) {
+export async function getAgentDashboard(workspaceId: string, workspaceName: string) {
   const [activity, receiptsPending] = await Promise.all([
     getAgentActivity(workspaceId),
-    getReceiptWorklist(workspaceId),
+    getReceiptWorklist(workspaceId, workspaceName),
   ]);
   return { activity, receiptsPending };
 }
@@ -22,30 +23,22 @@ export async function getAgentDashboard(workspaceId: string) {
 /** Shared core: actually calls the WhatsApp API with the payment_receipt
  * template (receipt photo as header image) and writes the result onto the
  * receipt row. Used both right after a receipt is created (automatic) and
- * from the Agent tab's retry action (fallback for when the automatic send
- * failed, e.g. WhatsApp API hiccup or no phone on file at the time).
+ * from the Agent tab's Send/Send all/script-modal actions.
  *
- * Template body variable order (must match what was approved in Meta):
- *   {{1}} member name, {{2}} amount, {{3}} workspace/gym name,
- *   {{4}} payment method, {{5}} valid till date
+ * `templateVars` are sent exactly as given — if the owner edited them in
+ * the Receipt Agent's script modal, those exact saved values go out, not
+ * freshly recomputed ones. See lib/receipts/template-vars.ts for the
+ * {{1}}-{{5}} order (must match what was approved in Meta).
  */
 async function sendReceiptOverWhatsApp({
   receiptId,
   memberPhone,
-  memberName,
-  amount,
-  workspaceName,
-  paymentMethod,
-  validTillDate,
+  templateVars,
   receiptImageUrl,
 }: {
   receiptId: string;
   memberPhone: string | null;
-  memberName: string;
-  amount: number;
-  workspaceName: string;
-  paymentMethod: string;
-  validTillDate: string | null;
+  templateVars: ReceiptTemplateVars;
   receiptImageUrl: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const supabase = createServiceClient();
@@ -64,13 +57,7 @@ async function sendReceiptOverWhatsApp({
   const result = await sendWhatsAppTemplate(
     memberPhone,
     "payment_receipt",
-    [
-      memberName,
-      amount.toLocaleString("en-IN"),
-      workspaceName,
-      paymentMethod,
-      validTillDate ? formatReceiptDate(validTillDate) : "—",
-    ],
+    buildReceiptTemplateBodyParams(templateVars),
     "en",
     receiptImageUrl
   );
@@ -96,16 +83,15 @@ async function sendReceiptOverWhatsApp({
   return { success: true };
 }
 
-/** Retry action for the Agent tab's log — used only as a fallback when the
- * automatic send (in `saveReceipt` below) didn't go through. */
+/** Fires from the Agent tab: the row's Send button, the hover paper-plane
+ * icon, "Send all", or the script modal's "Send now" — any explicit,
+ * owner-initiated send of a queued/failed receipt. `templateVars` is
+ * whatever's currently showing in the row (the owner's saved edit if
+ * there is one, otherwise the auto-computed default). */
 export async function sendAgentReceipt(args: {
   receiptId: string;
   memberPhone: string | null;
-  memberName: string;
-  amount: number;
-  workspaceName: string;
-  paymentMethod: string;
-  validTillDate: string | null;
+  templateVars: ReceiptTemplateVars;
   receiptImageUrl: string | null;
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendReceiptOverWhatsApp(args);
@@ -169,10 +155,12 @@ export async function sendAgentReminder({
 
 /** Called right after a payment is marked paid. Uploads the receipt image
  * (generated client-side on canvas) to Supabase Storage, saves the row,
- * and pings the owner on Telegram so they know to send it on WhatsApp
- * manually (auto-send via the WhatsApp API is off — see
- * AUTO_WHATSAPP_ENABLED above). The receipt still lands in the Agent
- * tab's log either way, so nothing silently disappears. */
+ * and — if this workspace's Receipt Agent is set to Automatic
+ * (Configuration gear on Automations > Receipts) — fires the WhatsApp
+ * template send immediately. In Manual mode the receipt just lands in
+ * the queue for the owner to send with a tap or "Send all". Either way
+ * it also pings the owner on Telegram as an activity log, and the
+ * receipt always lands in the Agent tab so nothing silently disappears. */
 export async function saveReceipt({
   workspaceId,
   memberId,
@@ -181,6 +169,8 @@ export async function saveReceipt({
   feeId,
   receiptNumber,
   amount,
+  planAmount,
+  remainingAmount,
   paymentMethod,
   paidDate,
   validTillDate,
@@ -194,6 +184,10 @@ export async function saveReceipt({
   feeId: string | null;
   receiptNumber: string;
   amount: number;
+  /** Full plan price for this billing cycle — {{3}} on the WhatsApp template. */
+  planAmount: number;
+  /** What's still owed after this payment — {{6}} on the WhatsApp template. */
+  remainingAmount: number;
   paymentMethod: string;
   paidDate: string;
   validTillDate: string | null;
@@ -250,15 +244,23 @@ export async function saveReceipt({
     };
   }
 
-  const whatsapp = AUTO_WHATSAPP_ENABLED
+  const receiptAgentSettings = await getReceiptAgentSettings(workspaceId);
+  const shouldAutoSend = AUTO_WHATSAPP_ENABLED && receiptAgentSettings.sendMode === "auto";
+
+  const whatsapp = shouldAutoSend
     ? await sendReceiptOverWhatsApp({
         receiptId: data.id,
         memberPhone,
-        memberName,
-        amount,
-        workspaceName,
-        paymentMethod,
-        validTillDate,
+        templateVars: {
+          name: memberName,
+          workspaceName,
+          planAmount,
+          amountPaid: amount,
+          paymentMethod,
+          remainingAmount,
+          paymentDate: paidDate,
+          validTillDate,
+        },
         receiptImageUrl,
       })
     : { success: false, error: "queued" };

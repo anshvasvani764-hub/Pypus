@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { getISTDateString, formatISTDateTime } from "@/lib/utils/date";
+import { buildReceiptPreviewText, type ReceiptTemplateVars } from "@/lib/receipts/template-vars";
 
 export interface AbsenteeWorklistItem {
   memberId: string;
@@ -37,6 +38,11 @@ export interface ReceiptWorklistItem {
   validTillDate: string | null;
   receiptImageUrl: string | null;
   waMessage: string;
+  /** The exact {{1}}-{{5}} values that'll be sent — the owner's saved
+   * edit if there is one, otherwise the auto-computed default. */
+  templateVars: ReceiptTemplateVars;
+  /** True when templateVars is an owner-edited override, not the auto-generated default. */
+  isMessageEdited: boolean;
 }
 
 export interface AgentActivityItem {
@@ -199,15 +205,21 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
 }
 
 /** Receipts that were generated but not yet sent to the member on WhatsApp. */
-export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWorklistItem[]> {
+export async function getReceiptWorklist(
+  workspaceId: string,
+  workspaceName: string
+): Promise<ReceiptWorklistItem[]> {
   const supabase = createServiceClient();
 
   const [receiptsRes, membersRes] = await Promise.all([
     supabase
       .from("receipts")
-      .select("id, member_id, fee_id, receipt_number, amount, paid_date, payment_method, receipt_image_url")
+      .select(
+        "id, member_id, fee_id, receipt_number, amount, paid_date, payment_method, receipt_image_url, whatsapp_template_vars"
+      )
       .eq("workspace_id", workspaceId)
-      .is("whatsapp_sent_at", null),
+      .is("whatsapp_sent_at", null)
+      .eq("agent_dismissed", false),
     supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
   ]);
 
@@ -216,17 +228,36 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
 
   // "Valid till" = the due_date on the fee this receipt was paid against,
-  // i.e. the next renewal date the payment covers up to.
+  // i.e. the next renewal date the payment covers up to. Plan amount /
+  // remaining amount also come from here (amount_snapshot / paid_amount)
+  // rather than being duplicated onto the receipt row.
   const feeIds = (receiptsRes.data ?? []).map((r) => r.fee_id).filter(Boolean) as string[];
-  const dueDateByFeeId = new Map<string, string>();
+  const feeById = new Map<string, { due_date: string; amount_snapshot: number; paid_amount: number }>();
   if (feeIds.length > 0) {
-    const feesRes = await supabase.from("fees").select("id, due_date").in("id", feeIds);
-    for (const f of feesRes.data ?? []) dueDateByFeeId.set(f.id, f.due_date);
+    const feesRes = await supabase
+      .from("fees")
+      .select("id, due_date, amount_snapshot, paid_amount")
+      .in("id", feeIds);
+    for (const f of feesRes.data ?? []) feeById.set(f.id, f);
   }
 
   return (receiptsRes.data ?? []).map((r) => {
     const member = nameById.get(r.member_id);
     const amount = Number(r.amount);
+    const fee = r.fee_id ? feeById.get(r.fee_id) : undefined;
+    const validTillDate = fee?.due_date ?? null;
+    const defaultVars: ReceiptTemplateVars = {
+      name: member?.name ?? "",
+      workspaceName,
+      planAmount: fee ? Number(fee.amount_snapshot) : amount,
+      amountPaid: amount,
+      paymentMethod: r.payment_method ?? "Cash",
+      remainingAmount: fee ? Math.max(Number(fee.amount_snapshot) - Number(fee.paid_amount), 0) : 0,
+      paymentDate: r.paid_date,
+      validTillDate,
+    };
+    const savedVars = (r.whatsapp_template_vars as ReceiptTemplateVars | null) ?? null;
+    const templateVars = savedVars ?? defaultVars;
     return {
       receiptId: r.id,
       memberId: r.member_id,
@@ -236,9 +267,11 @@ export async function getReceiptWorklist(workspaceId: string): Promise<ReceiptWo
       amount,
       paidDate: r.paid_date,
       paymentMethod: r.payment_method ?? "Cash",
-      validTillDate: r.fee_id ? (dueDateByFeeId.get(r.fee_id) ?? null) : null,
+      validTillDate,
       receiptImageUrl: r.receipt_image_url ?? null,
-      waMessage: `Hi ${member?.name ?? ""}, thanks for your payment of ₹${amount.toLocaleString("en-IN")}. Receipt #${r.receipt_number} — please save it for your records.`,
+      waMessage: buildReceiptPreviewText(templateVars),
+      templateVars,
+      isMessageEdited: Boolean(savedVars),
     };
   });
 }

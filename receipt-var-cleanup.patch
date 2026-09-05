@@ -1,0 +1,86 @@
+diff --git a/app/actions/agent.ts b/app/actions/agent.ts
+index e34b814..ea35c9d 100644
+--- a/app/actions/agent.ts
++++ b/app/actions/agent.ts
+@@ -228,8 +228,6 @@ export async function saveReceipt({
+       fee_id: feeId,
+       receipt_number: receiptNumber,
+       amount,
+-      plan_amount: planAmount,
+-      remaining_amount: remainingAmount,
+       payment_method: paymentMethod,
+       paid_date: paidDate,
+       receipt_image_url: receiptImageUrl,
+diff --git a/lib/agent/queries.ts b/lib/agent/queries.ts
+index ab87a35..ab8898c 100644
+--- a/lib/agent/queries.ts
++++ b/lib/agent/queries.ts
+@@ -215,7 +215,7 @@ export async function getReceiptWorklist(
+     supabase
+       .from("receipts")
+       .select(
+-        "id, member_id, fee_id, receipt_number, amount, plan_amount, remaining_amount, paid_date, payment_method, receipt_image_url, whatsapp_template_vars"
++        "id, member_id, fee_id, receipt_number, amount, paid_date, payment_method, receipt_image_url, whatsapp_template_vars"
+       )
+       .eq("workspace_id", workspaceId)
+       .is("whatsapp_sent_at", null)
+@@ -228,28 +228,31 @@ export async function getReceiptWorklist(
+   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
+ 
+   // "Valid till" = the due_date on the fee this receipt was paid against,
+-  // i.e. the next renewal date the payment covers up to.
++  // i.e. the next renewal date the payment covers up to. Plan amount /
++  // remaining amount also come from here (amount_snapshot / paid_amount)
++  // rather than being duplicated onto the receipt row.
+   const feeIds = (receiptsRes.data ?? []).map((r) => r.fee_id).filter(Boolean) as string[];
+-  const dueDateByFeeId = new Map<string, string>();
++  const feeById = new Map<string, { due_date: string; amount_snapshot: number; paid_amount: number }>();
+   if (feeIds.length > 0) {
+-    const feesRes = await supabase.from("fees").select("id, due_date").in("id", feeIds);
+-    for (const f of feesRes.data ?? []) dueDateByFeeId.set(f.id, f.due_date);
++    const feesRes = await supabase
++      .from("fees")
++      .select("id, due_date, amount_snapshot, paid_amount")
++      .in("id", feeIds);
++    for (const f of feesRes.data ?? []) feeById.set(f.id, f);
+   }
+ 
+   return (receiptsRes.data ?? []).map((r) => {
+     const member = nameById.get(r.member_id);
+     const amount = Number(r.amount);
+-    const validTillDate = r.fee_id ? (dueDateByFeeId.get(r.fee_id) ?? null) : null;
+-    // plan_amount/remaining_amount are only populated for receipts saved
+-    // after the 8-var template migration — older rows fall back to the
+-    // amount paid so the message still renders something sane.
++    const fee = r.fee_id ? feeById.get(r.fee_id) : undefined;
++    const validTillDate = fee?.due_date ?? null;
+     const defaultVars: ReceiptTemplateVars = {
+       name: member?.name ?? "",
+       workspaceName,
+-      planAmount: r.plan_amount != null ? Number(r.plan_amount) : amount,
++      planAmount: fee ? Number(fee.amount_snapshot) : amount,
+       amountPaid: amount,
+       paymentMethod: r.payment_method ?? "Cash",
+-      remainingAmount: r.remaining_amount != null ? Number(r.remaining_amount) : 0,
++      remainingAmount: fee ? Math.max(Number(fee.amount_snapshot) - Number(fee.paid_amount), 0) : 0,
+       paymentDate: r.paid_date,
+       validTillDate,
+     };
+diff --git a/supabase/migrations/20260905030000_receipt_plan_remaining_amount.sql b/supabase/migrations/20260905030000_receipt_plan_remaining_amount.sql
+deleted file mode 100644
+index e60eeb2..0000000
+--- a/supabase/migrations/20260905030000_receipt_plan_remaining_amount.sql
++++ /dev/null
+@@ -1,12 +0,0 @@
+--- The approved "payment_receipt" WhatsApp template actually has 8 body
+--- variables (confirmed in WhatsApp Manager), not the 5 the Receipt Agent
+--- code originally assumed — it includes Plan Amount and Remaining Amount
+--- alongside the amount actually paid this time. Those two numbers are
+--- computed client-side when the receipt image is generated
+--- (lib/utils/receipt-generator.ts) but were never persisted, so the Agent
+--- tab's worklist (lib/agent/queries.ts) had no way to rebuild them for the
+--- default/auto-computed template vars. Persist them on the receipt row.
+-
+-alter table public.receipts
+-  add column if not exists plan_amount numeric,
+-  add column if not exists remaining_amount numeric;
