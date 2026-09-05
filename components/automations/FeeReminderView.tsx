@@ -16,13 +16,13 @@ import {
   Send,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { sendReminder } from "@/app/actions/member-reminders";
 import {
   saveFeeReminderSettings,
+  sendFeeReminderNow,
   type FeeReminderSettings,
-  type RepeatInterval,
   type SendMode,
 } from "@/app/actions/fee-reminders";
+import { hoursWithDayHint } from "@/lib/agent/fee-reminder-eligibility";
 import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
 import type { FeeWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
 
@@ -31,56 +31,42 @@ interface FeeReminderViewProps {
   workspaceSlug: string;
   workspaceName: string;
   pending: FeeWorklistItem[];
-  sent: AgentActivityItem[];
+  sentBeforeDue: AgentActivityItem[];
+  sentOverdue: AgentActivityItem[];
   initialSettings: FeeReminderSettings;
 }
 
-type RowFilter = "all" | "due" | "overdue" | "sent";
-type RowStatus = "due" | "overdue" | "sending" | "sent" | "failed";
+type PageTab = "queue" | "before_due_log" | "overdue_log";
+type RowFilter = "all" | "before_due" | "overdue";
+type RowStatus = "before_due" | "overdue" | "sending" | "sent" | "failed";
 
 interface PendingRow {
-  source: "pending";
   key: string;
   item: FeeWorklistItem;
   status: RowStatus;
 }
 
-interface SentRow {
-  source: "sent";
-  key: string;
-  memberName: string;
-  detail: string;
-  at: string;
-}
-
 const PAGE_SIZE = 10;
-
-const REPEAT_OPTIONS: { value: RepeatInterval; label: string }[] = [
-  { value: "once", label: "Once" },
-  { value: "daily", label: "Daily" },
-  { value: "every_2_days", label: "Every 2 days" },
-];
 
 export function FeeReminderView({
   workspaceId,
   workspaceSlug,
   workspaceName,
   pending,
-  sent,
+  sentBeforeDue,
+  sentOverdue,
   initialSettings,
 }: FeeReminderViewProps) {
   const router = useRouter();
 
+  const [tab, setTab] = useState<PageTab>("queue");
+
   const [rows, setRows] = useState<PendingRow[]>(() =>
     pending.map((item) => ({
-      source: "pending",
       key: `fee-${item.feeId}`,
       item,
-      status: item.status,
+      status: item.reminderStage,
     }))
-  );
-  const [sentRows, setSentRows] = useState<SentRow[]>(() =>
-    sent.map((a) => ({ source: "sent", key: a.id, memberName: a.memberName, detail: a.detail, at: a.at }))
   );
 
   const [query, setQuery] = useState("");
@@ -96,19 +82,12 @@ export function FeeReminderView({
   useEffect(() => {
     setRows(
       pending.map((item) => ({
-        source: "pending",
         key: `fee-${item.feeId}`,
         item,
-        status: item.status,
+        status: item.reminderStage,
       }))
     );
   }, [pending]);
-
-  useEffect(() => {
-    setSentRows(
-      sent.map((a) => ({ source: "sent", key: a.id, memberName: a.memberName, detail: a.detail, at: a.at }))
-    );
-  }, [sent]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -131,29 +110,21 @@ export function FeeReminderView({
 
     setRows((prev) => prev.map((r) => (r.key === row.key ? { ...r, status: "sending" } : r)));
 
-    const result = await sendReminder({
+    const result = await sendFeeReminderNow({
       workspaceId,
+      workspaceName,
       memberId: item.memberId,
       memberPhone: item.memberPhone,
       memberName: item.memberName,
-      workspaceName,
       feeId: item.feeId,
-      type: "fees",
+      stage: item.reminderStage,
+      amount: item.amount,
+      dueDate: item.dueDate,
+      daysOverdue: item.daysOverdue,
     });
 
-    if (result.success && result.url) {
-      window.open(result.url, "_blank", "noopener,noreferrer");
+    if (result.success) {
       setRows((prev) => prev.filter((r) => r.key !== row.key));
-      setSentRows((prev) => [
-        {
-          source: "sent",
-          key: `just-sent-${item.feeId}-${Date.now()}`,
-          memberName: item.memberName,
-          detail: "Fee reminder sent on WhatsApp",
-          at: "Just now",
-        },
-        ...prev,
-      ]);
       return true;
     }
 
@@ -192,38 +163,42 @@ export function FeeReminderView({
   }
 
   const filteredRows = rows.filter((r) => {
-    if (statusFilter === "sent") return false;
-    if (statusFilter !== "all" && statusFilter !== r.item.status) return false;
+    if (statusFilter !== "all" && statusFilter !== r.item.reminderStage) return false;
     if (query && !r.item.memberName.toLowerCase().includes(query.toLowerCase())) return false;
-    return true;
-  });
-  const filteredSent = sentRows.filter((s) => {
-    if (statusFilter !== "all" && statusFilter !== "sent") return false;
-    if (query && !s.memberName.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [query, statusFilter]);
+  }, [query, statusFilter, tab]);
 
   const visiblePending = filteredRows.slice(0, visibleCount);
-  const visibleSent = filteredSent.slice(0, Math.max(0, visibleCount - filteredRows.length));
-  const totalFiltered = filteredRows.length + filteredSent.length;
-  const hasMore = visibleCount < totalFiltered;
+  const hasMorePending = visibleCount < filteredRows.length;
+
+  const activeLog = tab === "before_due_log" ? sentBeforeDue : sentOverdue;
+  const filteredLog = activeLog.filter(
+    (a) => !query || a.memberName.toLowerCase().includes(query.toLowerCase())
+  );
+  const visibleLog = filteredLog.slice(0, visibleCount);
+  const hasMoreLog = visibleCount < filteredLog.length;
 
   const sendableCount = filteredRows.filter((r) => r.item.memberPhone).length;
+
+  const TABS: { value: PageTab; label: string; count: number }[] = [
+    { value: "queue", label: "Pending queue", count: rows.length },
+    { value: "before_due_log", label: "Before-due log", count: sentBeforeDue.length },
+    { value: "overdue_log", label: "Overdue log", count: sentOverdue.length },
+  ];
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
       <PageHeader
         title="Fee reminders"
-        subtitle="Members with a due or overdue fee — send a WhatsApp nudge with one tap."
+        subtitle="Soft reminders before the due date, repeating nudges after — sent on WhatsApp."
         actions={
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
-              <MessageCircle className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
-              WhatsApp
+              
             </div>
             <button
               type="button"
@@ -237,6 +212,22 @@ export function FeeReminderView({
         }
       />
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 w-fit">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setTab(t.value)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              tab === t.value ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {t.label} ({t.count})
+          </button>
+        ))}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1 max-w-sm">
@@ -249,41 +240,37 @@ export function FeeReminderView({
           />
         </div>
 
-        <div className="relative" ref={filterRef}>
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            {statusFilter === "all"
-              ? "All statuses"
-              : statusFilter === "due"
-                ? "Due"
-                : statusFilter === "overdue"
-                  ? "Overdue"
-                  : "Sent"}
-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-          </button>
-          {filterOpen && (
-            <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-              {(["all", "due", "overdue", "sent"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter(s);
-                    setFilterOpen(false);
-                  }}
-                  className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  {s === "all" ? "All statuses" : s === "due" ? "Due" : s === "overdue" ? "Overdue" : "Sent"}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {tab === "queue" && (
+          <div className="relative" ref={filterRef}>
+            <button
+              type="button"
+              onClick={() => setFilterOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {statusFilter === "all" ? "All" : statusFilter === "before_due" ? "Before due" : "Overdue"}
+              <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+            </button>
+            {filterOpen && (
+              <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                {(["all", "before_due", "overdue"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(s);
+                      setFilterOpen(false);
+                    }}
+                    className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    {s === "all" ? "All" : s === "before_due" ? "Before due" : "Overdue"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {sendableCount > 0 && (
+        {tab === "queue" && sendableCount > 0 && (
           <button
             type="button"
             onClick={handleSendAll}
@@ -294,103 +281,105 @@ export function FeeReminderView({
             Send all pending ({sendableCount})
           </button>
         )}
-
-        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          Sent {sentRows.length} · Pending {rows.length}
-        </div>
       </div>
 
-      {/* Row list */}
-      {filteredRows.length === 0 && filteredSent.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
-            <Check className="h-6 w-6 text-emerald-600" />
-          </div>
-          <p className="text-sm font-medium text-gray-900">No fee reminders yet</p>
-          <p className="max-w-xs text-xs text-gray-500">
-            As soon as a member&apos;s fee is due or overdue, they&apos;ll show up here so you can send a WhatsApp reminder.
-          </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-          {visiblePending.map((row) => {
-            const overdue = row.item.status === "overdue";
-            return (
-              <div
-                key={row.key}
-                role="button"
-                tabIndex={0}
-                onClick={() => openMemberFees(row.item.memberId)}
-                onKeyDown={(e) => e.key === "Enter" && openMemberFees(row.item.memberId)}
-                className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 hover:bg-gray-50"
-              >
+      {/* Queue tab */}
+      {tab === "queue" &&
+        (filteredRows.length === 0 ? (
+          <EmptyState
+            title="No reminders due right now"
+            body="As soon as a soft reminder or overdue nudge becomes eligible, it'll show up here so you can send it on WhatsApp."
+          />
+        ) : (
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            {visiblePending.map((row) => {
+              const overdue = row.item.reminderStage === "overdue";
+              return (
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                    overdue ? "bg-red-50" : "bg-amber-50"
-                  }`}
+                  key={row.key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openMemberFees(row.item.memberId)}
+                  onKeyDown={(e) => e.key === "Enter" && openMemberFees(row.item.memberId)}
+                  className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 hover:bg-gray-50"
                 >
-                  <Bell className={`h-4 w-4 ${overdue ? "text-red-600" : "text-amber-600"}`} />
-                </div>
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                      overdue ? "bg-red-50" : "bg-amber-50"
+                    }`}
+                  >
+                    <Bell className={`h-4 w-4 ${overdue ? "text-red-600" : "text-amber-600"}`} />
+                  </div>
 
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-900">{row.item.memberName}</p>
+                    <p className="truncate text-xs text-gray-500">
+                      ₹{row.item.amount.toLocaleString("en-IN")}
+                      {row.item.planName ? ` · ${row.item.planName}` : ""}
+                      {overdue ? ` · ${row.item.daysOverdue} days overdue` : ` · due ${row.item.dueDate}`}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                      overdue ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"
+                    }`}
+                  >
+                    {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                    {overdue ? "Overdue" : "Soft reminder"}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSend(row);
+                    }}
+                    disabled={!row.item.memberPhone || row.status === "sending"}
+                    className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+                  >
+                    {row.status === "sending" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send className="h-3.5 w-3.5" />
+                    )}
+                    {row.item.memberPhone ? "Send" : "No phone"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+
+      {/* Log tabs */}
+      {tab !== "queue" &&
+        (filteredLog.length === 0 ? (
+          <EmptyState
+            title={tab === "before_due_log" ? "No soft reminders sent yet" : "No overdue reminders sent yet"}
+            body="Sends show up here the instant they go out on WhatsApp."
+          />
+        ) : (
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            {visibleLog.map((row) => (
+              <div key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
+                  <Bell className="h-4 w-4 text-gray-400" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">{row.item.memberName}</p>
-                  <p className="truncate text-xs text-gray-500">
-                    ₹{row.item.amount.toLocaleString("en-IN")}
-                    {row.item.planName ? ` · ${row.item.planName}` : ""}
-                    {overdue ? ` · ${row.item.daysOverdue} days overdue` : ` · due ${row.item.dueDate}`}
-                  </p>
+                  <p className="truncate text-sm font-medium text-gray-900">{row.memberName}</p>
+                  <p className="truncate text-xs text-gray-500">{row.detail}</p>
                 </div>
-
-                <span
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                    overdue ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"
-                  }`}
-                >
-                  {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                  {overdue ? "Overdue" : "Due"}
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                  <Check className="h-3 w-3" />
+                  Sent
                 </span>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSend(row);
-                  }}
-                  disabled={!row.item.memberPhone || row.status === "sending"}
-                  className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
-                >
-                  {row.status === "sending" ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  {row.item.memberPhone ? "Send" : "No phone"}
-                </button>
+                <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
               </div>
-            );
-          })}
+            ))}
+          </div>
+        ))}
 
-          {visibleSent.map((row) => (
-            <div key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
-                <Bell className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900">{row.memberName}</p>
-                <p className="truncate text-xs text-gray-500">{row.detail}</p>
-              </div>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                <Check className="h-3 w-3" />
-                Sent
-              </span>
-              <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {hasMore && (
+      {((tab === "queue" && hasMorePending) || (tab !== "queue" && hasMoreLog)) && (
         <div className="flex justify-center">
           <button
             type="button"
@@ -424,6 +413,18 @@ export function FeeReminderView({
   );
 }
 
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+        <Check className="h-6 w-6 text-emerald-600" />
+      </div>
+      <p className="text-sm font-medium text-gray-900">{title}</p>
+      <p className="max-w-xs text-xs text-gray-500">{body}</p>
+    </div>
+  );
+}
+
 function FeeReminderSettingsPanel({
   workspaceId,
   initialSettings,
@@ -435,9 +436,9 @@ function FeeReminderSettingsPanel({
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
-  const [enabled, setEnabled] = useState(initialSettings.enabled);
-  const [daysAfterDue, setDaysAfterDue] = useState(String(initialSettings.daysAfterDue));
-  const [repeatInterval, setRepeatInterval] = useState<RepeatInterval>(initialSettings.repeatInterval);
+  const [beforeDueDays, setBeforeDueDays] = useState(String(initialSettings.beforeDueDays));
+  const [afterDueHours, setAfterDueHours] = useState(String(initialSettings.afterDueHours));
+  const [repeatIntervalHours, setRepeatIntervalHours] = useState(String(initialSettings.repeatIntervalHours));
   const [sendMode, setSendMode] = useState<SendMode>(initialSettings.sendMode);
   const [saving, setSaving] = useState(false);
 
@@ -446,9 +447,13 @@ function FeeReminderSettingsPanel({
     setSaving(true);
 
     const result = await saveFeeReminderSettings(workspaceId, {
-      enabled,
-      daysAfterDue: Math.max(0, Number(daysAfterDue) || 0),
-      repeatInterval,
+      // Send mode is the single source of truth now — "enabled" just
+      // tracks whether auto-mode is switched on, so the cron job (which
+      // filters on enabled + send_mode = "auto") keeps working unchanged.
+      enabled: sendMode === "auto",
+      beforeDueDays: Math.max(0, Number(beforeDueDays) || 0),
+      afterDueHours: Math.max(0, Number(afterDueHours) || 0),
+      repeatIntervalHours: Math.max(24, Number(repeatIntervalHours) || 24),
       sendMode,
     });
 
@@ -472,73 +477,110 @@ function FeeReminderSettingsPanel({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Enabled</p>
-              <p className="text-xs text-gray-500">Turn fee reminders on for this workspace</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setEnabled((v) => !v)}
-              aria-pressed={enabled}
-              aria-label="Toggle fee reminders enabled"
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                enabled ? "bg-emerald-600" : "bg-gray-300"
-              }`}
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-900">Send mode</p>
+            <div
+              role="group"
+              aria-label="Fee reminder send mode"
+              className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1"
             >
-              <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  enabled ? "translate-x-5" : "translate-x-0"
+              <button
+                type="button"
+                onClick={() => setSendMode("manual")}
+                aria-pressed={sendMode === "manual"}
+                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
+                  sendMode === "manual"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 }`}
-              />
-            </button>
+              >
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendMode("auto")}
+                aria-pressed={sendMode === "auto"}
+                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
+                  sendMode === "auto"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Automatic
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-500">
+              {sendMode === "manual"
+                ? "Every eligible reminder waits in the Pending queue — you send each one yourself, whenever you want."
+                : "Reminders go out on their own on the schedule below, no queue to check."}
+            </p>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Start reminder (days after due date)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={daysAfterDue}
-              onChange={(e) => setDaysAfterDue(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-            />
-          </div>
+          {sendMode === "auto" && (
+            <>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Soft reminder — days before due date
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={beforeDueDays}
+                  onChange={(e) => setBeforeDueDays(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Sent once, never repeats. Skipped if the fee is paid before this date.
+                </p>
+              </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Repeat</label>
-            <select
-              value={repeatInterval}
-              onChange={(e) => setRepeatInterval(e.target.value as RepeatInterval)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-            >
-              {REPEAT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  First overdue reminder — hours after due date{" "}
+                  <span className="font-normal text-gray-400">{hoursWithDayHint(Number(afterDueHours) || 0)}</span>
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={afterDueHours}
+                  onChange={(e) => setAfterDueHours(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Send mode</label>
-            <select
-              value={sendMode}
-              onChange={(e) => setSendMode(e.target.value as SendMode)}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="manual">Manual approval</option>
-              <option value="auto">Automatic</option>
-            </select>
-            {sendMode === "auto" && !AUTO_WHATSAPP_ENABLED && (
-              <p className="mt-1.5 text-xs text-amber-600">
-                Saved, but automatic sending isn&apos;t live yet — WhatsApp auto-send is off workspace-wide until a
-                business number is reconnected. Reminders will still need manual send till then.
-              </p>
-            )}
-          </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Repeat every — hours{" "}
+                  <span className="font-normal text-gray-400">
+                    {hoursWithDayHint(Number(repeatIntervalHours) || 0)}
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min={24}
+                  value={repeatIntervalHours}
+                  onChange={(e) => setRepeatIntervalHours(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  Minimum 24 hours. Keeps repeating from the last send until the fee is marked paid.
+                </p>
+              </div>
+
+              {!AUTO_WHATSAPP_ENABLED && (
+                <p className="text-xs text-amber-600">
+                  Saved, but automatic sending isn&apos;t live yet — WhatsApp auto-send is off workspace-wide until a
+                  business number is reconnected. Reminders will still need manual send till then.
+                </p>
+              )}
+              {AUTO_WHATSAPP_ENABLED && (
+                <p className="text-xs text-gray-400">
+                  Auto mode fires from an hourly server job, not from this page being open — both the before-due
+                  and overdue WhatsApp templates are approved and live.
+                </p>
+              )}
+            </>
+          )}
 
           <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/60 px-6 py-4">
             <button

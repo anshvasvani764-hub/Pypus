@@ -11,6 +11,10 @@ export async function sendReminder({
   workspaceName,
   feeId,
   type,
+  stage,
+  amount,
+  dueDate,
+  daysOverdue,
 }: {
   workspaceId: string;
   memberId: string;
@@ -19,13 +23,21 @@ export async function sendReminder({
   workspaceName: string;
   feeId: string | null;
   type: "fees" | "attendance";
+  /** Required when type === "fees" — which log this send belongs in. */
+  stage?: "before_due" | "overdue";
+  amount?: number;
+  dueDate?: string;
+  daysOverdue?: number;
 }): Promise<{ success: boolean; error?: string; url?: string }> {
   const supabase = createServiceClient();
 
   const cleanPhone = memberPhone.replace(/[^0-9]/g, "");
+  const amountLabel = amount != null ? `₹${amount.toLocaleString("en-IN")}` : "your";
   const message =
     type === "fees"
-      ? `Hi ${memberName}, your gym subscription has expired. Kindly submit your gym fees at the earliest. – ${workspaceName}`
+      ? stage === "before_due"
+        ? `Hi ${memberName}, your gym fee of ${amountLabel} is due on ${dueDate}. Kindly pay on time to avoid interruption. – ${workspaceName}`
+        : `Hi ${memberName}, your gym fee of ${amountLabel} is overdue${daysOverdue ? ` by ${daysOverdue} days` : ""}. Kindly clear it at the earliest. – ${workspaceName}`
       : `Hi ${memberName}, we haven't seen you at the gym in a while. Hope everything's doing well — come back soon! – ${workspaceName}`;
 
   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -40,6 +52,7 @@ export async function sendReminder({
       message,
       status: "sent",
       reason: type,
+      reminder_stage: type === "fees" ? (stage ?? "overdue") : null,
       sent_at: new Date().toISOString(),
     });
 

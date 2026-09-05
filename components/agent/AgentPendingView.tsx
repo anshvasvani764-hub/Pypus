@@ -302,8 +302,7 @@ export function AgentPendingView({
         actions={
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
-              <MessageCircle className="h-3.5 w-3.5" fill="currentColor" strokeWidth={0} />
-              WhatsApp
+          
             </div>
             <button
               type="button"

@@ -1,0 +1,1174 @@
+diff --git a/app/[app]/automations/fee-reminders/page.tsx b/app/[app]/automations/fee-reminders/page.tsx
+index 7972eee..3204bc0 100644
+--- a/app/[app]/automations/fee-reminders/page.tsx
++++ b/app/[app]/automations/fee-reminders/page.tsx
+@@ -6,7 +6,7 @@ import { UnderConstructionOverlay } from "@/components/automations/UnderConstruc
+ 
+ // Page is built and wired up, just not ready to expose to gym owners yet —
+ // flip this off once it's ready to ship.
+-const FEE_REMINDERS_LIVE = false;
++const FEE_REMINDERS_LIVE = true;
+ 
+ export default async function FeeRemindersPage({
+   params,
+@@ -24,15 +24,21 @@ export default async function FeeRemindersPage({
+   const workspaceId = wsData?.id ?? "";
+   const workspaceName = wsData?.name ?? "Your Gym";
+ 
+-  const [pending, activity, settings] = await Promise.all([
+-    getFeeWorklist(workspaceId),
++  const settings = await getFeeReminderSettings(workspaceId);
++  const [pending, activity] = await Promise.all([
++    getFeeWorklist(workspaceId, settings),
+     getAgentActivity(workspaceId),
+-    getFeeReminderSettings(workspaceId),
+   ]);
+ 
+   // Fee reminders share the "reminders" table + activity feed with
+-  // attendance nudges — only reason "fees" belongs on this page.
+-  const sentFeeReminders = activity.filter((a) => a.kind === "reminder" && a.reason === "fees");
++  // attendance nudges — only reason "fees" belongs on this page, split
++  // into the two logs by stage.
++  const sentBeforeDue = activity.filter(
++    (a) => a.kind === "reminder" && a.reason === "fees" && a.stage === "before_due"
++  );
++  const sentOverdue = activity.filter(
++    (a) => a.kind === "reminder" && a.reason === "fees" && a.stage === "overdue"
++  );
+ 
+   return (
+     <div className="relative min-h-[70vh]">
+@@ -42,7 +48,8 @@ export default async function FeeRemindersPage({
+           workspaceSlug={workspaceSlug}
+           workspaceName={workspaceName}
+           pending={pending}
+-          sent={sentFeeReminders}
++          sentBeforeDue={sentBeforeDue}
++          sentOverdue={sentOverdue}
+           initialSettings={settings}
+         />
+       </div>
+diff --git a/app/actions/fee-reminders.ts b/app/actions/fee-reminders.ts
+index 4dd448e..1f03d23 100644
+--- a/app/actions/fee-reminders.ts
++++ b/app/actions/fee-reminders.ts
+@@ -3,13 +3,16 @@
+ import { createServiceClient } from "@/lib/supabase/service";
+ import { revalidatePath } from "next/cache";
+ 
+-export type RepeatInterval = "daily" | "every_2_days" | "once";
+ export type SendMode = "manual" | "auto";
+ 
+ export interface FeeReminderSettings {
+   enabled: boolean;
+-  daysAfterDue: number;
+-  repeatInterval: RepeatInterval;
++  /** Soft reminder: sent once, this many days before the due date. */
++  beforeDueDays: number;
++  /** First overdue reminder: sent this many hours after the due date. */
++  afterDueHours: number;
++  /** Overdue reminders repeat every this many hours after that, until paid. Min 24. */
++  repeatIntervalHours: number;
+   sendMode: SendMode;
+ }
+ 
+@@ -18,8 +21,9 @@ export interface FeeReminderSettings {
+ // value below), so keeping it module-private fixes the "found object" error.
+ const DEFAULT_FEE_REMINDER_SETTINGS: FeeReminderSettings = {
+   enabled: false,
+-  daysAfterDue: 1,
+-  repeatInterval: "once",
++  beforeDueDays: 1,
++  afterDueHours: 24,
++  repeatIntervalHours: 48,
+   sendMode: "manual",
+ };
+ 
+@@ -34,7 +38,7 @@ export async function getFeeReminderSettings(
+   const supabase = createServiceClient();
+   const { data, error } = await supabase
+     .from("fee_reminder_settings")
+-    .select("enabled, days_after_due, repeat_interval, send_mode")
++    .select("enabled, before_due_days, after_due_hours, repeat_interval_hours, send_mode")
+     .eq("workspace_id", workspaceId)
+     .maybeSingle();
+ 
+@@ -46,15 +50,16 @@ export async function getFeeReminderSettings(
+ 
+   return {
+     enabled: data.enabled,
+-    daysAfterDue: data.days_after_due,
+-    repeatInterval: data.repeat_interval as RepeatInterval,
++    beforeDueDays: data.before_due_days,
++    afterDueHours: data.after_due_hours,
++    repeatIntervalHours: data.repeat_interval_hours,
+     sendMode: data.send_mode as SendMode,
+   };
+ }
+ 
+ /** Saves the Fee Reminders config from the settings panel. Only persists
+- * the preference — actually firing reminders on a schedule (the cron job
+- * for "auto" mode) is separate, still-to-build work. */
++ * the preference — actually firing reminders on a schedule (auto mode's
++ * cron job) reads this same table at send time. */
+ export async function saveFeeReminderSettings(
+   workspaceId: string,
+   settings: FeeReminderSettings
+@@ -65,8 +70,9 @@ export async function saveFeeReminderSettings(
+     {
+       workspace_id: workspaceId,
+       enabled: settings.enabled,
+-      days_after_due: settings.daysAfterDue,
+-      repeat_interval: settings.repeatInterval,
++      before_due_days: settings.beforeDueDays,
++      after_due_hours: settings.afterDueHours,
++      repeat_interval_hours: Math.max(24, settings.repeatIntervalHours),
+       send_mode: settings.sendMode,
+       updated_at: new Date().toISOString(),
+     },
+diff --git a/app/actions/member-reminders.ts b/app/actions/member-reminders.ts
+index 5100aa1..52a7f2e 100644
+--- a/app/actions/member-reminders.ts
++++ b/app/actions/member-reminders.ts
+@@ -11,6 +11,10 @@ export async function sendReminder({
+   workspaceName,
+   feeId,
+   type,
++  stage,
++  amount,
++  dueDate,
++  daysOverdue,
+ }: {
+   workspaceId: string;
+   memberId: string;
+@@ -19,13 +23,21 @@ export async function sendReminder({
+   workspaceName: string;
+   feeId: string | null;
+   type: "fees" | "attendance";
++  /** Required when type === "fees" — which log this send belongs in. */
++  stage?: "before_due" | "overdue";
++  amount?: number;
++  dueDate?: string;
++  daysOverdue?: number;
+ }): Promise<{ success: boolean; error?: string; url?: string }> {
+   const supabase = createServiceClient();
+ 
+   const cleanPhone = memberPhone.replace(/[^0-9]/g, "");
++  const amountLabel = amount != null ? `₹${amount.toLocaleString("en-IN")}` : "your";
+   const message =
+     type === "fees"
+-      ? `Hi ${memberName}, your gym subscription has expired. Kindly submit your gym fees at the earliest. – ${workspaceName}`
++      ? stage === "before_due"
++        ? `Hi ${memberName}, your gym fee of ${amountLabel} is due on ${dueDate}. Kindly pay on time to avoid interruption. – ${workspaceName}`
++        : `Hi ${memberName}, your gym fee of ${amountLabel} is overdue${daysOverdue ? ` by ${daysOverdue} days` : ""}. Kindly clear it at the earliest. – ${workspaceName}`
+       : `Hi ${memberName}, we haven't seen you at the gym in a while. Hope everything's doing well — come back soon! – ${workspaceName}`;
+ 
+   const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+@@ -40,6 +52,7 @@ export async function sendReminder({
+       message,
+       status: "sent",
+       reason: type,
++      reminder_stage: type === "fees" ? (stage ?? "overdue") : null,
+       sent_at: new Date().toISOString(),
+     });
+ 
+diff --git a/app/api/cron/fee-reminders/route.ts b/app/api/cron/fee-reminders/route.ts
+new file mode 100644
+index 0000000..de71e8b
+--- /dev/null
++++ b/app/api/cron/fee-reminders/route.ts
+@@ -0,0 +1,104 @@
++import { NextResponse } from "next/server";
++import { createServiceClient } from "@/lib/supabase/service";
++import { getFeeWorklist } from "@/lib/agent/queries";
++import { getFeeReminderSettings } from "@/app/actions/fee-reminders";
++import { sendWhatsAppTemplate } from "@/lib/whatsapp/client";
++import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
++
++/**
++ * Fires every hour (see vercel.json). This is what makes "Automatic" send
++ * mode actually real-time instead of depending on the Fee Reminders page
++ * being open in a browser tab — unlike the Receipt Agent's auto mode,
++ * which piggybacks on the page's own poll-while-open loop, a fee reminder
++ * has to land N hours after a due date passes at 2am on a Tuesday whether
++ * or not anyone's looking at the dashboard.
++ *
++ * For each workspace with fee reminders enabled AND send_mode = "auto",
++ * this recomputes eligibility the exact same way the page does
++ * (getFeeWorklist + evaluateFeeReminder) and sends anything eligible.
++ * Workspaces on "manual" mode are skipped here — their eligible fees just
++ * sit in the Pending Queue tab waiting for a human to click Send, which
++ * getFeeWorklist already surfaces without this job's help.
++ *
++ * ⚠️ Not fully wired yet: sending a business-initiated WhatsApp message
++ * outside the 24h reply window requires an *approved* Meta message
++ * template (same constraint the receipt agent hit — see
++ * lib/whatsapp/client.ts). There's no approved "fee_reminder" template on
++ * this account yet, so FEE_REMINDER_TEMPLATE_NAME below is a placeholder.
++ * Until that's approved and swapped in, this job safely no-ops sends (logs
++ * + skips) rather than silently failing or spamming free-form text that
++ * Meta will reject for members outside the reply window.
++ */
++
++const FEE_REMINDER_TEMPLATE_NAME = "fee_reminder"; // TODO: swap for the real approved template name once live.
++const FEE_REMINDER_TEMPLATE_APPROVED = false;
++
++export async function GET(request: Request) {
++  const authHeader = request.headers.get("authorization");
++  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
++    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
++  }
++
++  const supabase = createServiceClient();
++
++  const { data: enabledSettings, error } = await supabase
++    .from("fee_reminder_settings")
++    .select("workspace_id, send_mode")
++    .eq("enabled", true)
++    .eq("send_mode", "auto");
++
++  if (error) {
++    console.error("fee-reminders cron: failed to list enabled workspaces", error);
++    return NextResponse.json({ error: error.message }, { status: 500 });
++  }
++
++  const results: Array<{ workspaceId: string; eligible: number; sent: number; skipped: string }> = [];
++
++  for (const row of enabledSettings ?? []) {
++    const workspaceId = row.workspace_id as string;
++    const settings = await getFeeReminderSettings(workspaceId);
++    const { data: wsData } = await supabase.from("workspaces").select("name").eq("id", workspaceId).single();
++    const workspaceName = wsData?.name ?? "Your Gym";
++
++    const eligible = await getFeeWorklist(workspaceId, settings);
++
++    let sent = 0;
++    let skipped = "";
++
++    if (!AUTO_WHATSAPP_ENABLED) {
++      skipped = "AUTO_WHATSAPP_ENABLED is off workspace-wide";
++    } else if (!FEE_REMINDER_TEMPLATE_APPROVED) {
++      skipped = "no approved WhatsApp template for fee reminders yet";
++    } else {
++      for (const item of eligible) {
++        if (!item.memberPhone) continue;
++        const result = await sendWhatsAppTemplate(item.memberPhone, FEE_REMINDER_TEMPLATE_NAME, [
++          item.memberName,
++          `₹${item.amount.toLocaleString("en-IN")}`,
++          item.dueDate,
++        ]);
++        if (result.success) {
++          await supabase.from("reminders").insert({
++            workspace_id: workspaceId,
++            member_id: item.memberId,
++            fee_id: item.feeId,
++            channel: "whatsapp",
++            message: item.waMessage,
++            status: "sent",
++            reason: "fees",
++            reminder_stage: item.reminderStage,
++            sent_at: new Date().toISOString(),
++          });
++          sent++;
++        } else {
++          console.error(`fee-reminders cron: send failed for ${item.memberName}`, result.error);
++        }
++      }
++    }
++
++    results.push({ workspaceId, eligible: eligible.length, sent, skipped });
++    void workspaceName;
++  }
++
++  return NextResponse.json({ ok: true, checked: results.length, results });
++}
+diff --git a/components/automations/FeeReminderView.tsx b/components/automations/FeeReminderView.tsx
+index f3c8291..21a59de 100644
+--- a/components/automations/FeeReminderView.tsx
++++ b/components/automations/FeeReminderView.tsx
+@@ -20,9 +20,9 @@ import { sendReminder } from "@/app/actions/member-reminders";
+ import {
+   saveFeeReminderSettings,
+   type FeeReminderSettings,
+-  type RepeatInterval,
+   type SendMode,
+ } from "@/app/actions/fee-reminders";
++import { hoursWithDayHint } from "@/lib/agent/fee-reminder-eligibility";
+ import { AUTO_WHATSAPP_ENABLED } from "@/lib/config/messaging";
+ import type { FeeWorklistItem, AgentActivityItem } from "@/lib/agent/queries";
+ 
+@@ -31,57 +31,43 @@ interface FeeReminderViewProps {
+   workspaceSlug: string;
+   workspaceName: string;
+   pending: FeeWorklistItem[];
+-  sent: AgentActivityItem[];
++  sentBeforeDue: AgentActivityItem[];
++  sentOverdue: AgentActivityItem[];
+   initialSettings: FeeReminderSettings;
+ }
+ 
+-type RowFilter = "all" | "due" | "overdue" | "sent";
+-type RowStatus = "due" | "overdue" | "sending" | "sent" | "failed";
++type PageTab = "queue" | "before_due_log" | "overdue_log";
++type RowFilter = "all" | "before_due" | "overdue";
++type RowStatus = "before_due" | "overdue" | "sending" | "sent" | "failed";
+ 
+ interface PendingRow {
+-  source: "pending";
+   key: string;
+   item: FeeWorklistItem;
+   status: RowStatus;
+ }
+ 
+-interface SentRow {
+-  source: "sent";
+-  key: string;
+-  memberName: string;
+-  detail: string;
+-  at: string;
+-}
+-
+ const PAGE_SIZE = 10;
+ 
+-const REPEAT_OPTIONS: { value: RepeatInterval; label: string }[] = [
+-  { value: "once", label: "Once" },
+-  { value: "daily", label: "Daily" },
+-  { value: "every_2_days", label: "Every 2 days" },
+-];
+-
+ export function FeeReminderView({
+   workspaceId,
+   workspaceSlug,
+   workspaceName,
+   pending,
+-  sent,
++  sentBeforeDue,
++  sentOverdue,
+   initialSettings,
+ }: FeeReminderViewProps) {
+   const router = useRouter();
+ 
++  const [tab, setTab] = useState<PageTab>("queue");
++
+   const [rows, setRows] = useState<PendingRow[]>(() =>
+     pending.map((item) => ({
+-      source: "pending",
+       key: `fee-${item.feeId}`,
+       item,
+-      status: item.status,
++      status: item.reminderStage,
+     }))
+   );
+-  const [sentRows, setSentRows] = useState<SentRow[]>(() =>
+-    sent.map((a) => ({ source: "sent", key: a.id, memberName: a.memberName, detail: a.detail, at: a.at }))
+-  );
+ 
+   const [query, setQuery] = useState("");
+   const [statusFilter, setStatusFilter] = useState<RowFilter>("all");
+@@ -96,20 +82,13 @@ export function FeeReminderView({
+   useEffect(() => {
+     setRows(
+       pending.map((item) => ({
+-        source: "pending",
+         key: `fee-${item.feeId}`,
+         item,
+-        status: item.status,
++        status: item.reminderStage,
+       }))
+     );
+   }, [pending]);
+ 
+-  useEffect(() => {
+-    setSentRows(
+-      sent.map((a) => ({ source: "sent", key: a.id, memberName: a.memberName, detail: a.detail, at: a.at }))
+-    );
+-  }, [sent]);
+-
+   useEffect(() => {
+     function handleClickOutside(e: MouseEvent) {
+       if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+@@ -139,21 +118,15 @@ export function FeeReminderView({
+       workspaceName,
+       feeId: item.feeId,
+       type: "fees",
++      stage: item.reminderStage,
++      amount: item.amount,
++      dueDate: item.dueDate,
++      daysOverdue: item.daysOverdue,
+     });
+ 
+     if (result.success && result.url) {
+       window.open(result.url, "_blank", "noopener,noreferrer");
+       setRows((prev) => prev.filter((r) => r.key !== row.key));
+-      setSentRows((prev) => [
+-        {
+-          source: "sent",
+-          key: `just-sent-${item.feeId}-${Date.now()}`,
+-          memberName: item.memberName,
+-          detail: "Fee reminder sent on WhatsApp",
+-          at: "Just now",
+-        },
+-        ...prev,
+-      ]);
+       return true;
+     }
+ 
+@@ -192,33 +165,38 @@ export function FeeReminderView({
+   }
+ 
+   const filteredRows = rows.filter((r) => {
+-    if (statusFilter === "sent") return false;
+-    if (statusFilter !== "all" && statusFilter !== r.item.status) return false;
++    if (statusFilter !== "all" && statusFilter !== r.item.reminderStage) return false;
+     if (query && !r.item.memberName.toLowerCase().includes(query.toLowerCase())) return false;
+     return true;
+   });
+-  const filteredSent = sentRows.filter((s) => {
+-    if (statusFilter !== "all" && statusFilter !== "sent") return false;
+-    if (query && !s.memberName.toLowerCase().includes(query.toLowerCase())) return false;
+-    return true;
+-  });
+ 
+   useEffect(() => {
+     setVisibleCount(PAGE_SIZE);
+-  }, [query, statusFilter]);
++  }, [query, statusFilter, tab]);
+ 
+   const visiblePending = filteredRows.slice(0, visibleCount);
+-  const visibleSent = filteredSent.slice(0, Math.max(0, visibleCount - filteredRows.length));
+-  const totalFiltered = filteredRows.length + filteredSent.length;
+-  const hasMore = visibleCount < totalFiltered;
++  const hasMorePending = visibleCount < filteredRows.length;
++
++  const activeLog = tab === "before_due_log" ? sentBeforeDue : sentOverdue;
++  const filteredLog = activeLog.filter(
++    (a) => !query || a.memberName.toLowerCase().includes(query.toLowerCase())
++  );
++  const visibleLog = filteredLog.slice(0, visibleCount);
++  const hasMoreLog = visibleCount < filteredLog.length;
+ 
+   const sendableCount = filteredRows.filter((r) => r.item.memberPhone).length;
+ 
++  const TABS: { value: PageTab; label: string; count: number }[] = [
++    { value: "queue", label: "Pending queue", count: rows.length },
++    { value: "before_due_log", label: "Before-due log", count: sentBeforeDue.length },
++    { value: "overdue_log", label: "Overdue log", count: sentOverdue.length },
++  ];
++
+   return (
+     <div className="space-y-6 px-6 py-6 md:px-8">
+       <PageHeader
+         title="Fee reminders"
+-        subtitle="Members with a due or overdue fee — send a WhatsApp nudge with one tap."
++        subtitle="Soft reminders before the due date, repeating nudges after — sent on WhatsApp."
+         actions={
+           <div className="flex items-center gap-2">
+             <div className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+@@ -237,6 +215,22 @@ export function FeeReminderView({
+         }
+       />
+ 
++      {/* Tabs */}
++      <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-white p-1 w-fit">
++        {TABS.map((t) => (
++          <button
++            key={t.value}
++            type="button"
++            onClick={() => setTab(t.value)}
++            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
++              tab === t.value ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-50"
++            }`}
++          >
++            {t.label} ({t.count})
++          </button>
++        ))}
++      </div>
++
+       {/* Toolbar */}
+       <div className="flex flex-wrap items-center gap-2">
+         <div className="relative min-w-[200px] flex-1 max-w-sm">
+@@ -249,41 +243,37 @@ export function FeeReminderView({
+           />
+         </div>
+ 
+-        <div className="relative" ref={filterRef}>
+-          <button
+-            type="button"
+-            onClick={() => setFilterOpen((v) => !v)}
+-            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+-          >
+-            {statusFilter === "all"
+-              ? "All statuses"
+-              : statusFilter === "due"
+-                ? "Due"
+-                : statusFilter === "overdue"
+-                  ? "Overdue"
+-                  : "Sent"}
+-            <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+-          </button>
+-          {filterOpen && (
+-            <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+-              {(["all", "due", "overdue", "sent"] as const).map((s) => (
+-                <button
+-                  key={s}
+-                  type="button"
+-                  onClick={() => {
+-                    setStatusFilter(s);
+-                    setFilterOpen(false);
+-                  }}
+-                  className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+-                >
+-                  {s === "all" ? "All statuses" : s === "due" ? "Due" : s === "overdue" ? "Overdue" : "Sent"}
+-                </button>
+-              ))}
+-            </div>
+-          )}
+-        </div>
++        {tab === "queue" && (
++          <div className="relative" ref={filterRef}>
++            <button
++              type="button"
++              onClick={() => setFilterOpen((v) => !v)}
++              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
++            >
++              {statusFilter === "all" ? "All" : statusFilter === "before_due" ? "Before due" : "Overdue"}
++              <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
++            </button>
++            {filterOpen && (
++              <div className="absolute left-0 z-10 mt-1 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
++                {(["all", "before_due", "overdue"] as const).map((s) => (
++                  <button
++                    key={s}
++                    type="button"
++                    onClick={() => {
++                      setStatusFilter(s);
++                      setFilterOpen(false);
++                    }}
++                    className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
++                  >
++                    {s === "all" ? "All" : s === "before_due" ? "Before due" : "Overdue"}
++                  </button>
++                ))}
++              </div>
++            )}
++          </div>
++        )}
+ 
+-        {sendableCount > 0 && (
++        {tab === "queue" && sendableCount > 0 && (
+           <button
+             type="button"
+             onClick={handleSendAll}
+@@ -294,103 +284,105 @@ export function FeeReminderView({
+             Send all pending ({sendableCount})
+           </button>
+         )}
+-
+-        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600">
+-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+-          Sent {sentRows.length} · Pending {rows.length}
+-        </div>
+       </div>
+ 
+-      {/* Row list */}
+-      {filteredRows.length === 0 && filteredSent.length === 0 ? (
+-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
+-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
+-            <Check className="h-6 w-6 text-emerald-600" />
+-          </div>
+-          <p className="text-sm font-medium text-gray-900">No fee reminders yet</p>
+-          <p className="max-w-xs text-xs text-gray-500">
+-            As soon as a member&apos;s fee is due or overdue, they&apos;ll show up here so you can send a WhatsApp reminder.
+-          </p>
+-        </div>
+-      ) : (
+-        <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+-          {visiblePending.map((row) => {
+-            const overdue = row.item.status === "overdue";
+-            return (
+-              <div
+-                key={row.key}
+-                role="button"
+-                tabIndex={0}
+-                onClick={() => openMemberFees(row.item.memberId)}
+-                onKeyDown={(e) => e.key === "Enter" && openMemberFees(row.item.memberId)}
+-                className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 hover:bg-gray-50"
+-              >
++      {/* Queue tab */}
++      {tab === "queue" &&
++        (filteredRows.length === 0 ? (
++          <EmptyState
++            title="No reminders due right now"
++            body="As soon as a soft reminder or overdue nudge becomes eligible, it'll show up here so you can send it on WhatsApp."
++          />
++        ) : (
++          <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
++            {visiblePending.map((row) => {
++              const overdue = row.item.reminderStage === "overdue";
++              return (
+                 <div
+-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+-                    overdue ? "bg-red-50" : "bg-amber-50"
+-                  }`}
++                  key={row.key}
++                  role="button"
++                  tabIndex={0}
++                  onClick={() => openMemberFees(row.item.memberId)}
++                  onKeyDown={(e) => e.key === "Enter" && openMemberFees(row.item.memberId)}
++                  className="flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 hover:bg-gray-50"
+                 >
+-                  <Bell className={`h-4 w-4 ${overdue ? "text-red-600" : "text-amber-600"}`} />
++                  <div
++                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
++                      overdue ? "bg-red-50" : "bg-amber-50"
++                    }`}
++                  >
++                    <Bell className={`h-4 w-4 ${overdue ? "text-red-600" : "text-amber-600"}`} />
++                  </div>
++
++                  <div className="min-w-0 flex-1">
++                    <p className="truncate text-sm font-medium text-gray-900">{row.item.memberName}</p>
++                    <p className="truncate text-xs text-gray-500">
++                      ₹{row.item.amount.toLocaleString("en-IN")}
++                      {row.item.planName ? ` · ${row.item.planName}` : ""}
++                      {overdue ? ` · ${row.item.daysOverdue} days overdue` : ` · due ${row.item.dueDate}`}
++                    </p>
++                  </div>
++
++                  <span
++                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
++                      overdue ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"
++                    }`}
++                  >
++                    {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
++                    {overdue ? "Overdue" : "Soft reminder"}
++                  </span>
++
++                  <button
++                    type="button"
++                    onClick={(e) => {
++                      e.stopPropagation();
++                      handleSend(row);
++                    }}
++                    disabled={!row.item.memberPhone || row.status === "sending"}
++                    className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
++                  >
++                    {row.status === "sending" ? (
++                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
++                    ) : (
++                      <Send className="h-3.5 w-3.5" />
++                    )}
++                    {row.item.memberPhone ? "Send" : "No phone"}
++                  </button>
++                </div>
++              );
++            })}
++          </div>
++        ))}
++
++      {/* Log tabs */}
++      {tab !== "queue" &&
++        (filteredLog.length === 0 ? (
++          <EmptyState
++            title={tab === "before_due_log" ? "No soft reminders sent yet" : "No overdue reminders sent yet"}
++            body="Sends show up here the instant they go out on WhatsApp."
++          />
++        ) : (
++          <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-200 bg-white">
++            {visibleLog.map((row) => (
++              <div key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
++                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
++                  <Bell className="h-4 w-4 text-gray-400" />
+                 </div>
+-
+                 <div className="min-w-0 flex-1">
+-                  <p className="truncate text-sm font-medium text-gray-900">{row.item.memberName}</p>
+-                  <p className="truncate text-xs text-gray-500">
+-                    ₹{row.item.amount.toLocaleString("en-IN")}
+-                    {row.item.planName ? ` · ${row.item.planName}` : ""}
+-                    {overdue ? ` · ${row.item.daysOverdue} days overdue` : ` · due ${row.item.dueDate}`}
+-                  </p>
++                  <p className="truncate text-sm font-medium text-gray-900">{row.memberName}</p>
++                  <p className="truncate text-xs text-gray-500">{row.detail}</p>
+                 </div>
+-
+-                <span
+-                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+-                    overdue ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"
+-                  }`}
+-                >
+-                  {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+-                  {overdue ? "Overdue" : "Due"}
++                <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
++                  <Check className="h-3 w-3" />
++                  Sent
+                 </span>
+-
+-                <button
+-                  type="button"
+-                  onClick={(e) => {
+-                    e.stopPropagation();
+-                    handleSend(row);
+-                  }}
+-                  disabled={!row.item.memberPhone || row.status === "sending"}
+-                  className="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+-                >
+-                  {row.status === "sending" ? (
+-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+-                  ) : (
+-                    <Send className="h-3.5 w-3.5" />
+-                  )}
+-                  {row.item.memberPhone ? "Send" : "No phone"}
+-                </button>
++                <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
+               </div>
+-            );
+-          })}
+-
+-          {visibleSent.map((row) => (
+-            <div key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5">
+-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-50 border border-gray-100">
+-                <Bell className="h-4 w-4 text-gray-400" />
+-              </div>
+-              <div className="min-w-0 flex-1">
+-                <p className="truncate text-sm font-medium text-gray-900">{row.memberName}</p>
+-                <p className="truncate text-xs text-gray-500">{row.detail}</p>
+-              </div>
+-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+-                <Check className="h-3 w-3" />
+-                Sent
+-              </span>
+-              <span className="shrink-0 text-xs text-gray-400">{row.at}</span>
+-            </div>
+-          ))}
+-        </div>
+-      )}
++            ))}
++          </div>
++        ))}
+ 
+-      {hasMore && (
++      {((tab === "queue" && hasMorePending) || (tab !== "queue" && hasMoreLog)) && (
+         <div className="flex justify-center">
+           <button
+             type="button"
+@@ -424,6 +416,18 @@ export function FeeReminderView({
+   );
+ }
+ 
++function EmptyState({ title, body }: { title: string; body: string }) {
++  return (
++    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center">
++      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50">
++        <Check className="h-6 w-6 text-emerald-600" />
++      </div>
++      <p className="text-sm font-medium text-gray-900">{title}</p>
++      <p className="max-w-xs text-xs text-gray-500">{body}</p>
++    </div>
++  );
++}
++
+ function FeeReminderSettingsPanel({
+   workspaceId,
+   initialSettings,
+@@ -436,8 +440,9 @@ function FeeReminderSettingsPanel({
+   onSaved: (message: string) => void;
+ }) {
+   const [enabled, setEnabled] = useState(initialSettings.enabled);
+-  const [daysAfterDue, setDaysAfterDue] = useState(String(initialSettings.daysAfterDue));
+-  const [repeatInterval, setRepeatInterval] = useState<RepeatInterval>(initialSettings.repeatInterval);
++  const [beforeDueDays, setBeforeDueDays] = useState(String(initialSettings.beforeDueDays));
++  const [afterDueHours, setAfterDueHours] = useState(String(initialSettings.afterDueHours));
++  const [repeatIntervalHours, setRepeatIntervalHours] = useState(String(initialSettings.repeatIntervalHours));
+   const [sendMode, setSendMode] = useState<SendMode>(initialSettings.sendMode);
+   const [saving, setSaving] = useState(false);
+ 
+@@ -447,8 +452,9 @@ function FeeReminderSettingsPanel({
+ 
+     const result = await saveFeeReminderSettings(workspaceId, {
+       enabled,
+-      daysAfterDue: Math.max(0, Number(daysAfterDue) || 0),
+-      repeatInterval,
++      beforeDueDays: Math.max(0, Number(beforeDueDays) || 0),
++      afterDueHours: Math.max(0, Number(afterDueHours) || 0),
++      repeatIntervalHours: Math.max(24, Number(repeatIntervalHours) || 24),
+       sendMode,
+     });
+ 
+@@ -496,30 +502,49 @@ function FeeReminderSettingsPanel({
+ 
+           <div>
+             <label className="mb-1 block text-sm font-medium text-gray-700">
+-              Start reminder (days after due date)
++              Soft reminder — days before due date
+             </label>
+             <input
+               type="number"
+               min={0}
+-              value={daysAfterDue}
+-              onChange={(e) => setDaysAfterDue(e.target.value)}
++              value={beforeDueDays}
++              onChange={(e) => setBeforeDueDays(e.target.value)}
+               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+             />
++            <p className="mt-1 text-xs text-gray-400">Sent once, never repeats. Skipped if the fee is paid before this date.</p>
+           </div>
+ 
+           <div>
+-            <label className="mb-1 block text-sm font-medium text-gray-700">Repeat</label>
+-            <select
+-              value={repeatInterval}
+-              onChange={(e) => setRepeatInterval(e.target.value as RepeatInterval)}
++            <label className="mb-1 block text-sm font-medium text-gray-700">
++              First overdue reminder — hours after due date{" "}
++              <span className="font-normal text-gray-400">{hoursWithDayHint(Number(afterDueHours) || 0)}</span>
++            </label>
++            <input
++              type="number"
++              min={0}
++              value={afterDueHours}
++              onChange={(e) => setAfterDueHours(e.target.value)}
+               className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+-            >
+-              {REPEAT_OPTIONS.map((opt) => (
+-                <option key={opt.value} value={opt.value}>
+-                  {opt.label}
+-                </option>
+-              ))}
+-            </select>
++            />
++          </div>
++
++          <div>
++            <label className="mb-1 block text-sm font-medium text-gray-700">
++              Repeat every — hours{" "}
++              <span className="font-normal text-gray-400">
++                {hoursWithDayHint(Number(repeatIntervalHours) || 0)}
++              </span>
++            </label>
++            <input
++              type="number"
++              min={24}
++              value={repeatIntervalHours}
++              onChange={(e) => setRepeatIntervalHours(e.target.value)}
++              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
++            />
++            <p className="mt-1 text-xs text-gray-400">
++              Minimum 24 hours. Keeps repeating from the last send until the fee is marked paid.
++            </p>
+           </div>
+ 
+           <div>
+@@ -538,6 +563,12 @@ function FeeReminderSettingsPanel({
+                 business number is reconnected. Reminders will still need manual send till then.
+               </p>
+             )}
++            {sendMode === "auto" && AUTO_WHATSAPP_ENABLED && (
++              <p className="mt-1.5 text-xs text-amber-600">
++                Auto mode fires from an hourly server job, not from this page being open — needs an approved
++                WhatsApp template for fee reminders before it can actually send (see cron route comment).
++              </p>
++            )}
+           </div>
+ 
+           <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+diff --git a/lib/agent/fee-reminder-eligibility.ts b/lib/agent/fee-reminder-eligibility.ts
+new file mode 100644
+index 0000000..5d00445
+--- /dev/null
++++ b/lib/agent/fee-reminder-eligibility.ts
+@@ -0,0 +1,86 @@
++export type ReminderStage = "before_due" | "overdue";
++
++export interface FeeReminderSettingsLike {
++  beforeDueDays: number;
++  afterDueHours: number;
++  repeatIntervalHours: number;
++}
++
++export interface FeeReminderEligibility {
++  eligible: boolean;
++  /** Which stage this fee is currently in the lifecycle of, even when not
++   *  eligible yet (e.g. "overdue" but the repeat gap hasn't elapsed). Null
++   *  only when the before-due reminder already went out and the due date
++   *  hasn't arrived yet — nothing left to schedule until it does. */
++  stage: ReminderStage | null;
++  /** ISO timestamp of when the next reminder for this fee will become
++   *  eligible (or did become eligible, if in the past and `eligible` is true). */
++  nextEligibleAt: string;
++}
++
++const HOUR_MS = 60 * 60 * 1000;
++const DAY_MS = 24 * HOUR_MS;
++
++/** due_date is a plain 'YYYY-MM-DD' — treat it as midnight IST. */
++function dueDateMidnightIST(dueDate: string): number {
++  return Date.parse(`${dueDate}T00:00:00+05:30`);
++}
++
++/**
++ * Given a fee's due date, the workspace's reminder settings, and the last
++ * time a reminder went out for this fee (per stage), works out whether a
++ * reminder is eligible to fire right now.
++ *
++ * Lifecycle:
++ *  - Before the due date: exactly one soft reminder, at
++ *    due_date - beforeDueDays. Skipped once sent.
++ *  - On/after the due date: first overdue reminder at
++ *    due_date + afterDueHours, then repeats every repeatIntervalHours from
++ *    the last overdue send — for as long as the fee stays unpaid. There's
++ *    no separate "cancel" step: a paid fee simply never reaches this
++ *    function again (the caller only evaluates fees still due/overdue).
++ */
++export function evaluateFeeReminder(
++  dueDate: string,
++  settings: FeeReminderSettingsLike,
++  lastBeforeDueSentAt: string | null,
++  lastOverdueSentAt: string | null,
++  now: number = Date.now()
++): FeeReminderEligibility {
++  const dueMs = dueDateMidnightIST(dueDate);
++  const beforeDueFireAt = dueMs - settings.beforeDueDays * DAY_MS;
++
++  if (now >= dueMs) {
++    const baseline = lastOverdueSentAt ? new Date(lastOverdueSentAt).getTime() : null;
++    const nextFireAt = baseline
++      ? baseline + settings.repeatIntervalHours * HOUR_MS
++      : dueMs + settings.afterDueHours * HOUR_MS;
++
++    return {
++      eligible: now >= nextFireAt,
++      stage: "overdue",
++      nextEligibleAt: new Date(nextFireAt).toISOString(),
++    };
++  }
++
++  if (lastBeforeDueSentAt) {
++    // Soft reminder already sent, due date hasn't arrived — nothing to do
++    // until it does and the overdue chain takes over.
++    return { eligible: false, stage: null, nextEligibleAt: new Date(dueMs).toISOString() };
++  }
++
++  return {
++    eligible: now >= beforeDueFireAt,
++    stage: "before_due",
++    nextEligibleAt: new Date(beforeDueFireAt).toISOString(),
++  };
++}
++
++/** Human label + hour-to-day hint, e.g. 36 -> "36h (1.5 days)". Used in the
++ *  settings panel so an hours field doesn't feel opaque. */
++export function hoursWithDayHint(hours: number): string {
++  if (!Number.isFinite(hours) || hours <= 0) return "";
++  const days = hours / 24;
++  const label = Number.isInteger(days) ? `${days} day${days === 1 ? "" : "s"}` : `${days.toFixed(1)} days`;
++  return `(${label})`;
++}
+diff --git a/lib/agent/queries.ts b/lib/agent/queries.ts
+index ab8898c..538c8cb 100644
+--- a/lib/agent/queries.ts
++++ b/lib/agent/queries.ts
+@@ -1,6 +1,11 @@
+ import { createServiceClient } from "@/lib/supabase/service";
+ import { getISTDateString, formatISTDateTime } from "@/lib/utils/date";
+ import { buildReceiptPreviewText, type ReceiptTemplateVars } from "@/lib/receipts/template-vars";
++import {
++  evaluateFeeReminder,
++  type FeeReminderSettingsLike,
++  type ReminderStage,
++} from "@/lib/agent/fee-reminder-eligibility";
+ 
+ export interface AbsenteeWorklistItem {
+   memberId: string;
+@@ -24,6 +29,9 @@ export interface FeeWorklistItem {
+   daysOverdue: number;
+   alreadyMessagedToday: boolean;
+   waMessage: string;
++  /** Which reminder is eligible right now: the once-off soft reminder
++   *  before the due date, or the repeating overdue chain. */
++  reminderStage: ReminderStage;
+ }
+ 
+ export interface ReceiptWorklistItem {
+@@ -49,6 +57,8 @@ export interface AgentActivityItem {
+   id: string;
+   kind: "reminder" | "receipt";
+   reason: "fees" | "attendance" | null; // set for kind "reminder", null for "receipt"
++  /** Only meaningful when reason === "fees" — which log this belongs in. */
++  stage: ReminderStage | null;
+   memberName: string;
+   detail: string;
+   at: string; // formatted IST datetime (display only — don't sort on this)
+@@ -142,10 +152,18 @@ export async function getAbsenteeWorklist(
+   return out.sort((a, b) => b.daysAbsent - a.daysAbsent);
+ }
+ 
+-/** Fees that are due or overdue right now, each with a ready WhatsApp message. */
+-export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistItem[]> {
++/** Fees with a reminder eligible to fire right now (before-due soft
++ *  reminder, or the next step of the overdue repeat chain), each with a
++ *  ready WhatsApp message. Paid fees never appear here — they drop out of
++ *  the `fees` query the moment they're marked paid, which is also what
++ *  "cancels" any reminder chain for them; there's no separate cancel step. */
++export async function getFeeWorklist(
++  workspaceId: string,
++  settings: FeeReminderSettingsLike
++): Promise<FeeWorklistItem[]> {
+   const supabase = createServiceClient();
+   const today = getISTDateString();
++  const now = Date.now();
+ 
+   const [feesRes, membersRes, remindersRes] = await Promise.all([
+     supabase
+@@ -156,19 +174,26 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
+     supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
+     supabase
+       .from("reminders")
+-      .select("fee_id, sent_at, reason")
++      .select("fee_id, sent_at, reminder_stage")
+       .eq("workspace_id", workspaceId)
+       .eq("reason", "fees"),
+   ]);
+ 
+   if (feesRes.error) throw feesRes.error;
+   if (membersRes.error) throw membersRes.error;
++  if (remindersRes.error) throw remindersRes.error;
+ 
+   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
+-  // Once a reminder has EVER been sent for a fee, stay hidden until it's paid —
+-  // a paid fee drops out of the query above entirely, and the next due cycle
+-  // gets a fresh fee id, so this never blocks a genuinely new bill.
+-  const feeIdsEverReminded = new Set((remindersRes.data ?? []).map((r) => r.fee_id));
++
++  // Latest sent_at per fee, split by stage — evaluateFeeReminder needs the
++  // most recent send of each kind to know where in the chain a fee is.
++  const lastSentByFeeAndStage = new Map<string, string>(); // key: `${feeId}:${stage}`
++  for (const r of remindersRes.data ?? []) {
++    if (!r.reminder_stage) continue;
++    const key = `${r.fee_id}:${r.reminder_stage}`;
++    const existing = lastSentByFeeAndStage.get(key);
++    if (!existing || r.sent_at > existing) lastSentByFeeAndStage.set(key, r.sent_at);
++  }
+ 
+   const out: FeeWorklistItem[] = [];
+   for (const f of feesRes.data ?? []) {
+@@ -176,7 +201,15 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
+     if (!member) continue;
+     const outstanding = (f.amount_snapshot ?? 0) - (f.paid_amount ?? 0);
+     if (outstanding <= 0) continue;
+-    if (feeIdsEverReminded.has(f.id)) continue;
++
++    const evalResult = evaluateFeeReminder(
++      f.due_date,
++      settings,
++      lastSentByFeeAndStage.get(`${f.id}:before_due`) ?? null,
++      lastSentByFeeAndStage.get(`${f.id}:overdue`) ?? null,
++      now
++    );
++    if (!evalResult.eligible || !evalResult.stage) continue;
+ 
+     const daysOverdue =
+       f.due_date < today
+@@ -194,8 +227,9 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
+       status: f.status as "due" | "overdue",
+       daysOverdue,
+       alreadyMessagedToday: false,
++      reminderStage: evalResult.stage,
+       waMessage:
+-        daysOverdue > 0
++        evalResult.stage === "overdue"
+           ? `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is overdue by ${daysOverdue} days. Kindly clear it at the earliest.`
+           : `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is due on ${f.due_date}. Kindly pay on time to avoid interruption.`,
+     });
+@@ -283,7 +317,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
+   const [remindersRes, receiptsRes, membersRes] = await Promise.all([
+     supabase
+       .from("reminders")
+-      .select("id, member_id, reason, message, sent_at")
++      .select("id, member_id, reason, message, sent_at, reminder_stage")
+       .eq("workspace_id", workspaceId)
+       .order("sent_at", { ascending: false })
+       .limit(limit),
+@@ -309,11 +343,17 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
+     id: `reminder-${r.id}`,
+     kind: "reminder",
+     reason: (r.reason as "fees" | "attendance" | null) ?? null,
++    stage: (r.reminder_stage as ReminderStage | null) ?? null,
+     memberName: nameById.get(r.member_id) ?? "Unknown member",
+     // Reminders are logged the instant they go out (wa.me link opened, or
+     // the WhatsApp API call succeeded) — never a "will send later" queue —
+     // so the log should say sent, not promise a future send.
+-    detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
++    detail:
++      r.reason === "fees"
++        ? r.reminder_stage === "before_due"
++          ? "Soft reminder sent on WhatsApp"
++          : "Overdue reminder sent on WhatsApp"
++        : "Attendance nudge sent on WhatsApp",
+     at: formatISTDateTime(r.sent_at),
+     atRaw: r.sent_at,
+   }));
+@@ -322,6 +362,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
+     id: `receipt-${r.id}`,
+     kind: "receipt",
+     reason: null,
++    stage: null,
+     memberName: nameById.get(r.member_id) ?? "Unknown member",
+     detail: `Receipt #${r.receipt_number} generated — ₹${Number(r.amount).toLocaleString("en-IN")}`,
+     at: formatISTDateTime(r.generated_at),
+diff --git a/supabase/migrations/20260905030000_fee_reminder_settings_v2.sql b/supabase/migrations/20260905030000_fee_reminder_settings_v2.sql
+new file mode 100644
+index 0000000..7216fa4
+--- /dev/null
++++ b/supabase/migrations/20260905030000_fee_reminder_settings_v2.sql
+@@ -0,0 +1,36 @@
++-- Upgrades the Fee Reminders automation from its v1 shape (days_after_due +
++-- once/daily/every_2_days enum, one combined "sent" log) to the real design:
++--   - a separate before-due "soft reminder" (fires once, days before due date)
++--   - an after-due "overdue reminder" chain (first fire N hours after due
++--     date, then repeats every M hours until the fee is paid)
++--   - hour-precision so "24" reads as "1 day" in the UI instead of forcing
++--     day-only granularity
++-- Not live yet (FEE_REMINDERS_LIVE = false in the page), so this is a clean
++-- column swap rather than a migrate-old-data affair.
++
++alter table public.fee_reminder_settings
++  add column if not exists before_due_days int not null default 1,
++  add column if not exists after_due_hours int not null default 24,
++  add column if not exists repeat_interval_hours int not null default 48;
++
++do $$
++begin
++  if not exists (
++    select 1 from pg_constraint where conname = 'fee_reminder_settings_repeat_interval_hours_check'
++  ) then
++    alter table public.fee_reminder_settings
++      add constraint fee_reminder_settings_repeat_interval_hours_check
++        check (repeat_interval_hours >= 24);
++  end if;
++end $$;
++
++alter table public.fee_reminder_settings
++  drop column if exists days_after_due,
++  drop column if exists repeat_interval;
++
++-- Which side of the due date a sent "fees" reminder belongs to, so the page
++-- can show two separate logs instead of one combined feed. Null for
++-- attendance reminders (reason != 'fees'), where the split doesn't apply.
++alter table public.reminders
++  add column if not exists reminder_stage text
++    check (reminder_stage in ('before_due', 'overdue'));
+diff --git a/vercel.json b/vercel.json
+new file mode 100644
+index 0000000..46b4a5c
+--- /dev/null
++++ b/vercel.json
+@@ -0,0 +1,8 @@
++{
++  "crons": [
++    {
++      "path": "/api/cron/fee-reminders",
++      "schedule": "0 * * * *"
++    }
++  ]
++}

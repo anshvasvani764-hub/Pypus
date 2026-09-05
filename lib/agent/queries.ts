@@ -1,6 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { getISTDateString, formatISTDateTime } from "@/lib/utils/date";
 import { buildReceiptPreviewText, type ReceiptTemplateVars } from "@/lib/receipts/template-vars";
+import {
+  evaluateFeeReminder,
+  type FeeReminderSettingsLike,
+  type ReminderStage,
+} from "@/lib/agent/fee-reminder-eligibility";
 
 export interface AbsenteeWorklistItem {
   memberId: string;
@@ -24,6 +29,9 @@ export interface FeeWorklistItem {
   daysOverdue: number;
   alreadyMessagedToday: boolean;
   waMessage: string;
+  /** Which reminder is eligible right now: the once-off soft reminder
+   *  before the due date, or the repeating overdue chain. */
+  reminderStage: ReminderStage;
 }
 
 export interface ReceiptWorklistItem {
@@ -49,6 +57,8 @@ export interface AgentActivityItem {
   id: string;
   kind: "reminder" | "receipt";
   reason: "fees" | "attendance" | null; // set for kind "reminder", null for "receipt"
+  /** Only meaningful when reason === "fees" — which log this belongs in. */
+  stage: ReminderStage | null;
   memberName: string;
   detail: string;
   at: string; // formatted IST datetime (display only — don't sort on this)
@@ -142,10 +152,18 @@ export async function getAbsenteeWorklist(
   return out.sort((a, b) => b.daysAbsent - a.daysAbsent);
 }
 
-/** Fees that are due or overdue right now, each with a ready WhatsApp message. */
-export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistItem[]> {
+/** Fees with a reminder eligible to fire right now (before-due soft
+ *  reminder, or the next step of the overdue repeat chain), each with a
+ *  ready WhatsApp message. Paid fees never appear here — they drop out of
+ *  the `fees` query the moment they're marked paid, which is also what
+ *  "cancels" any reminder chain for them; there's no separate cancel step. */
+export async function getFeeWorklist(
+  workspaceId: string,
+  settings: FeeReminderSettingsLike
+): Promise<FeeWorklistItem[]> {
   const supabase = createServiceClient();
   const today = getISTDateString();
+  const now = Date.now();
 
   const [feesRes, membersRes, remindersRes] = await Promise.all([
     supabase
@@ -156,19 +174,26 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
     supabase.from("members").select("id, name, phone").eq("workspace_id", workspaceId),
     supabase
       .from("reminders")
-      .select("fee_id, sent_at, reason")
+      .select("fee_id, sent_at, reminder_stage")
       .eq("workspace_id", workspaceId)
       .eq("reason", "fees"),
   ]);
 
   if (feesRes.error) throw feesRes.error;
   if (membersRes.error) throw membersRes.error;
+  if (remindersRes.error) throw remindersRes.error;
 
   const nameById = new Map((membersRes.data ?? []).map((m) => [m.id, m]));
-  // Once a reminder has EVER been sent for a fee, stay hidden until it's paid —
-  // a paid fee drops out of the query above entirely, and the next due cycle
-  // gets a fresh fee id, so this never blocks a genuinely new bill.
-  const feeIdsEverReminded = new Set((remindersRes.data ?? []).map((r) => r.fee_id));
+
+  // Latest sent_at per fee, split by stage — evaluateFeeReminder needs the
+  // most recent send of each kind to know where in the chain a fee is.
+  const lastSentByFeeAndStage = new Map<string, string>(); // key: `${feeId}:${stage}`
+  for (const r of remindersRes.data ?? []) {
+    if (!r.reminder_stage) continue;
+    const key = `${r.fee_id}:${r.reminder_stage}`;
+    const existing = lastSentByFeeAndStage.get(key);
+    if (!existing || r.sent_at > existing) lastSentByFeeAndStage.set(key, r.sent_at);
+  }
 
   const out: FeeWorklistItem[] = [];
   for (const f of feesRes.data ?? []) {
@@ -176,7 +201,15 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
     if (!member) continue;
     const outstanding = (f.amount_snapshot ?? 0) - (f.paid_amount ?? 0);
     if (outstanding <= 0) continue;
-    if (feeIdsEverReminded.has(f.id)) continue;
+
+    const evalResult = evaluateFeeReminder(
+      f.due_date,
+      settings,
+      lastSentByFeeAndStage.get(`${f.id}:before_due`) ?? null,
+      lastSentByFeeAndStage.get(`${f.id}:overdue`) ?? null,
+      now
+    );
+    if (!evalResult.eligible || !evalResult.stage) continue;
 
     const daysOverdue =
       f.due_date < today
@@ -194,8 +227,9 @@ export async function getFeeWorklist(workspaceId: string): Promise<FeeWorklistIt
       status: f.status as "due" | "overdue",
       daysOverdue,
       alreadyMessagedToday: false,
+      reminderStage: evalResult.stage,
       waMessage:
-        daysOverdue > 0
+        evalResult.stage === "overdue"
           ? `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is overdue by ${daysOverdue} days. Kindly clear it at the earliest.`
           : `Hi ${member.name}, your gym fee of ₹${outstanding.toLocaleString("en-IN")} is due on ${f.due_date}. Kindly pay on time to avoid interruption.`,
     });
@@ -283,7 +317,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
   const [remindersRes, receiptsRes, membersRes] = await Promise.all([
     supabase
       .from("reminders")
-      .select("id, member_id, reason, message, sent_at")
+      .select("id, member_id, reason, message, sent_at, reminder_stage")
       .eq("workspace_id", workspaceId)
       .order("sent_at", { ascending: false })
       .limit(limit),
@@ -309,11 +343,17 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
     id: `reminder-${r.id}`,
     kind: "reminder",
     reason: (r.reason as "fees" | "attendance" | null) ?? null,
+    stage: (r.reminder_stage as ReminderStage | null) ?? null,
     memberName: nameById.get(r.member_id) ?? "Unknown member",
     // Reminders are logged the instant they go out (wa.me link opened, or
     // the WhatsApp API call succeeded) — never a "will send later" queue —
     // so the log should say sent, not promise a future send.
-    detail: r.reason === "fees" ? "Fee reminder sent on WhatsApp" : "Attendance nudge sent on WhatsApp",
+    detail:
+      r.reason === "fees"
+        ? r.reminder_stage === "before_due"
+          ? "Soft reminder sent on WhatsApp"
+          : "Overdue reminder sent on WhatsApp"
+        : "Attendance nudge sent on WhatsApp",
     at: formatISTDateTime(r.sent_at),
     atRaw: r.sent_at,
   }));
@@ -322,6 +362,7 @@ export async function getAgentActivity(workspaceId: string, limit = 100): Promis
     id: `receipt-${r.id}`,
     kind: "receipt",
     reason: null,
+    stage: null,
     memberName: nameById.get(r.member_id) ?? "Unknown member",
     detail: `Receipt #${r.receipt_number} generated — ₹${Number(r.amount).toLocaleString("en-IN")}`,
     at: formatISTDateTime(r.generated_at),

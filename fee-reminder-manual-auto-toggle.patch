@@ -1,0 +1,220 @@
+--- a/components/automations/FeeReminderView.tsx	2026-09-05 17:09:36.132475474 +0000
++++ b/components/automations/FeeReminderView.tsx	2026-09-05 17:09:08.027437406 +0000
+@@ -439,7 +439,6 @@
+   onClose: () => void;
+   onSaved: (message: string) => void;
+ }) {
+-  const [enabled, setEnabled] = useState(initialSettings.enabled);
+   const [beforeDueDays, setBeforeDueDays] = useState(String(initialSettings.beforeDueDays));
+   const [afterDueHours, setAfterDueHours] = useState(String(initialSettings.afterDueHours));
+   const [repeatIntervalHours, setRepeatIntervalHours] = useState(String(initialSettings.repeatIntervalHours));
+@@ -451,7 +450,10 @@
+     setSaving(true);
+ 
+     const result = await saveFeeReminderSettings(workspaceId, {
+-      enabled,
++      // Send mode is the single source of truth now — "enabled" just
++      // tracks whether auto-mode is switched on, so the cron job (which
++      // filters on enabled + send_mode = "auto") keeps working unchanged.
++      enabled: sendMode === "auto",
+       beforeDueDays: Math.max(0, Number(beforeDueDays) || 0),
+       afterDueHours: Math.max(0, Number(afterDueHours) || 0),
+       repeatIntervalHours: Math.max(24, Number(repeatIntervalHours) || 24),
+@@ -478,98 +480,110 @@
+         </div>
+ 
+         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+-          <div className="flex items-center justify-between">
+-            <div>
+-              <p className="text-sm font-medium text-gray-900">Enabled</p>
+-              <p className="text-xs text-gray-500">Turn fee reminders on for this workspace</p>
+-            </div>
+-            <button
+-              type="button"
+-              onClick={() => setEnabled((v) => !v)}
+-              aria-pressed={enabled}
+-              aria-label="Toggle fee reminders enabled"
+-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+-                enabled ? "bg-emerald-600" : "bg-gray-300"
+-              }`}
++          <div>
++            <p className="mb-2 text-sm font-medium text-gray-900">Send mode</p>
++            <div
++              role="group"
++              aria-label="Fee reminder send mode"
++              className="grid grid-cols-2 gap-1 rounded-xl bg-gray-100 p-1"
+             >
+-              <span
+-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+-                  enabled ? "translate-x-5" : "translate-x-0"
++              <button
++                type="button"
++                onClick={() => setSendMode("manual")}
++                aria-pressed={sendMode === "manual"}
++                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
++                  sendMode === "manual"
++                    ? "bg-white text-gray-900 shadow-sm"
++                    : "text-gray-500 hover:text-gray-700"
+                 }`}
+-              />
+-            </button>
+-          </div>
+-
+-          <div>
+-            <label className="mb-1 block text-sm font-medium text-gray-700">
+-              Soft reminder — days before due date
+-            </label>
+-            <input
+-              type="number"
+-              min={0}
+-              value={beforeDueDays}
+-              onChange={(e) => setBeforeDueDays(e.target.value)}
+-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+-            />
+-            <p className="mt-1 text-xs text-gray-400">Sent once, never repeats. Skipped if the fee is paid before this date.</p>
+-          </div>
+-
+-          <div>
+-            <label className="mb-1 block text-sm font-medium text-gray-700">
+-              First overdue reminder — hours after due date{" "}
+-              <span className="font-normal text-gray-400">{hoursWithDayHint(Number(afterDueHours) || 0)}</span>
+-            </label>
+-            <input
+-              type="number"
+-              min={0}
+-              value={afterDueHours}
+-              onChange={(e) => setAfterDueHours(e.target.value)}
+-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+-            />
+-          </div>
+-
+-          <div>
+-            <label className="mb-1 block text-sm font-medium text-gray-700">
+-              Repeat every — hours{" "}
+-              <span className="font-normal text-gray-400">
+-                {hoursWithDayHint(Number(repeatIntervalHours) || 0)}
+-              </span>
+-            </label>
+-            <input
+-              type="number"
+-              min={24}
+-              value={repeatIntervalHours}
+-              onChange={(e) => setRepeatIntervalHours(e.target.value)}
+-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+-            />
+-            <p className="mt-1 text-xs text-gray-400">
+-              Minimum 24 hours. Keeps repeating from the last send until the fee is marked paid.
++              >
++                Manual
++              </button>
++              <button
++                type="button"
++                onClick={() => setSendMode("auto")}
++                aria-pressed={sendMode === "auto"}
++                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${
++                  sendMode === "auto"
++                    ? "bg-white text-gray-900 shadow-sm"
++                    : "text-gray-500 hover:text-gray-700"
++                }`}
++              >
++                Automatic
++              </button>
++            </div>
++            <p className="mt-1.5 text-xs text-gray-500">
++              {sendMode === "manual"
++                ? "Every eligible reminder waits in the Pending queue — you send each one yourself, whenever you want."
++                : "Reminders go out on their own on the schedule below, no queue to check."}
+             </p>
+           </div>
+ 
+-          <div>
+-            <label className="mb-1 block text-sm font-medium text-gray-700">Send mode</label>
+-            <select
+-              value={sendMode}
+-              onChange={(e) => setSendMode(e.target.value as SendMode)}
+-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+-            >
+-              <option value="manual">Manual approval</option>
+-              <option value="auto">Automatic</option>
+-            </select>
+-            {sendMode === "auto" && !AUTO_WHATSAPP_ENABLED && (
+-              <p className="mt-1.5 text-xs text-amber-600">
+-                Saved, but automatic sending isn&apos;t live yet — WhatsApp auto-send is off workspace-wide until a
+-                business number is reconnected. Reminders will still need manual send till then.
+-              </p>
+-            )}
+-            {sendMode === "auto" && AUTO_WHATSAPP_ENABLED && (
+-              <p className="mt-1.5 text-xs text-amber-600">
+-                Auto mode fires from an hourly server job, not from this page being open — needs an approved
+-                WhatsApp template for fee reminders before it can actually send (see cron route comment).
+-              </p>
+-            )}
+-          </div>
++          {sendMode === "auto" && (
++            <>
++              <div>
++                <label className="mb-1 block text-sm font-medium text-gray-700">
++                  Soft reminder — days before due date
++                </label>
++                <input
++                  type="number"
++                  min={0}
++                  value={beforeDueDays}
++                  onChange={(e) => setBeforeDueDays(e.target.value)}
++                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
++                />
++                <p className="mt-1 text-xs text-gray-400">
++                  Sent once, never repeats. Skipped if the fee is paid before this date.
++                </p>
++              </div>
++
++              <div>
++                <label className="mb-1 block text-sm font-medium text-gray-700">
++                  First overdue reminder — hours after due date{" "}
++                  <span className="font-normal text-gray-400">{hoursWithDayHint(Number(afterDueHours) || 0)}</span>
++                </label>
++                <input
++                  type="number"
++                  min={0}
++                  value={afterDueHours}
++                  onChange={(e) => setAfterDueHours(e.target.value)}
++                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
++                />
++              </div>
++
++              <div>
++                <label className="mb-1 block text-sm font-medium text-gray-700">
++                  Repeat every — hours{" "}
++                  <span className="font-normal text-gray-400">
++                    {hoursWithDayHint(Number(repeatIntervalHours) || 0)}
++                  </span>
++                </label>
++                <input
++                  type="number"
++                  min={24}
++                  value={repeatIntervalHours}
++                  onChange={(e) => setRepeatIntervalHours(e.target.value)}
++                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
++                />
++                <p className="mt-1 text-xs text-gray-400">
++                  Minimum 24 hours. Keeps repeating from the last send until the fee is marked paid.
++                </p>
++              </div>
++
++              {!AUTO_WHATSAPP_ENABLED && (
++                <p className="text-xs text-amber-600">
++                  Saved, but automatic sending isn&apos;t live yet — WhatsApp auto-send is off workspace-wide until a
++                  business number is reconnected. Reminders will still need manual send till then.
++                </p>
++              )}
++              {AUTO_WHATSAPP_ENABLED && (
++                <p className="text-xs text-amber-600">
++                  Auto mode fires from an hourly server job, not from this page being open — needs an approved
++                  WhatsApp template for fee reminders before it can actually send (see cron route comment).
++                </p>
++              )}
++            </>
++          )}
+ 
+           <div className="-mx-6 -mb-5 mt-5 flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+             <button
