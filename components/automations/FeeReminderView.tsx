@@ -59,7 +59,13 @@ export function FeeReminderView({
 }: FeeReminderViewProps) {
   const router = useRouter();
 
-  const [tab, setTab] = useState<PageTab>("queue");
+  const isAutoMode = initialSettings.sendMode === "auto";
+
+  // Auto mode sends successful reminders straight to the log — pending queue
+  // there only ever holds failures or items waiting for the next hourly
+  // cron pass, so it isn't the useful default view the way it is in manual
+  // mode (where a human has to click Send from here).
+  const [tab, setTab] = useState<PageTab>(isAutoMode ? "before_due_log" : "queue");
 
   const [rows, setRows] = useState<PendingRow[]>(() =>
     pending.map((item) => ({
@@ -76,6 +82,7 @@ export function FeeReminderView({
   const [bulkSending, setBulkSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showClearQueueModal, setShowClearQueueModal] = useState(false);
 
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -88,6 +95,12 @@ export function FeeReminderView({
       }))
     );
   }, [pending]);
+
+  useEffect(() => {
+    if (!showClearQueueModal || bulkSending) return;
+    const nothingLeftToSend = rows.filter((r) => r.item.memberPhone).length === 0;
+    if (nothingLeftToSend) setShowClearQueueModal(false);
+  }, [rows, bulkSending, showClearQueueModal]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -184,11 +197,27 @@ export function FeeReminderView({
 
   const sendableCount = filteredRows.filter((r) => r.item.memberPhone).length;
 
-  const TABS: { value: PageTab; label: string; count: number }[] = [
-    { value: "queue", label: "Pending queue", count: rows.length },
+  const logTabs: { value: PageTab; label: string; count: number }[] = [
     { value: "before_due_log", label: "Before-due log", count: sentBeforeDue.length },
     { value: "overdue_log", label: "Overdue log", count: sentOverdue.length },
   ];
+  const queueTab = { value: "queue" as PageTab, label: "Pending queue", count: rows.length };
+
+  // Manual mode: queue is the primary workspace, stays first and always visible.
+  // Auto mode: successful sends bypass the queue entirely, so it only holds
+  // failures/in-flight items — push it last and hide it when there's nothing in it.
+  const TABS =
+    isAutoMode
+      ? [...logTabs, ...(rows.length > 0 ? [queueTab] : [])]
+      : [queueTab, ...logTabs];
+
+  // If the queue tab disappears (auto mode, last pending item just got
+  // processed while this page was open) and it was selected, fall back to a log tab.
+  useEffect(() => {
+    if (!TABS.some((t) => t.value === tab)) {
+      setTab("before_due_log");
+    }
+  }, [TABS, tab]);
 
   return (
     <div className="space-y-6 px-6 py-6 md:px-8">
@@ -401,12 +430,23 @@ export function FeeReminderView({
         <FeeReminderSettingsPanel
           workspaceId={workspaceId}
           initialSettings={initialSettings}
+          pendingCount={rows.filter((r) => r.item.memberPhone).length}
           onClose={() => setSettingsOpen(false)}
           onSaved={(message) => {
             setSettingsOpen(false);
             flashToast(message);
             router.refresh();
           }}
+          onRequestClearQueue={() => setShowClearQueueModal(true)}
+        />
+      )}
+
+      {showClearQueueModal && (
+        <ClearQueueOnAutoModal
+          rows={rows}
+          bulkSending={bulkSending}
+          onSendAll={handleSendAll}
+          onClose={() => setShowClearQueueModal(false)}
         />
       )}
     </div>
@@ -428,13 +468,17 @@ function EmptyState({ title, body }: { title: string; body: string }) {
 function FeeReminderSettingsPanel({
   workspaceId,
   initialSettings,
+  pendingCount,
   onClose,
   onSaved,
+  onRequestClearQueue,
 }: {
   workspaceId: string;
   initialSettings: FeeReminderSettings;
+  pendingCount: number;
   onClose: () => void;
   onSaved: (message: string) => void;
+  onRequestClearQueue: () => void;
 }) {
   const [beforeDueDays, setBeforeDueDays] = useState(String(initialSettings.beforeDueDays));
   const [afterDueHours, setAfterDueHours] = useState(String(initialSettings.afterDueHours));
@@ -459,6 +503,14 @@ function FeeReminderSettingsPanel({
 
     setSaving(false);
     onSaved(result.success ? "Settings saved" : result.error || "Failed to save settings");
+
+    // Just switched manual → auto and something's sitting in the queue —
+    // offer to clear it now (one at a time, in the popup) instead of
+    // silently waiting for the next hourly cron tick to pick it up.
+    const switchedToAuto = result.success && initialSettings.sendMode !== "auto" && sendMode === "auto";
+    if (switchedToAuto && pendingCount > 0) {
+      onRequestClearQueue();
+    }
   }
 
   return (
@@ -600,6 +652,91 @@ function FeeReminderSettingsPanel({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/** Shown right after switching manual → auto in settings, when there was
+ * something already sitting in the queue. Reuses the exact same one-at-a-
+ * time send loop as the "Send all pending" button on the Queue tab
+ * (handleSendAll → sendOne) — nothing here fires in parallel or bypasses
+ * the per-item success/failure handling. */
+function ClearQueueOnAutoModal({
+  rows,
+  bulkSending,
+  onSendAll,
+  onClose,
+}: {
+  rows: PendingRow[];
+  bulkSending: boolean;
+  onSendAll: () => void;
+  onClose: () => void;
+}) {
+  const sendable = rows.filter((r) => r.item.memberPhone);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <h2 className="text-base font-semibold text-gray-900">Auto mode is on</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-6 py-5">
+          <p className="text-sm text-gray-600">
+            {sendable.length > 0
+              ? `${sendable.length} reminder${sendable.length === 1 ? "" : "s"} ${
+                  sendable.length === 1 ? "is" : "are"
+                } already sitting in the queue from before. Send them now instead of waiting for the next hourly run?`
+              : "Queue is already clear — nothing waiting to send."}
+          </p>
+
+          {sendable.length > 0 && (
+            <div className="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-100">
+              {sendable.map((row) => (
+                <div key={row.key} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span className="text-gray-800">{row.item.memberName}</span>
+                  {row.status === "sending" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                  ) : row.status === "failed" ? (
+                    <span className="text-xs font-medium text-red-500">Failed</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Waiting</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Skip for now
+          </button>
+          {sendable.length > 0 && (
+            <button
+              type="button"
+              onClick={onSendAll}
+              disabled={bulkSending}
+              className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+            >
+              {bulkSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Send all ({sendable.length})
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
