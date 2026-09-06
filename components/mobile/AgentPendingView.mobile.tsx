@@ -7,18 +7,20 @@ import {
   Loader2,
   Clock,
   RotateCcw,
-  MessageCircle,
   Receipt,
   Search,
+  Settings as SettingsIcon,
   X as XIcon,
 } from 'lucide-react'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { sendAgentReceipt } from '@/app/actions/agent'
+import { saveReceiptAgentSettings } from '@/app/actions/receipt-agent'
 import { AUTO_WHATSAPP_ENABLED } from '@/lib/config/messaging'
 import type { ReceiptWorklistItem, AgentActivityItem } from '@/lib/agent/queries'
 import type { ReceiptSendMode } from '@/app/actions/receipt-agent'
 
 interface Props {
+  workspaceId?: string
   workspaceSlug: string
   workspaceName: string
   activity: AgentActivityItem[]
@@ -83,17 +85,21 @@ function StatusIcon({ status }: { status: RowStatus }) {
 }
 
 export function AgentPendingView({
+  workspaceId = '',
   workspaceSlug,
   workspaceName,
   activity,
   receiptsPending,
-  sendMode = 'manual',
+  sendMode: initialSendMode = 'manual',
 }: Props) {
   const router = useRouter()
   const [rows, setRows] = useState<LiveRow[]>([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('All')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [sendMode, setSendMode] = useState<ReceiptSendMode>(initialSendMode)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const queuedKeysRef = useRef<Set<string>>(new Set())
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
@@ -165,6 +171,11 @@ export function AgentPendingView({
     )
   }
 
+  function flashToast(message: string) {
+    setToast(message)
+    setTimeout(() => setToast(null), 3000)
+  }
+
   function retryNow(e: React.MouseEvent, key: string, item: ReceiptWorklistItem) {
     e.stopPropagation()
     e.preventDefault()
@@ -213,14 +224,19 @@ export function AgentPendingView({
   return (
     <div className="font-ve min-h-screen bg-ve-surface text-ve-on-surface pb-6">
       <MobileTopBar
-        title="Agent"
-        label="Pypus"
+        title="Receipts"
+        label="Automations"
         workspaceSlug={workspaceSlug}
         backHref={`/${workspaceSlug}/workspace`}
         action={
-          <div className="flex items-center gap-1 rounded-full bg-ve-primary/10 px-2.5 py-1.5 text-ve-primary">
-            <MessageCircle size={13} fill="currentColor" strokeWidth={0} />
-          </div>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Receipt agent settings"
+            className="flex size-8 shrink-0 -mr-1.5 items-center justify-center rounded-full text-ve-on-surface active:bg-ve-surface-container-high active:scale-95"
+          >
+            <SettingsIcon size={18} />
+          </button>
         }
       />
 
@@ -230,7 +246,7 @@ export function AgentPendingView({
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-ve-primary" />
             <p className="truncate text-[12px] font-semibold text-ve-on-surface">
-              WhatsApp connected
+              {sendMode === 'auto' ? 'Automatic sending is on' : 'Manual — send from Queue'}
             </p>
           </div>
           <span className="shrink-0 text-[11px] font-bold text-ve-outline">
@@ -368,6 +384,126 @@ export function AgentPendingView({
           </div>
         )}
       </main>
+
+      {settingsOpen && (
+        <ReceiptAgentSettingsSheet
+          workspaceId={workspaceId}
+          sendMode={sendMode}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(mode, message) => {
+            setSendMode(mode)
+            setSettingsOpen(false)
+            flashToast(message)
+            router.refresh()
+          }}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[80] rounded-xl border border-ve-outline-variant/20 bg-ve-on-surface px-4 py-2.5 text-center text-[12px] font-bold text-ve-surface shadow-lg">
+          {toast}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ReceiptAgentSettingsSheet({
+  workspaceId,
+  sendMode,
+  onClose,
+  onSaved,
+}: {
+  workspaceId: string
+  sendMode: ReceiptSendMode
+  onClose: () => void
+  onSaved: (mode: ReceiptSendMode, message: string) => void
+}) {
+  const [mode, setMode] = useState<ReceiptSendMode>(sendMode)
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    const result = await saveReceiptAgentSettings(workspaceId, { sendMode: mode })
+    setSaving(false)
+    onSaved(mode, result.success ? 'Settings saved' : result.error || 'Failed to save settings')
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40">
+      <div className="w-full sm:max-w-md max-h-[85vh] overflow-y-auto rounded-t-[1.5rem] sm:rounded-[1.5rem] bg-white shadow-xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between bg-white px-5 py-4 border-b border-ve-outline-variant/10">
+          <h2 className="text-base font-bold text-ve-on-surface">Receipt agent settings</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close settings"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-ve-on-surface-variant hover:bg-ve-surface-container transition-colors"
+          >
+            <XIcon size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="px-5 py-5 space-y-4">
+          <div>
+            <p className="mb-2 text-sm font-bold text-ve-on-surface">Send mode</p>
+            <div
+              role="group"
+              aria-label="Receipt agent send mode"
+              className="grid grid-cols-2 gap-1 rounded-xl bg-ve-surface-container p-1"
+            >
+              <button
+                type="button"
+                onClick={() => setMode('manual')}
+                aria-pressed={mode === 'manual'}
+                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                  mode === 'manual'
+                    ? 'bg-white text-ve-on-surface shadow-sm'
+                    : 'text-ve-on-surface-variant'
+                }`}
+              >
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('auto')}
+                aria-pressed={mode === 'auto'}
+                className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                  mode === 'auto'
+                    ? 'bg-white text-ve-on-surface shadow-sm'
+                    : 'text-ve-on-surface-variant'
+                }`}
+              >
+                Automatic
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-ve-outline leading-snug">
+              {mode === 'manual'
+                ? 'Receipts wait in Queue — send with one tap or Send all.'
+                : "Receipts send themselves the moment they're generated."}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-ve-outline-variant/10">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 min-h-[44px] rounded-full border border-ve-outline-variant/40 text-sm font-bold text-ve-on-surface-variant active:scale-95 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ve-primary text-white text-sm font-bold active:scale-95 transition-all disabled:opacity-60"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

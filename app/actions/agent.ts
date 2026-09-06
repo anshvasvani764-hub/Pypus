@@ -96,7 +96,6 @@ export async function sendAgentReceipt(args: {
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendReceiptOverWhatsApp(args);
   if (result.success) {
-    revalidatePath(`/[app]/agent`, "page");
     revalidatePath(`/[app]/automations/receipts`, "page");
   }
   return result;
@@ -150,7 +149,6 @@ export async function sendAgentReminder({
     return { success: false, error: error.message };
   }
 
-  revalidatePath(`/[app]/agent`, "page");
   revalidatePath(`/[app]/automations/receipts`, "page");
   return { success: true };
 }
@@ -277,7 +275,6 @@ export async function saveReceipt({
     memberPhone,
   }).catch((err) => console.error("Telegram notify failed:", err));
 
-  revalidatePath(`/[app]/agent`, "page");
   revalidatePath(`/[app]/automations/receipts`, "page");
   return {
     success: true,

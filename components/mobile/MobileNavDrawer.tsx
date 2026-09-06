@@ -3,7 +3,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { X, ChevronRight, LayoutDashboard, LayoutGrid, Sparkles, Bot, Settings } from 'lucide-react'
+import { X, ChevronRight, LayoutDashboard, LayoutGrid, MessageCircle, Bot, Settings } from 'lucide-react'
 import { useMobileNav } from '@/context/MobileNavContext'
 
 const DRAWER_WIDTH = 280
@@ -56,7 +56,16 @@ export function MobileNavDrawer({ workspaceSlug }: { workspaceSlug: string }) {
         { href: `${base}/team`, label: 'Team' },
       ],
     },
-    { type: 'link', href: `${base}/agent`, icon: Sparkles, label: 'Agent' },
+    {
+      type: 'section',
+      id: 'automations',
+      icon: MessageCircle,
+      label: 'Automations',
+      children: [
+        { href: `${base}/automations/receipts`, label: 'Receipts' },
+        { href: `${base}/automations/fee-reminders`, label: 'Fee reminders' },
+      ],
+    },
     { type: 'link', href: `${base}/assistant`, icon: Bot, label: 'Assistant' },
     { type: 'link', href: `${base}/settings`, icon: Settings, label: 'Settings' },
   ]

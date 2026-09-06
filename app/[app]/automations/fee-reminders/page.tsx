@@ -2,6 +2,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getAgentActivity, getFeeWorklist } from "@/lib/agent/queries";
 import { getFeeReminderSettings } from "@/app/actions/fee-reminders";
 import { FeeReminderView } from "@/components/automations/FeeReminderView";
+import { FeeReminderView as FeeReminderViewMobile } from "@/components/mobile/FeeReminderView.mobile";
+import { getDevice } from "@/lib/device";
 
 export default async function FeeRemindersPage({
   params,
@@ -38,6 +40,20 @@ export default async function FeeRemindersPage({
   const sentOverdue = activity.filter(
     (a) => a.kind === "reminder" && a.reason === "fees" && a.stage === "overdue"
   );
+
+  if ((await getDevice()) === "mobile") {
+    return (
+      <FeeReminderViewMobile
+        workspaceId={workspaceId}
+        workspaceSlug={workspaceSlug}
+        workspaceName={workspaceName}
+        pending={pending}
+        sentBeforeDue={sentBeforeDue}
+        sentOverdue={sentOverdue}
+        initialSettings={settings}
+      />
+    );
+  }
 
   return (
     <div className="relative min-h-[70vh]">

@@ -29,6 +29,7 @@ export default async function ReceiptsPage({
   if ((await getDevice()) === "mobile") {
     return (
       <AgentPendingViewMobile
+        workspaceId={workspaceId}
         workspaceSlug={workspaceSlug}
         workspaceName={workspaceName}
         activity={activity}
