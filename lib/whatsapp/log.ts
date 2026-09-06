@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { normalizePhoneForWhatsApp } from "@/lib/whatsapp/phone";
 
 export type WaReason = "fee_reminder" | "receipt" | "manual" | "other";
 
@@ -22,9 +23,14 @@ const TEMPLATE_CATEGORY_GUESS: Record<string, string> = {
 
 /** Best-effort country guess from the phone prefix, used to pick the right
  * wa_rate_card row. Only India is handled precisely since that's currently
- * 100% of traffic — extend if a workspace ever has members outside India. */
+ * 100% of traffic — extend if a workspace ever has members outside India.
+ *
+ * Members are stored in the DB as bare 10-digit numbers (no "91" prefix),
+ * so this has to normalize the same way client.ts does before checking the
+ * prefix — checking the raw DB value directly mistook every Indian member
+ * for `OTHER`, since bare 10-digit numbers never start with "91". */
 function guessCountry(toPhone: string): string {
-  return toPhone.replace(/[\s\-()+]/g, "").startsWith("91") ? "IN" : "OTHER";
+  return normalizePhoneForWhatsApp(toPhone).startsWith("91") ? "IN" : "OTHER";
 }
 
 /**

@@ -1,0 +1,109 @@
+diff --git a/lib/whatsapp/client.ts b/lib/whatsapp/client.ts
+index 0a25abf..388a530 100644
+--- a/lib/whatsapp/client.ts
++++ b/lib/whatsapp/client.ts
+@@ -16,6 +16,7 @@
+  */
+ 
+ import { logWaMessage, type WaLogContext } from "@/lib/whatsapp/log";
++import { normalizePhoneForWhatsApp } from "@/lib/whatsapp/phone";
+ 
+ const WHATSAPP_API_VERSION = "v21.0";
+ 
+@@ -29,13 +30,7 @@ function apiUrl(): string {
+ 
+ /** Normalizes an Indian phone number to Meta's expected format: "91XXXXXXXXXX" (no +, no spaces). */
+ export function formatPhoneForWhatsApp(phone: string): string {
+-  let clean = phone.replace(/[\s\-()]/g, "");
+-  if (clean.startsWith("+")) {
+-    clean = clean.slice(1);
+-  } else if (!clean.startsWith("91")) {
+-    clean = "91" + clean;
+-  }
+-  return clean;
++  return normalizePhoneForWhatsApp(phone);
+ }
+ 
+ export interface WhatsAppSendResult {
+diff --git a/lib/whatsapp/log.ts b/lib/whatsapp/log.ts
+index 86a821d..3fa7931 100644
+--- a/lib/whatsapp/log.ts
++++ b/lib/whatsapp/log.ts
+@@ -1,4 +1,5 @@
+ import { createServiceClient } from "@/lib/supabase/service";
++import { normalizePhoneForWhatsApp } from "@/lib/whatsapp/phone";
+ 
+ export type WaReason = "fee_reminder" | "receipt" | "manual" | "other";
+ 
+@@ -22,9 +23,14 @@ const TEMPLATE_CATEGORY_GUESS: Record<string, string> = {
+ 
+ /** Best-effort country guess from the phone prefix, used to pick the right
+  * wa_rate_card row. Only India is handled precisely since that's currently
+- * 100% of traffic — extend if a workspace ever has members outside India. */
++ * 100% of traffic — extend if a workspace ever has members outside India.
++ *
++ * Members are stored in the DB as bare 10-digit numbers (no "91" prefix),
++ * so this has to normalize the same way client.ts does before checking the
++ * prefix — checking the raw DB value directly mistook every Indian member
++ * for `OTHER`, since bare 10-digit numbers never start with "91". */
+ function guessCountry(toPhone: string): string {
+-  return toPhone.replace(/[\s\-()+]/g, "").startsWith("91") ? "IN" : "OTHER";
++  return normalizePhoneForWhatsApp(toPhone).startsWith("91") ? "IN" : "OTHER";
+ }
+ 
+ /**
+diff --git a/lib/whatsapp/phone.ts b/lib/whatsapp/phone.ts
+new file mode 100644
+index 0000000..7e97cfc
+--- /dev/null
++++ b/lib/whatsapp/phone.ts
+@@ -0,0 +1,25 @@
++/**
++ * Normalizes a phone number to Meta's expected format: "91XXXXXXXXXX"
++ * (no +, no spaces, no dashes).
++ *
++ * Members are stored in the DB as bare 10-digit Indian numbers (no "91"
++ * prefix), so this also has to handle that case — not just "+91..." or
++ * "91..." input.
++ *
++ * Shared by lib/whatsapp/client.ts (to build the actual API payload) and
++ * lib/whatsapp/log.ts (to guess the country for cost-dashboard purposes).
++ * Keeping this in one place means both always agree on what counts as an
++ * Indian number — that agreement is exactly what broke before: the logger
++ * used to check the raw, un-prefixed DB value instead of the normalized
++ * one, so bare 10-digit numbers never matched "91" and were misfiled as
++ * `OTHER`.
++ */
++export function normalizePhoneForWhatsApp(phone: string): string {
++  let clean = phone.replace(/[\s\-()]/g, "");
++  if (clean.startsWith("+")) {
++    clean = clean.slice(1);
++  } else if (!clean.startsWith("91")) {
++    clean = "91" + clean;
++  }
++  return clean;
++}
+diff --git a/supabase/migrations/20260906020000_backfill_wa_message_log_country.sql b/supabase/migrations/20260906020000_backfill_wa_message_log_country.sql
+new file mode 100644
+index 0000000..be31e01
+--- /dev/null
++++ b/supabase/migrations/20260906020000_backfill_wa_message_log_country.sql
+@@ -0,0 +1,18 @@
++-- Backfill: rows logged before the guessCountry fix (lib/whatsapp/log.ts)
++-- mis-tagged every bare 10-digit Indian member number as 'OTHER', because
++-- the old logic checked the raw DB value for a "91" prefix instead of
++-- normalizing first. That made those rows fail to join wa_rate_card
++-- (which only has 'IN' rows), so their cost was silently dropped from the
++-- admin cost dashboard.
++--
++-- Re-derive country the same way the fixed code does: normalize to Meta's
++-- "91XXXXXXXXXX" form, then check the prefix. Since the app is 100% Indian
++-- traffic today, `OTHER` rows with a plausible 10-digit or 91-prefixed
++-- number are corrected to 'IN'; anything else is left as-is.
++update public.wa_message_log
++set country = 'IN'
++where country = 'OTHER'
++  and (
++    to_phone ~ '^[6-9][0-9]{9}$'                 -- bare 10-digit Indian mobile
++    or regexp_replace(to_phone, '[\s\-()+]', '', 'g') ~ '^91[6-9][0-9]{9}$'
++  );
