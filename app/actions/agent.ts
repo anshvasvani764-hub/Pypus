@@ -54,12 +54,24 @@ async function sendReceiptOverWhatsApp({
     return { success: false, error: "Receipt image not ready yet — try again in a moment" };
   }
 
+  // Callers only pass receiptId — fetch workspace_id/member_id off the
+  // receipt row itself for the cost-log entry instead of changing every
+  // call site's (and their UI callers') signature.
+  const { data: receiptRow } = await supabase
+    .from("receipts")
+    .select("workspace_id, member_id")
+    .eq("id", receiptId)
+    .maybeSingle();
+
   const result = await sendWhatsAppTemplate(
     memberPhone,
     "payment_receipt",
     buildReceiptTemplateBodyParams(templateVars),
     "en",
-    receiptImageUrl
+    receiptImageUrl,
+    receiptRow?.workspace_id
+      ? { workspaceId: receiptRow.workspace_id, memberId: receiptRow.member_id, reason: "receipt" }
+      : undefined
   );
 
   const { error } = await supabase
@@ -125,7 +137,11 @@ export async function sendAgentReminder({
 
   const supabase = createServiceClient();
 
-  const result = await sendWhatsAppText(memberPhone, message);
+  const result = await sendWhatsAppText(memberPhone, message, {
+    workspaceId,
+    memberId,
+    reason: reason === "fees" ? "fee_reminder" : "other",
+  });
 
   if (!result.success) {
     return { success: false, error: result.error || "WhatsApp send failed" };

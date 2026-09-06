@@ -1,0 +1,423 @@
+diff --git a/app/actions/agent.ts b/app/actions/agent.ts
+index aaeb096..1a8b59c 100644
+--- a/app/actions/agent.ts
++++ b/app/actions/agent.ts
+@@ -54,12 +54,24 @@ async function sendReceiptOverWhatsApp({
+     return { success: false, error: "Receipt image not ready yet — try again in a moment" };
+   }
+ 
++  // Callers only pass receiptId — fetch workspace_id/member_id off the
++  // receipt row itself for the cost-log entry instead of changing every
++  // call site's (and their UI callers') signature.
++  const { data: receiptRow } = await supabase
++    .from("receipts")
++    .select("workspace_id, member_id")
++    .eq("id", receiptId)
++    .maybeSingle();
++
+   const result = await sendWhatsAppTemplate(
+     memberPhone,
+     "payment_receipt",
+     buildReceiptTemplateBodyParams(templateVars),
+     "en",
+-    receiptImageUrl
++    receiptImageUrl,
++    receiptRow?.workspace_id
++      ? { workspaceId: receiptRow.workspace_id, memberId: receiptRow.member_id, reason: "receipt" }
++      : undefined
+   );
+ 
+   const { error } = await supabase
+@@ -125,7 +137,11 @@ export async function sendAgentReminder({
+ 
+   const supabase = createServiceClient();
+ 
+-  const result = await sendWhatsAppText(memberPhone, message);
++  const result = await sendWhatsAppText(memberPhone, message, {
++    workspaceId,
++    memberId,
++    reason: reason === "fees" ? "fee_reminder" : "other",
++  });
+ 
+   if (!result.success) {
+     return { success: false, error: result.error || "WhatsApp send failed" };
+diff --git a/app/actions/fee-reminders.ts b/app/actions/fee-reminders.ts
+index 461ee91..6e65e51 100644
+--- a/app/actions/fee-reminders.ts
++++ b/app/actions/fee-reminders.ts
+@@ -133,7 +133,11 @@ export async function sendFeeReminderNow({
+       ? [memberName, workspaceName, amountParam, dueDateParam, String(daysOverdue)]
+       : [memberName, workspaceName, amountParam, dueDateParam];
+ 
+-  const result = await sendWhatsAppTemplate(memberPhone, templateName, bodyParams);
++  const result = await sendWhatsAppTemplate(memberPhone, templateName, bodyParams, "en", undefined, {
++    workspaceId,
++    memberId,
++    reason: "fee_reminder",
++  });
+ 
+   if (!result.success) {
+     return { success: false, error: result.error || "WhatsApp send failed" };
+diff --git a/app/api/cron/fee-reminders/route.ts b/app/api/cron/fee-reminders/route.ts
+index 667246b..3f37ffb 100644
+--- a/app/api/cron/fee-reminders/route.ts
++++ b/app/api/cron/fee-reminders/route.ts
+@@ -85,7 +85,11 @@ export async function GET(request: Request) {
+             ? [item.memberName, workspaceName, amountParam, dueDateParam, String(item.daysOverdue)]
+             : [item.memberName, workspaceName, amountParam, dueDateParam];
+ 
+-        const result = await sendWhatsAppTemplate(item.memberPhone, templateName, bodyParams);
++        const result = await sendWhatsAppTemplate(item.memberPhone, templateName, bodyParams, "en", undefined, {
++          workspaceId,
++          memberId: item.memberId,
++          reason: "fee_reminder",
++        });
+ 
+         if (result.success) {
+           await supabase.from("reminders").insert({
+diff --git a/app/api/whatsapp/webhook/route.ts b/app/api/whatsapp/webhook/route.ts
+new file mode 100644
+index 0000000..1024eca
+--- /dev/null
++++ b/app/api/whatsapp/webhook/route.ts
+@@ -0,0 +1,116 @@
++import { NextResponse } from "next/server";
++import crypto from "crypto";
++import { createServiceClient } from "@/lib/supabase/service";
++
++/**
++ * Receives Meta's WhatsApp Cloud API webhook callbacks.
++ *
++ * Setup on Meta's side (one-time, in the Meta App dashboard →
++ * WhatsApp → Configuration → Webhook):
++ *   Callback URL:    https://pypus.in/api/whatsapp/webhook
++ *   Verify token:    same value as WHATSAPP_WEBHOOK_VERIFY_TOKEN env var
++ *   Subscribe to:    "messages" field (this carries delivery/read status,
++ *                    which is what includes the `pricing` object below)
++ *
++ * Why this exists: Meta doesn't return a message's billing category in the
++ * send response (see lib/whatsapp/client.ts) — it only appears later, on a
++ * delivered/read status webhook, as:
++ *   "pricing": { "billable": true, "category": "utility", ... }
++ * This route matches that back to the wa_message_log row (by message_id,
++ * written at send time) and fills in pricing_category/billable, so the
++ * cost dashboard's numbers become Meta-confirmed instead of just guesses.
++ *
++ * Env vars needed:
++ *   WHATSAPP_WEBHOOK_VERIFY_TOKEN — any string you pick, must match what's
++ *     entered in the Meta dashboard's "Verify token" field.
++ *   WHATSAPP_APP_SECRET — optional but recommended, from the Meta App's
++ *     Settings → Basic → App Secret. If set, incoming payloads are
++ *     signature-checked; if unset, that check is skipped (payload is still
++ *     processed — don't block on this to get the pipeline live).
++ */
++
++// --- GET: Meta's one-time verification handshake ---
++export async function GET(request: Request) {
++  const url = new URL(request.url);
++  const mode = url.searchParams.get("hub.mode");
++  const token = url.searchParams.get("hub.verify_token");
++  const challenge = url.searchParams.get("hub.challenge");
++
++  if (mode === "subscribe" && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
++    return new NextResponse(challenge ?? "", { status: 200 });
++  }
++
++  return NextResponse.json({ error: "verification failed" }, { status: 403 });
++}
++
++function isValidSignature(rawBody: string, signatureHeader: string | null): boolean {
++  const appSecret = process.env.WHATSAPP_APP_SECRET;
++  if (!appSecret) return true; // not configured yet — don't block the pipeline on this
++  if (!signatureHeader) return false;
++
++  const expected =
++    "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
++
++  try {
++    return crypto.timingSafeEqual(Buffer.from(signatureHeader), Buffer.from(expected));
++  } catch {
++    return false; // length mismatch etc. — treat as invalid, not a crash
++  }
++}
++
++interface MetaStatusEntry {
++  id: string; // this is the WhatsApp message id — matches wa_message_log.message_id
++  status: string; // sent | delivered | read | failed
++  pricing?: {
++    billable?: boolean;
++    category?: string; // utility | marketing | authentication | service
++    pricing_model?: string;
++    type?: string;
++  };
++}
++
++// --- POST: actual status callbacks ---
++export async function POST(request: Request) {
++  const rawBody = await request.text();
++
++  if (!isValidSignature(rawBody, request.headers.get("x-hub-signature-256"))) {
++    return NextResponse.json({ error: "invalid signature" }, { status: 401 });
++  }
++
++  // Always parse defensively — Meta retries on non-200, so a malformed
++  // payload here shouldn't turn into an infinite retry loop.
++  let payload: any;
++  try {
++    payload = JSON.parse(rawBody);
++  } catch {
++    return NextResponse.json({ ok: true }); // ack anyway, nothing we can do with it
++  }
++
++  const supabase = createServiceClient();
++
++  const statuses: MetaStatusEntry[] =
++    payload?.entry?.flatMap((entry: any) =>
++      entry?.changes?.flatMap((change: any) => change?.value?.statuses ?? []) ?? []
++    ) ?? [];
++
++  for (const status of statuses) {
++    if (!status?.id || !status.pricing) continue; // only status updates that actually carry pricing are useful here
++
++    const { error } = await supabase
++      .from("wa_message_log")
++      .update({
++        pricing_category: status.pricing.category ?? null,
++        billable: status.pricing.billable ?? null,
++        priced_at: new Date().toISOString(),
++      })
++      .eq("message_id", status.id);
++
++    if (error) {
++      console.error("whatsapp webhook: failed to update wa_message_log", status.id, error);
++    }
++  }
++
++  // Meta expects a fast 200 — always ack even if a row didn't match
++  // (e.g. a message sent before this table existed).
++  return NextResponse.json({ ok: true });
++}
+diff --git a/lib/whatsapp/client.ts b/lib/whatsapp/client.ts
+index 1882bd0..0a25abf 100644
+--- a/lib/whatsapp/client.ts
++++ b/lib/whatsapp/client.ts
+@@ -15,6 +15,8 @@
+  *   recently, or for verified test recipient numbers.
+  */
+ 
++import { logWaMessage, type WaLogContext } from "@/lib/whatsapp/log";
++
+ const WHATSAPP_API_VERSION = "v21.0";
+ 
+ function apiUrl(): string {
+@@ -78,13 +80,28 @@ async function callWhatsAppApi(body: Record<string, unknown>): Promise<WhatsAppS
+  * service window, or to numbers added as "test recipients" in Meta's
+  * API Setup tab while the app hasn't been through Advanced Access review.
+  */
+-export async function sendWhatsAppText(to: string, message: string): Promise<WhatsAppSendResult> {
+-  return callWhatsAppApi({
++export async function sendWhatsAppText(
++  to: string,
++  message: string,
++  logCtx?: WaLogContext
++): Promise<WhatsAppSendResult> {
++  const result = await callWhatsAppApi({
+     messaging_product: "whatsapp",
+     to: formatPhoneForWhatsApp(to),
+     type: "text",
+     text: { body: message },
+   });
++
++  if (logCtx) {
++    await logWaMessage(logCtx, {
++      toPhone: to,
++      messageId: result.messageId,
++      sendStatus: result.success ? "sent" : "failed",
++      error: result.error,
++    });
++  }
++
++  return result;
+ }
+ 
+ /**
+@@ -105,7 +122,8 @@ export async function sendWhatsAppTemplate(
+   templateName: string,
+   bodyParams: string[] = [],
+   languageCode = "en",
+-  headerImageLink?: string
++  headerImageLink?: string,
++  logCtx?: WaLogContext
+ ): Promise<WhatsAppSendResult> {
+   const components: Record<string, unknown>[] = [];
+ 
+@@ -123,7 +141,7 @@ export async function sendWhatsAppTemplate(
+     });
+   }
+ 
+-  return callWhatsAppApi({
++  const result = await callWhatsAppApi({
+     messaging_product: "whatsapp",
+     to: formatPhoneForWhatsApp(to),
+     type: "template",
+@@ -133,4 +151,16 @@ export async function sendWhatsAppTemplate(
+       ...(components.length > 0 ? { components } : {}),
+     },
+   });
++
++  if (logCtx) {
++    await logWaMessage(logCtx, {
++      templateName,
++      toPhone: to,
++      messageId: result.messageId,
++      sendStatus: result.success ? "sent" : "failed",
++      error: result.error,
++    });
++  }
++
++  return result;
+ }
+diff --git a/lib/whatsapp/log.ts b/lib/whatsapp/log.ts
+new file mode 100644
+index 0000000..86a821d
+--- /dev/null
++++ b/lib/whatsapp/log.ts
+@@ -0,0 +1,71 @@
++import { createServiceClient } from "@/lib/supabase/service";
++
++export type WaReason = "fee_reminder" | "receipt" | "manual" | "other";
++
++export interface WaLogContext {
++  workspaceId: string;
++  memberId?: string | null;
++  reason: WaReason;
++}
++
++/** Meta doesn't tell us a message's billing category in the send response —
++ * only the delivery/read status webhook confirms it (see
++ * app/api/whatsapp/webhook/route.ts, `pricing_category` on the row). This
++ * is just our best guess at send time so the dashboard has something to
++ * show immediately, before that webhook lands. Update this map if a new
++ * approved template gets added. */
++const TEMPLATE_CATEGORY_GUESS: Record<string, string> = {
++  pre_due_fee_reminder: "utility",
++  fee_reminder: "utility",
++  payment_receipt: "utility",
++};
++
++/** Best-effort country guess from the phone prefix, used to pick the right
++ * wa_rate_card row. Only India is handled precisely since that's currently
++ * 100% of traffic — extend if a workspace ever has members outside India. */
++function guessCountry(toPhone: string): string {
++  return toPhone.replace(/[\s\-()+]/g, "").startsWith("91") ? "IN" : "OTHER";
++}
++
++/**
++ * Writes one row per outbound WhatsApp API call to wa_message_log — the
++ * single source of truth the cost dashboard reads from. Called from inside
++ * lib/whatsapp/client.ts right after every send attempt (success AND
++ * failure — failures are worth seeing too, even though they're never
++ * billable), so every call site gets logged automatically without anyone
++ * having to remember to do it.
++ *
++ * Best-effort: a logging failure must never fail the actual WhatsApp send,
++ * so this only console.errors and swallows the error.
++ */
++export async function logWaMessage(
++  ctx: WaLogContext,
++  details: {
++    templateName?: string | null;
++    toPhone: string;
++    messageId?: string;
++    sendStatus: "sent" | "failed";
++    error?: string;
++  }
++): Promise<void> {
++  try {
++    const supabase = createServiceClient();
++    const { error } = await supabase.from("wa_message_log").insert({
++      workspace_id: ctx.workspaceId,
++      member_id: ctx.memberId ?? null,
++      reason: ctx.reason,
++      template_name: details.templateName ?? null,
++      category: details.templateName
++        ? TEMPLATE_CATEGORY_GUESS[details.templateName] ?? "unknown"
++        : "service",
++      country: guessCountry(details.toPhone),
++      to_phone: details.toPhone,
++      message_id: details.messageId ?? null,
++      send_status: details.sendStatus,
++      error: details.error ?? null,
++    });
++    if (error) console.error("logWaMessage insert failed:", error);
++  } catch (err) {
++    console.error("logWaMessage threw:", err);
++  }
++}
+diff --git a/supabase/migrations/20260906010000_wa_message_log.sql b/supabase/migrations/20260906010000_wa_message_log.sql
+new file mode 100644
+index 0000000..3c8c3b9
+--- /dev/null
++++ b/supabase/migrations/20260906010000_wa_message_log.sql
+@@ -0,0 +1,61 @@
++-- Central log of every outbound WhatsApp Cloud API call, across all
++-- workspaces, written from a single choke point (lib/whatsapp/client.ts)
++-- so nothing has to remember to log itself. This is what the platform-level
++-- cost dashboard reads from.
++--
++-- Meta does not return a message's billing category in the send response —
++-- only the delivery/read status webhook confirms `pricing.category` /
++-- `pricing.billable` (see app/api/whatsapp/webhook/route.ts). So each row
++-- starts with our best-guess `category` at send time, and gets upgraded to
++-- the authoritative `pricing_category` / `billable` once that webhook
++-- lands. The dashboard should prefer pricing_category over category when
++-- both are present.
++
++create table if not exists public.wa_message_log (
++  id uuid primary key default gen_random_uuid(),
++  workspace_id uuid not null references public.workspaces(id) on delete cascade,
++  member_id uuid references public.members(id) on delete set null,
++  reason text not null check (reason in ('fee_reminder', 'receipt', 'manual', 'other')),
++  template_name text,
++  category text,                 -- our guess at send time: utility/marketing/authentication/service/unknown
++  pricing_category text,         -- confirmed by Meta's status webhook (authoritative once set)
++  billable boolean,              -- confirmed by Meta's status webhook
++  country text not null default 'IN',
++  to_phone text not null,
++  message_id text,               -- Meta's message id — matched against webhook status callbacks
++  send_status text not null default 'sent' check (send_status in ('sent', 'failed')),
++  error text,
++  created_at timestamptz not null default now(),
++  priced_at timestamptz          -- when the webhook confirmed pricing_category/billable
++);
++
++create index if not exists wa_message_log_workspace_created_idx
++  on public.wa_message_log (workspace_id, created_at desc);
++
++-- Only index rows that actually have a message_id (failed sends won't) —
++-- this is the webhook's lookup key.
++create index if not exists wa_message_log_message_id_idx
++  on public.wa_message_log (message_id)
++  where message_id is not null;
++
++-- Editable per-category, per-country rate card (₹). Meta changes these
++-- rates periodically and doesn't expose ₹ amount via API/webhook — the
++-- webhook only confirms *which* category a message billed as. Seeded at 0;
++-- fill in the real current rates from Meta Business Manager → WhatsApp
++-- Manager → Billing before trusting the dashboard's ₹ numbers.
++create table if not exists public.wa_rate_card (
++  category text not null check (category in ('utility', 'marketing', 'authentication', 'service', 'unknown')),
++  country text not null default 'IN',
++  price_inr numeric not null default 0,
++  updated_at timestamptz not null default now(),
++  primary key (category, country)
++);
++
++insert into public.wa_rate_card (category, country, price_inr)
++values
++  ('utility', 'IN', 0),
++  ('marketing', 'IN', 0),
++  ('authentication', 'IN', 0),
++  ('service', 'IN', 0),
++  ('unknown', 'IN', 0)
++on conflict (category, country) do nothing;

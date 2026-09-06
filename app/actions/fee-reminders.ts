@@ -133,7 +133,11 @@ export async function sendFeeReminderNow({
       ? [memberName, workspaceName, amountParam, dueDateParam, String(daysOverdue)]
       : [memberName, workspaceName, amountParam, dueDateParam];
 
-  const result = await sendWhatsAppTemplate(memberPhone, templateName, bodyParams);
+  const result = await sendWhatsAppTemplate(memberPhone, templateName, bodyParams, "en", undefined, {
+    workspaceId,
+    memberId,
+    reason: "fee_reminder",
+  });
 
   if (!result.success) {
     return { success: false, error: result.error || "WhatsApp send failed" };

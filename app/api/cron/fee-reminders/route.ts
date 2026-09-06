@@ -85,7 +85,11 @@ export async function GET(request: Request) {
             ? [item.memberName, workspaceName, amountParam, dueDateParam, String(item.daysOverdue)]
             : [item.memberName, workspaceName, amountParam, dueDateParam];
 
-        const result = await sendWhatsAppTemplate(item.memberPhone, templateName, bodyParams);
+        const result = await sendWhatsAppTemplate(item.memberPhone, templateName, bodyParams, "en", undefined, {
+          workspaceId,
+          memberId: item.memberId,
+          reason: "fee_reminder",
+        });
 
         if (result.success) {
           await supabase.from("reminders").insert({

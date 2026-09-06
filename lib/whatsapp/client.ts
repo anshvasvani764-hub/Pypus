@@ -15,6 +15,8 @@
  *   recently, or for verified test recipient numbers.
  */
 
+import { logWaMessage, type WaLogContext } from "@/lib/whatsapp/log";
+
 const WHATSAPP_API_VERSION = "v21.0";
 
 function apiUrl(): string {
@@ -78,13 +80,28 @@ async function callWhatsAppApi(body: Record<string, unknown>): Promise<WhatsAppS
  * service window, or to numbers added as "test recipients" in Meta's
  * API Setup tab while the app hasn't been through Advanced Access review.
  */
-export async function sendWhatsAppText(to: string, message: string): Promise<WhatsAppSendResult> {
-  return callWhatsAppApi({
+export async function sendWhatsAppText(
+  to: string,
+  message: string,
+  logCtx?: WaLogContext
+): Promise<WhatsAppSendResult> {
+  const result = await callWhatsAppApi({
     messaging_product: "whatsapp",
     to: formatPhoneForWhatsApp(to),
     type: "text",
     text: { body: message },
   });
+
+  if (logCtx) {
+    await logWaMessage(logCtx, {
+      toPhone: to,
+      messageId: result.messageId,
+      sendStatus: result.success ? "sent" : "failed",
+      error: result.error,
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -105,7 +122,8 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   bodyParams: string[] = [],
   languageCode = "en",
-  headerImageLink?: string
+  headerImageLink?: string,
+  logCtx?: WaLogContext
 ): Promise<WhatsAppSendResult> {
   const components: Record<string, unknown>[] = [];
 
@@ -123,7 +141,7 @@ export async function sendWhatsAppTemplate(
     });
   }
 
-  return callWhatsAppApi({
+  const result = await callWhatsAppApi({
     messaging_product: "whatsapp",
     to: formatPhoneForWhatsApp(to),
     type: "template",
@@ -133,4 +151,16 @@ export async function sendWhatsAppTemplate(
       ...(components.length > 0 ? { components } : {}),
     },
   });
+
+  if (logCtx) {
+    await logWaMessage(logCtx, {
+      templateName,
+      toPhone: to,
+      messageId: result.messageId,
+      sendStatus: result.success ? "sent" : "failed",
+      error: result.error,
+    });
+  }
+
+  return result;
 }
