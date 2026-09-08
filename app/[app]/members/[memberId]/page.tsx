@@ -8,6 +8,7 @@ import { MemberTabs } from "@/components/members/MemberTabs";
 import { MemberOverviewTab } from "@/components/members/MemberOverviewTab";
 import { MemberProfileOverviewView } from "@/components/mobile/MemberProfileOverviewView.mobile";
 import { getDevice } from "@/lib/device";
+import { PypusPageContext } from "@/components/pypus/PypusPageContext";
 
 export default async function MemberProfilePage({
   params,
@@ -33,8 +34,24 @@ export default async function MemberProfilePage({
 
   const basePath = `/${workspaceSlug}/members/${memberId}`;
 
+  const pageContext = {
+    selectedEntity: { type: "member", id: member.id, name: member.name },
+    visibleEntities: [{ type: "member", id: member.id, name: member.name }],
+    visibleData: {
+      member_name: member.name,
+      plan_name: summary.planName,
+      fee_status: summary.status,
+      due_date: summary.dueDate,
+    },
+    availableActions: [
+      { action: "edit_member", label: "Edit member", entity: { type: "member", id: member.id, name: member.name } },
+      { action: "send_fee_reminder", label: "Send fees reminder", entity: { type: "member", id: member.id, name: member.name } },
+    ],
+  };
+
   if ((await getDevice()) === "mobile") {
     return (
+      <PypusPageContext context={pageContext}>
       <MemberProfileOverviewView
         member={member}
         workspaceSlug={workspaceSlug}
@@ -47,10 +64,12 @@ export default async function MemberProfilePage({
         payableFeeId={summary.payableFee?.id ?? null}
         fees={fees}
       />
+      </PypusPageContext>
     );
   }
 
   return (
+    <PypusPageContext context={pageContext}>
     <div className="w-full max-w-6xl px-8 py-10">
       <MemberBreadcrumbs
         items={[
@@ -77,5 +96,6 @@ export default async function MemberProfilePage({
 
       <MemberOverviewTab member={member} />
     </div>
+    </PypusPageContext>
   );
 }

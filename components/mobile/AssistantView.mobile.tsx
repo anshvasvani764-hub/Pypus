@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Bot, Send, RotateCcw } from 'lucide-react'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { usePypusUIContext } from '@/context/PypusUIContext'
 
 interface Message {
   id: string
@@ -30,6 +31,7 @@ const QUICK_PROMPTS = [
 
 export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
   const { workspace } = useWorkspace(workspaceSlug)
+  const { uiContext } = usePypusUIContext()
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -69,7 +71,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
       const res = await fetch('/api/pypus/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history }),
+        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history, uiContext }),
       })
       const data = await res.json()
       reply =

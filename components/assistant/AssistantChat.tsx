@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Send, Bot, User } from 'lucide-react'
+import { usePypusUIContext } from '@/context/PypusUIContext'
 
 interface Message {
   id: string
@@ -47,6 +48,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
   // Carried the same way `history` is (client state, round-tripped every
   // turn) so "usko"/"iska" keeps working across messages without a DB table.
   const resolvedContextRef = useRef<ResolvedContext | null>(null)
+  const { uiContext } = usePypusUIContext()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -79,6 +81,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
           message: text,
           history,
           resolvedContext: resolvedContextRef.current,
+          uiContext,
         }),
       })
       const data = await res.json()

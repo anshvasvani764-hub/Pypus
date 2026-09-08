@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { getSubscriptionState } from '@/lib/subscriptions/get-subscription-status'
 import { AssistantPanelProvider } from '@/context/AssistantPanelContext'
 import { AssistantPanel } from '@/components/assistant/AssistantPanel'
+import { PypusUIContextProvider } from '@/context/PypusUIContext'
 
 export default async function AppLayout({
   children,
@@ -46,11 +47,13 @@ export default async function AppLayout({
     return (
       <MobileNavProvider>
         <AssistantPanelProvider>
+          <PypusUIContextProvider>
           <div className="font-ve min-h-screen w-full overflow-x-hidden bg-ve-surface text-ve-on-surface">
             <MobileNavDrawer workspaceSlug={workspaceSlug} />
             <main className="pb-6">{children}</main>
             <AssistantPanel />
           </div>
+          </PypusUIContextProvider>
         </AssistantPanelProvider>
       </MobileNavProvider>
     )
@@ -62,6 +65,7 @@ export default async function AppLayout({
     <SidebarProvider>
       <SearchProvider>
         <AssistantPanelProvider>
+          <PypusUIContextProvider>
           <div className="flex min-h-screen bg-[#FAFAF7]">
             <Sidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
@@ -70,6 +74,7 @@ export default async function AppLayout({
             </div>
             <AssistantPanel />
           </div>
+          </PypusUIContextProvider>
         </AssistantPanelProvider>
       </SearchProvider>
     </SidebarProvider>

@@ -1,0 +1,644 @@
+diff --git a/app/[app]/fees/plans/page.tsx b/app/[app]/fees/plans/page.tsx
+index 6acddca..cf262f2 100644
+--- a/app/[app]/fees/plans/page.tsx
++++ b/app/[app]/fees/plans/page.tsx
+@@ -3,6 +3,7 @@ import { getPlans, getMembers } from "@/lib/supabase/queries";
+ import { PlansManagementView as PlansManagementViewDesktop } from "@/components/fees/PlansManagementView";
+ import { PlansManagementView as PlansManagementViewMobile } from "@/components/mobile/PlansManagementView.mobile";
+ import { getDevice } from "@/lib/device";
++import { PypusPageContext } from "@/components/pypus/PypusPageContext";
+ 
+ interface PlansPageProps {
+   params: Promise<{ app: string }>;
+@@ -25,23 +26,41 @@ export default async function PlansPage({ params }: PlansPageProps) {
+     getMembers(workspaceId),
+   ]);
+ 
++  const pageContext = {
++    visibleEntities: plans.map((plan) => ({ type: "plan", id: plan.id, name: plan.name })),
++    availableActions: [
++      { action: "create_plan", label: "Create plan" },
++      { action: "edit_plan", label: "Edit plan" },
++      { action: "toggle_plan_status", label: "Enable or disable plan" },
++      { action: "view_plan_members", label: "View plan members" },
++    ],
++    visibleData: {
++      plan_count: plans.length,
++      active_plan_count: plans.filter((plan) => plan.status === "active").length,
++    },
++  };
++
+   if ((await getDevice()) === "mobile") {
+     return (
++      <PypusPageContext context={pageContext}>
+       <PlansManagementViewMobile
+         workspaceId={workspaceId}
+         workspaceSlug={workspaceSlug}
+         plans={plans}
+         members={members}
+       />
++      </PypusPageContext>
+     );
+   }
+ 
+   return (
++    <PypusPageContext context={pageContext}>
+     <PlansManagementViewDesktop
+       workspaceId={workspaceId}
+       workspaceSlug={workspaceSlug}
+       initialPlans={plans}
+       initialMembers={members}
+     />
++    </PypusPageContext>
+   );
+ }
+\ No newline at end of file
+diff --git a/app/[app]/layout.tsx b/app/[app]/layout.tsx
+index 47c6eca..a849f70 100644
+--- a/app/[app]/layout.tsx
++++ b/app/[app]/layout.tsx
+@@ -10,6 +10,7 @@ import { createServiceClient } from '@/lib/supabase/service'
+ import { getSubscriptionState } from '@/lib/subscriptions/get-subscription-status'
+ import { AssistantPanelProvider } from '@/context/AssistantPanelContext'
+ import { AssistantPanel } from '@/components/assistant/AssistantPanel'
++import { PypusUIContextProvider } from '@/context/PypusUIContext'
+ 
+ export default async function AppLayout({
+   children,
+@@ -46,11 +47,13 @@ export default async function AppLayout({
+     return (
+       <MobileNavProvider>
+         <AssistantPanelProvider>
++          <PypusUIContextProvider>
+           <div className="font-ve min-h-screen w-full overflow-x-hidden bg-ve-surface text-ve-on-surface">
+             <MobileNavDrawer workspaceSlug={workspaceSlug} />
+             <main className="pb-6">{children}</main>
+             <AssistantPanel />
+           </div>
++          </PypusUIContextProvider>
+         </AssistantPanelProvider>
+       </MobileNavProvider>
+     )
+@@ -62,6 +65,7 @@ export default async function AppLayout({
+     <SidebarProvider>
+       <SearchProvider>
+         <AssistantPanelProvider>
++          <PypusUIContextProvider>
+           <div className="flex min-h-screen bg-[#FAFAF7]">
+             <Sidebar />
+             <div className="flex flex-1 flex-col overflow-hidden">
+@@ -70,6 +74,7 @@ export default async function AppLayout({
+             </div>
+             <AssistantPanel />
+           </div>
++          </PypusUIContextProvider>
+         </AssistantPanelProvider>
+       </SearchProvider>
+     </SidebarProvider>
+diff --git a/app/[app]/members/[memberId]/page.tsx b/app/[app]/members/[memberId]/page.tsx
+index 0523b6e..9f0797f 100644
+--- a/app/[app]/members/[memberId]/page.tsx
++++ b/app/[app]/members/[memberId]/page.tsx
+@@ -8,6 +8,7 @@ import { MemberTabs } from "@/components/members/MemberTabs";
+ import { MemberOverviewTab } from "@/components/members/MemberOverviewTab";
+ import { MemberProfileOverviewView } from "@/components/mobile/MemberProfileOverviewView.mobile";
+ import { getDevice } from "@/lib/device";
++import { PypusPageContext } from "@/components/pypus/PypusPageContext";
+ 
+ export default async function MemberProfilePage({
+   params,
+@@ -33,8 +34,24 @@ export default async function MemberProfilePage({
+ 
+   const basePath = `/${workspaceSlug}/members/${memberId}`;
+ 
++  const pageContext = {
++    selectedEntity: { type: "member", id: member.id, name: member.name },
++    visibleEntities: [{ type: "member", id: member.id, name: member.name }],
++    visibleData: {
++      member_name: member.name,
++      plan_name: summary.planName,
++      fee_status: summary.status,
++      due_date: summary.dueDate,
++    },
++    availableActions: [
++      { action: "edit_member", label: "Edit member", entity: { type: "member", id: member.id, name: member.name } },
++      { action: "send_fee_reminder", label: "Send fees reminder", entity: { type: "member", id: member.id, name: member.name } },
++    ],
++  };
++
+   if ((await getDevice()) === "mobile") {
+     return (
++      <PypusPageContext context={pageContext}>
+       <MemberProfileOverviewView
+         member={member}
+         workspaceSlug={workspaceSlug}
+@@ -47,10 +64,12 @@ export default async function MemberProfilePage({
+         payableFeeId={summary.payableFee?.id ?? null}
+         fees={fees}
+       />
++      </PypusPageContext>
+     );
+   }
+ 
+   return (
++    <PypusPageContext context={pageContext}>
+     <div className="w-full max-w-6xl px-8 py-10">
+       <MemberBreadcrumbs
+         items={[
+@@ -77,5 +96,6 @@ export default async function MemberProfilePage({
+ 
+       <MemberOverviewTab member={member} />
+     </div>
++    </PypusPageContext>
+   );
+ }
+diff --git a/app/api/pypus/chat/route.ts b/app/api/pypus/chat/route.ts
+index 837bc38..f77e5aa 100644
+--- a/app/api/pypus/chat/route.ts
++++ b/app/api/pypus/chat/route.ts
+@@ -5,6 +5,7 @@ import { PYPUS_TOOLS, runPypusTool, type ToolContext } from "@/lib/pypus/tools";
+ import { PYPUS_SYSTEM_PROMPT } from "@/lib/pypus/prompt";
+ import { getISTDateString } from "@/lib/utils/date";
+ import type { ResolvedContext } from "@/lib/pypus/tools/resolved-context";
++import type { PypusUIContext } from "@/lib/pypus/ui-context";
+ 
+ /** Trusts the shape but not the values — real validation happens wherever this gets used (a resolver looks the id up by workspace, so a forged id just resolves to nothing). */
+ function sanitizeResolvedContext(raw: unknown): ResolvedContext | null {
+@@ -24,6 +25,58 @@ function sanitizeResolvedContext(raw: unknown): ResolvedContext | null {
+ /** Only the last few turns are needed to carry a pending confirmation — keeps the request small. */
+ const MAX_HISTORY_TURNS = 8;
+ 
++function sanitizeUIContext(raw: unknown): PypusUIContext | null {
++  if (!raw || typeof raw !== "object") return null;
++  const r = raw as Record<string, unknown>;
++  if (typeof r.route !== "string" || typeof r.screen !== "string") return null;
++
++  const entity = (value: unknown) => {
++    if (!value || typeof value !== "object") return null;
++    const e = value as Record<string, unknown>;
++    if (typeof e.type !== "string" || typeof e.id !== "string" || !e.id) return null;
++    return { type: e.type.slice(0, 80), id: e.id.slice(0, 200), name: typeof e.name === "string" ? e.name.slice(0, 200) : null };
++  };
++
++  const actions = Array.isArray(r.availableActions)
++    ? r.availableActions.slice(0, 30).map((a) => {
++        if (!a || typeof a !== "object") return null;
++        const x = a as Record<string, unknown>;
++        if (typeof x.action !== "string") return null;
++        return { action: x.action.slice(0, 100), label: typeof x.label === "string" ? x.label.slice(0, 200) : undefined, entity: entity(x.entity) };
++      }).filter(Boolean) as PypusUIContext["availableActions"]
++    : [];
++
++  const visibleEntities = Array.isArray(r.visibleEntities)
++    ? r.visibleEntities.slice(0, 50).map(entity).filter(Boolean) as PypusUIContext["visibleEntities"]
++    : [];
++
++  const visibleData: PypusUIContext["visibleData"] = {};
++  if (r.visibleData && typeof r.visibleData === "object") {
++    for (const [key, value] of Object.entries(r.visibleData as Record<string, unknown>).slice(0, 50)) {
++      if (["string", "number", "boolean"].includes(typeof value) || value === null) {
++        visibleData[key.slice(0, 100)] = value as string | number | boolean | null;
++      }
++    }
++  }
++
++  return {
++    route: r.route.slice(0, 500),
++    screen: r.screen.slice(0, 120),
++    module: typeof r.module === "string" ? r.module.slice(0, 120) : null,
++    selectedEntity: entity(r.selectedEntity),
++    visibleEntities,
++    visibleData,
++    availableActions: actions,
++    recentAction: (() => {
++      if (!r.recentAction || typeof r.recentAction !== "object") return null;
++      const a = r.recentAction as Record<string, unknown>;
++      if (typeof a.action !== "string") return null;
++      return { action: a.action.slice(0, 100), label: typeof a.label === "string" ? a.label.slice(0, 200) : undefined, entity: entity(a.entity) };
++    })(),
++    capturedAt: typeof r.capturedAt === "string" ? r.capturedAt : new Date().toISOString(),
++  };
++}
++
+ function sanitizeHistory(raw: unknown): LLMChatMessage[] {
+   if (!Array.isArray(raw)) return [];
+   return raw
+@@ -52,8 +105,9 @@ export async function POST(request: Request) {
+   let message: unknown;
+   let history: unknown;
+   let resolvedContext: unknown;
++  let uiContext: unknown;
+   try {
+-    ({ workspaceId, message, history, resolvedContext } = await request.json());
++    ({ workspaceId, message, history, resolvedContext, uiContext } = await request.json());
+   } catch {
+     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+   }
+@@ -62,7 +116,12 @@ export async function POST(request: Request) {
+     return NextResponse.json({ error: "workspaceId and message are required" }, { status: 400 });
+   }
+ 
+-  const userMessage = `Today is ${getISTDateString()} (Asia/Kolkata).\n\nQuestion: ${message}`;
++  const safeUIContext = sanitizeUIContext(uiContext);
++  const uiContextMessage = safeUIContext
++    ? `\n\nCURRENT UI CONTEXT (live app state; use it to resolve references and explain navigation, but verify mutable business facts with tools):\n${JSON.stringify(safeUIContext)}`
++    : "";
++
++  const userMessage = `Today is ${getISTDateString()} (Asia/Kolkata).${uiContextMessage}\n\nQuestion: ${message}`;
+ 
+   // Mutable and shared across every tool call this turn — resolvers update
+   // .resolvedContext in place when they land on a single confident entity,
+diff --git a/components/assistant/AssistantChat.tsx b/components/assistant/AssistantChat.tsx
+index b7310ce..c46359f 100644
+--- a/components/assistant/AssistantChat.tsx
++++ b/components/assistant/AssistantChat.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useEffect, useRef, useState } from 'react'
+ import { Send, Bot, User } from 'lucide-react'
++import { usePypusUIContext } from '@/context/PypusUIContext'
+ 
+ interface Message {
+   id: string
+@@ -47,6 +48,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
+   // Carried the same way `history` is (client state, round-tripped every
+   // turn) so "usko"/"iska" keeps working across messages without a DB table.
+   const resolvedContextRef = useRef<ResolvedContext | null>(null)
++  const { uiContext } = usePypusUIContext()
+ 
+   useEffect(() => {
+     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+@@ -79,6 +81,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
+           message: text,
+           history,
+           resolvedContext: resolvedContextRef.current,
++          uiContext,
+         }),
+       })
+       const data = await res.json()
+diff --git a/components/dashboard/AssistantViewDesktop.tsx b/components/dashboard/AssistantViewDesktop.tsx
+index 9d73bc2..a181b52 100644
+--- a/components/dashboard/AssistantViewDesktop.tsx
++++ b/components/dashboard/AssistantViewDesktop.tsx
+@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
+ import { useParams } from 'next/navigation'
+ import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react'
+ import { useWorkspace } from '@/hooks/useWorkspace'
++import { usePypusUIContext } from '@/context/PypusUIContext'
+ 
+ interface Message {
+   id: string
+@@ -32,6 +33,7 @@ const QUICK_PROMPTS = [
+ export function AssistantViewDesktop() {
+   const params = useParams<{ app: string }>()
+   const { workspace } = useWorkspace(params?.app ?? '')
++  const { uiContext } = usePypusUIContext()
+   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
+   const [input, setInput] = useState('')
+   const [isTyping, setIsTyping] = useState(false)
+@@ -71,7 +73,7 @@ export function AssistantViewDesktop() {
+       const res = await fetch('/api/pypus/chat', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history }),
++        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history, uiContext }),
+       })
+       const data = await res.json()
+       reply =
+diff --git a/components/fees/PlanCard.tsx b/components/fees/PlanCard.tsx
+index 4cac7a5..bf883d7 100644
+--- a/components/fees/PlanCard.tsx
++++ b/components/fees/PlanCard.tsx
+@@ -20,7 +20,12 @@ export function PlanCard({
+   onToggleStatus,
+ }: PlanCardProps) {
+   return (
+-    <div className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-gray-300 hover:shadow-sm transition-all">
++    <div
++      data-pypus-entity-type="plan"
++      data-pypus-entity-id={plan.id}
++      data-pypus-entity-name={plan.name}
++      className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-gray-300 hover:shadow-sm transition-all"
++    >
+       <div className="flex items-start justify-between">
+         <div>
+           <h3 className="text-base font-semibold text-gray-900">{plan.name}</h3>
+@@ -61,6 +66,8 @@ export function PlanCard({
+           {onEdit && (
+             <button
+               onClick={onEdit}
++              data-pypus-action="edit_plan"
++              data-pypus-action-label="Edit plan"
+               className="px-3 py-1.5 rounded-full text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+             >
+               Edit
+@@ -69,6 +76,8 @@ export function PlanCard({
+           {onViewMembers && (
+             <button
+               onClick={onViewMembers}
++              data-pypus-action="view_plan_members"
++              data-pypus-action-label="View plan members"
+               className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+             >
+               View Members
+@@ -77,6 +86,8 @@ export function PlanCard({
+           {onToggleStatus && (
+             <button
+               onClick={onToggleStatus}
++              data-pypus-action="toggle_plan_status"
++              data-pypus-action-label={plan.status === "active" ? "Disable plan" : "Enable plan"}
+               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                 plan.status === "active"
+                   ? "text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100"
+diff --git a/components/mobile/AssistantView.mobile.tsx b/components/mobile/AssistantView.mobile.tsx
+index 0e9cb3f..e48921c 100644
+--- a/components/mobile/AssistantView.mobile.tsx
++++ b/components/mobile/AssistantView.mobile.tsx
+@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
+ import { Bot, Send, RotateCcw } from 'lucide-react'
+ import { MobileTopBar } from '@/components/mobile/MobileTopBar'
+ import { useWorkspace } from '@/hooks/useWorkspace'
++import { usePypusUIContext } from '@/context/PypusUIContext'
+ 
+ interface Message {
+   id: string
+@@ -30,6 +31,7 @@ const QUICK_PROMPTS = [
+ 
+ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
+   const { workspace } = useWorkspace(workspaceSlug)
++  const { uiContext } = usePypusUIContext()
+   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
+   const [input, setInput] = useState('')
+   const [isTyping, setIsTyping] = useState(false)
+@@ -69,7 +71,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
+       const res = await fetch('/api/pypus/chat', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history }),
++        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history, uiContext }),
+       })
+       const data = await res.json()
+       reply =
+diff --git a/components/pypus/PypusPageContext.tsx b/components/pypus/PypusPageContext.tsx
+new file mode 100644
+index 0000000..5a7dfe7
+--- /dev/null
++++ b/components/pypus/PypusPageContext.tsx
+@@ -0,0 +1,22 @@
++"use client";
++
++import { useEffect } from "react";
++import { usePypusUIContext } from "@/context/PypusUIContext";
++import type { PypusUIContext } from "@/lib/pypus/ui-context";
++
++/** Server-to-client bridge for page-specific semantic UI context. */
++export function PypusPageContext({
++  children,
++  context,
++}: {
++  children: React.ReactNode;
++  context: Partial<PypusUIContext>;
++}) {
++  const { registerContext } = usePypusUIContext();
++
++  useEffect(() => {
++    registerContext(context);
++  }, [context, registerContext]);
++
++  return <>{children}</>;
++}
+diff --git a/context/PypusUIContext.tsx b/context/PypusUIContext.tsx
+new file mode 100644
+index 0000000..1f2d8e4
+--- /dev/null
++++ b/context/PypusUIContext.tsx
+@@ -0,0 +1,131 @@
++"use client";
++
++import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
++import { usePathname } from "next/navigation";
++import {
++  inferUIContextFromPath,
++  type PypusUIContext,
++  type UIActionContext,
++  type UIEntityRef,
++} from "@/lib/pypus/ui-context";
++
++interface PypusUIContextValue {
++  uiContext: PypusUIContext;
++  registerContext: (patch: Partial<PypusUIContext>) => void;
++  setSelectedEntity: (entity: UIEntityRef | null) => void;
++  recordAction: (action: UIActionContext) => void;
++}
++
++const PypusUIContextReact = createContext<PypusUIContextValue | null>(null);
++
++function uniqueEntities(entities: UIEntityRef[]): UIEntityRef[] {
++  const seen = new Set<string>();
++  return entities.filter((entity) => {
++    const key = `${entity.type}:${entity.id}`;
++    if (seen.has(key)) return false;
++    seen.add(key);
++    return true;
++  });
++}
++
++export function PypusUIContextProvider({ children }: { children: React.ReactNode }) {
++  const pathname = usePathname() ?? "/";
++  const inferred = useMemo(() => inferUIContextFromPath(pathname), [pathname]);
++  const [uiContext, setUIContext] = useState<PypusUIContext>(() => ({
++    ...inferred,
++    selectedEntity: null,
++    visibleEntities: [],
++    visibleData: {},
++    availableActions: [],
++    recentAction: null,
++    capturedAt: new Date().toISOString(),
++  }));
++
++  useEffect(() => {
++    const parts = pathname.split("/").filter(Boolean);
++    const memberId = inferred.screen === "member_details" ? parts[2] : null;
++
++    setUIContext((prev) => ({
++      ...prev,
++      ...inferred,
++      selectedEntity:
++        memberId && prev.selectedEntity?.type === "member" && prev.selectedEntity.id === memberId
++          ? prev.selectedEntity
++          : memberId
++            ? { type: "member", id: memberId }
++            : null,
++      visibleEntities: [],
++      visibleData: {},
++      availableActions: [],
++      recentAction: null,
++      capturedAt: new Date().toISOString(),
++    }));
++  }, [pathname, inferred]);
++
++  // Generic UI awareness hook: modules can mark important interactive elements
++  // with data-pypus-* attributes. New modules do not need changes in this provider.
++  useEffect(() => {
++    const onClick = (event: MouseEvent) => {
++      const target = event.target as HTMLElement | null;
++      const actionEl = target?.closest<HTMLElement>("[data-pypus-action]");
++      const entityEl = target?.closest<HTMLElement>("[data-pypus-entity-id]");
++      if (!actionEl && !entityEl) return;
++
++      const entityId = entityEl?.dataset.pypusEntityId;
++      const entityType = entityEl?.dataset.pypusEntityType;
++      const entityName = entityEl?.dataset.pypusEntityName;
++      const action = actionEl?.dataset.pypusAction;
++      const label = actionEl?.dataset.pypusActionLabel;
++
++      const entity = entityId && entityType
++        ? { type: entityType, id: entityId, name: entityName ?? null }
++        : null;
++
++      setUIContext((prev) => ({
++        ...prev,
++        selectedEntity: entity ?? prev.selectedEntity,
++        recentAction: action ? { action, label, entity } : prev.recentAction,
++        capturedAt: new Date().toISOString(),
++      }));
++    };
++
++    document.addEventListener("click", onClick, true);
++    return () => document.removeEventListener("click", onClick, true);
++  }, []);
++
++  const registerContext = useCallback((patch: Partial<PypusUIContext>) => {
++    setUIContext((prev) => ({
++      ...prev,
++      ...patch,
++      visibleEntities: uniqueEntities(patch.visibleEntities ?? prev.visibleEntities),
++      availableActions: patch.availableActions ?? prev.availableActions,
++      capturedAt: new Date().toISOString(),
++    }));
++  }, []);
++
++  const setSelectedEntity = useCallback((entity: UIEntityRef | null) => {
++    setUIContext((prev) => ({ ...prev, selectedEntity: entity, capturedAt: new Date().toISOString() }));
++  }, []);
++
++  const recordAction = useCallback((action: UIActionContext) => {
++    setUIContext((prev) => ({
++      ...prev,
++      recentAction: action,
++      selectedEntity: action.entity ?? prev.selectedEntity,
++      capturedAt: new Date().toISOString(),
++    }));
++  }, []);
++
++  const value = useMemo(
++    () => ({ uiContext, registerContext, setSelectedEntity, recordAction }),
++    [uiContext, registerContext, setSelectedEntity, recordAction]
++  );
++
++  return <PypusUIContextReact.Provider value={value}>{children}</PypusUIContextReact.Provider>;
++}
++
++export function usePypusUIContext() {
++  const value = useContext(PypusUIContextReact);
++  if (!value) throw new Error("usePypusUIContext must be used inside PypusUIContextProvider");
++  return value;
++}
+diff --git a/lib/pypus/prompt.ts b/lib/pypus/prompt.ts
+index 4900459..b5074ad 100644
+--- a/lib/pypus/prompt.ts
++++ b/lib/pypus/prompt.ts
+@@ -1,5 +1,12 @@
+ export const PYPUS_SYSTEM_PROMPT = `You are Pypus, the AI assistant inside a gym management app. You answer the gym owner's questions about their own workspace.
+ 
++UI / SCREEN AWARENESS
++- You receive a CURRENT UI CONTEXT when the app can provide it. Treat it as the user's live location and focus: screen, module, selected entity, visible entities/data, available UI actions and recent UI action.
++- Use UI context to understand phrases like "ye wala", "iska", "iss user", "this plan", and to explain how to navigate the app from the current screen.
++- If the user asks "how do I...", give the route through the app (for example Home → Fees → Plans → Create Plan) based on the current screen and available actions. Do not invent a screen/action that is not supported by the UI context when the context is available.
++- UI context is NOT the source of truth for mutable business facts. For fees, payments, members, attendance, etc., verify with the appropriate database tool before stating a factual value or taking a business action.
++- A new module should be understandable through its UI context without requiring a new hard-coded agent prompt.
++
+ DATA SOURCE
+ - You have NO knowledge of this gym. Every number, name, date and amount MUST come from a tool call. Never guess, estimate, extrapolate or reuse a figure from earlier in the conversation.
+ - Call as many tools as the question needs before answering. If a tool returns an empty list or zero, say so plainly — do not fill the gap with assumptions.
+diff --git a/lib/pypus/ui-context.ts b/lib/pypus/ui-context.ts
+new file mode 100644
+index 0000000..61e1b22
+--- /dev/null
++++ b/lib/pypus/ui-context.ts
+@@ -0,0 +1,75 @@
++export type UIEntityType =
++  | "member"
++  | "plan"
++  | "expense"
++  | "team_member"
++  | "lead"
++  | "payment"
++  | "customer"
++  | string;
++
++export interface UIEntityRef {
++  type: UIEntityType;
++  id: string;
++  name?: string | null;
++}
++
++export interface UIActionContext {
++  action: string;
++  label?: string;
++  entity?: UIEntityRef | null;
++}
++
++export interface PypusUIContext {
++  route: string;
++  screen: string;
++  module: string | null;
++  selectedEntity: UIEntityRef | null;
++  visibleEntities: UIEntityRef[];
++  visibleData: Record<string, string | number | boolean | null>;
++  availableActions: UIActionContext[];
++  recentAction: UIActionContext | null;
++  capturedAt: string;
++}
++
++export function inferUIContextFromPath(pathname: string): Pick<
++  PypusUIContext,
++  "route" | "screen" | "module"
++> {
++  const parts = pathname.split("/").filter(Boolean);
++  const module = parts[1] ?? null;
++
++  if (module === "members" && parts[2]) {
++    return { route: pathname, screen: "member_details", module: "members" };
++  }
++  if (module === "members") {
++    return { route: pathname, screen: "members", module: "members" };
++  }
++  if (module === "fees" && parts[2] === "plans") {
++    return { route: pathname, screen: "fees_plans", module: "fees" };
++  }
++  if (module === "fees") {
++    return { route: pathname, screen: "fees", module: "fees" };
++  }
++  if (module === "attendance") {
++    return { route: pathname, screen: "attendance", module: "attendance" };
++  }
++  if (module === "expenses") {
++    return { route: pathname, screen: "expenses", module: "expenses" };
++  }
++  if (module === "team") {
++    return { route: pathname, screen: "team", module: "team" };
++  }
++  if (module === "automations") {
++    const sub = parts[2] ?? "";
++    return { route: pathname, screen: sub ? `automations_${sub}` : "automations", module: "automations" };
++  }
++  if (module === "settings") {
++    return { route: pathname, screen: "settings", module: "settings" };
++  }
++  if (module === "workspace") {
++    return { route: pathname, screen: "workspace", module: null };
++  }
++
++  return { route: pathname, screen: "home", module: null };
++}

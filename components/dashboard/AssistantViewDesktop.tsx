@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react'
 import { useWorkspace } from '@/hooks/useWorkspace'
+import { usePypusUIContext } from '@/context/PypusUIContext'
 
 interface Message {
   id: string
@@ -32,6 +33,7 @@ const QUICK_PROMPTS = [
 export function AssistantViewDesktop() {
   const params = useParams<{ app: string }>()
   const { workspace } = useWorkspace(params?.app ?? '')
+  const { uiContext } = usePypusUIContext()
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -71,7 +73,7 @@ export function AssistantViewDesktop() {
       const res = await fetch('/api/pypus/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history }),
+        body: JSON.stringify({ workspaceId: workspace?.id, message: text, history, uiContext }),
       })
       const data = await res.json()
       reply =

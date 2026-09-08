@@ -20,7 +20,12 @@ export function PlanCard({
   onToggleStatus,
 }: PlanCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+    <div
+      data-pypus-entity-type="plan"
+      data-pypus-entity-id={plan.id}
+      data-pypus-entity-name={plan.name}
+      className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-gray-300 hover:shadow-sm transition-all"
+    >
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-base font-semibold text-gray-900">{plan.name}</h3>
@@ -61,6 +66,8 @@ export function PlanCard({
           {onEdit && (
             <button
               onClick={onEdit}
+              data-pypus-action="edit_plan"
+              data-pypus-action-label="Edit plan"
               className="px-3 py-1.5 rounded-full text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors"
             >
               Edit
@@ -69,6 +76,8 @@ export function PlanCard({
           {onViewMembers && (
             <button
               onClick={onViewMembers}
+              data-pypus-action="view_plan_members"
+              data-pypus-action-label="View plan members"
               className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
             >
               View Members
@@ -77,6 +86,8 @@ export function PlanCard({
           {onToggleStatus && (
             <button
               onClick={onToggleStatus}
+              data-pypus-action="toggle_plan_status"
+              data-pypus-action-label={plan.status === "active" ? "Disable plan" : "Enable plan"}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 plan.status === "active"
                   ? "text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100"
