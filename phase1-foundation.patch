@@ -1,0 +1,336 @@
+diff --git a/app/api/pypus/chat/route.ts b/app/api/pypus/chat/route.ts
+index 1d5d097..837bc38 100644
+--- a/app/api/pypus/chat/route.ts
++++ b/app/api/pypus/chat/route.ts
+@@ -1,9 +1,25 @@
+ import { NextResponse } from "next/server";
+ import { createClient } from "@/lib/supabase/server";
+ import { callLLMWithTools, type LLMChatMessage } from "@/lib/llm";
+-import { PYPUS_TOOLS, runPypusTool } from "@/lib/pypus/tools";
++import { PYPUS_TOOLS, runPypusTool, type ToolContext } from "@/lib/pypus/tools";
+ import { PYPUS_SYSTEM_PROMPT } from "@/lib/pypus/prompt";
+ import { getISTDateString } from "@/lib/utils/date";
++import type { ResolvedContext } from "@/lib/pypus/tools/resolved-context";
++
++/** Trusts the shape but not the values — real validation happens wherever this gets used (a resolver looks the id up by workspace, so a forged id just resolves to nothing). */
++function sanitizeResolvedContext(raw: unknown): ResolvedContext | null {
++  if (!raw || typeof raw !== "object") return null;
++  const r = raw as Record<string, unknown>;
++  if (
++    (r.entityType === "member" || r.entityType === "expense" || r.entityType === "team_member") &&
++    typeof r.entityId === "string" &&
++    r.entityId &&
++    typeof r.entityName === "string"
++  ) {
++    return { entityType: r.entityType, entityId: r.entityId, entityName: r.entityName };
++  }
++  return null;
++}
+ 
+ /** Only the last few turns are needed to carry a pending confirmation — keeps the request small. */
+ const MAX_HISTORY_TURNS = 8;
+@@ -35,8 +51,9 @@ export async function POST(request: Request) {
+   let workspaceId: unknown;
+   let message: unknown;
+   let history: unknown;
++  let resolvedContext: unknown;
+   try {
+-    ({ workspaceId, message, history } = await request.json());
++    ({ workspaceId, message, history, resolvedContext } = await request.json());
+   } catch {
+     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+   }
+@@ -47,24 +64,38 @@ export async function POST(request: Request) {
+ 
+   const userMessage = `Today is ${getISTDateString()} (Asia/Kolkata).\n\nQuestion: ${message}`;
+ 
++  // Mutable and shared across every tool call this turn — resolvers update
++  // .resolvedContext in place when they land on a single confident entity,
++  // so whatever it holds once the tool loop finishes is what goes back to
++  // the client for next turn's "usko"/"iska" to resolve against.
++  const ctx: ToolContext = {
++    supabase,
++    workspaceId,
++    resolvedContext: sanitizeResolvedContext(resolvedContext),
++  };
++
+   try {
+     const reply = await callLLMWithTools(
+       PYPUS_SYSTEM_PROMPT,
+       userMessage,
+       PYPUS_TOOLS.map(({ name, description, parameters }) => ({ name, description, parameters })),
+-      (name, args) => runPypusTool(name, args, { supabase, workspaceId }),
++      (name, args) => runPypusTool(name, args, ctx),
+       sanitizeHistory(history)
+     );
+-    return NextResponse.json({ reply });
++    return NextResponse.json({ reply, resolvedContext: ctx.resolvedContext ?? null });
+   } catch (err) {
++    // Pass resolvedContext through unchanged on failure — a transient LLM
++    // error shouldn't wipe out "who we were just talking about".
+     if (err instanceof Error && err.message === "LLM_API_KEY not set yet") {
+       return NextResponse.json({
+         reply: "AI provider not configured yet — add LLM_API_KEY and LLM_PROVIDER in .env.local",
++        resolvedContext: ctx.resolvedContext ?? null,
+       });
+     }
+     console.error("pypus/chat: LLM call failed", err);
+     return NextResponse.json({
+       reply: "I ran into a problem reaching the AI provider. Please try again shortly.",
++      resolvedContext: ctx.resolvedContext ?? null,
+     });
+   }
+ }
+diff --git a/components/assistant/AssistantChat.tsx b/components/assistant/AssistantChat.tsx
+index 5cdaf12..b7310ce 100644
+--- a/components/assistant/AssistantChat.tsx
++++ b/components/assistant/AssistantChat.tsx
+@@ -10,6 +10,13 @@ interface Message {
+   timestamp: string
+ }
+ 
++/** Mirrors lib/pypus/tools/resolved-context.ts — kept in sync with the server's shape. */
++interface ResolvedContext {
++  entityType: 'member' | 'expense' | 'team_member'
++  entityId: string
++  entityName: string
++}
++
+ const INITIAL_MESSAGES: Message[] = [
+   {
+     id: '1',
+@@ -37,6 +44,9 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
+   const [isTyping, setIsTyping] = useState(false)
+   const messagesEndRef = useRef<HTMLDivElement>(null)
+   const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
++  // Carried the same way `history` is (client state, round-tripped every
++  // turn) so "usko"/"iska" keeps working across messages without a DB table.
++  const resolvedContextRef = useRef<ResolvedContext | null>(null)
+ 
+   useEffect(() => {
+     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+@@ -64,7 +74,12 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
+       const res = await fetch('/api/pypus/chat', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ workspaceId, message: text, history }),
++        body: JSON.stringify({
++          workspaceId,
++          message: text,
++          history,
++          resolvedContext: resolvedContextRef.current,
++        }),
+       })
+       const data = await res.json()
+       reply =
+@@ -72,6 +87,10 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
+         (res.status === 401
+           ? 'Your session expired — please sign in again.'
+           : 'Something went wrong. Please try again.')
++      // Server only ever returns a value here when a resolver actually
++      // landed on something this turn or is passing the prior one through —
++      // never overwrite a good context with a stray undefined.
++      if ('resolvedContext' in data) resolvedContextRef.current = data.resolvedContext ?? null
+     } catch {
+       reply = "I couldn't reach the server. Check your connection and try again."
+     }
+diff --git a/lib/pypus/prompt.ts b/lib/pypus/prompt.ts
+index d398a77..4900459 100644
+--- a/lib/pypus/prompt.ts
++++ b/lib/pypus/prompt.ts
+@@ -32,6 +32,22 @@ ACTIONS (write tools)
+     3. If the owner's reply doesn't confirm, don't call it again — just note that it wasn't done. Never proceed on a vague or ambiguous reply — when in doubt, ask again instead of guessing.
+ - If a write tool returns an error (member_not_found, ambiguous_member, duplicate_phone, no_due_fee, plan_not_found, expense_not_found, ambiguous_expense, category_not_found, team_member_not_found, ambiguous_team_member, role_not_found), relay that plainly and ask for the missing detail — don't guess or retry blindly.
+ 
++INTENT — question vs action vs answering your own clarification
++- Every message is one of three things: a question (wants information), an instruction (wants a write tool called), or the owner answering a clarification you just asked (a bare name, a number, "haan"/"yes", a plan/date/amount with no verb). Read the last one or two turns to tell which — a bare "Shukla wala" or "98XXXXXXXX" right after you asked something is almost never a new question on its own.
++- Judge intent from what the owner is actually asking for, not from keyword matching. "Kartik ko follow up karna hai" is an instruction to act, not a request for Kartik's data — if it's unclear what "follow up" should concretely do here, ask rather than picking a tool.
++
++REFERENCES — ye / iska / usko / woh wala / uska / same wala
++- These point at whatever member/expense/team-member the conversation was just about. You do not need to re-resolve the name yourself — pass the reference through as-is (e.g. member_name: "usko" or "iska") and the tool will resolve it against what it last found, PROVIDED nothing changed the subject since.
++- If a message like "Shukla wala" or "kal wale lead" still carries a real distinguishing word (a surname, "kal wale"), pass that word through as the name/title — normal matching (including typo tolerance) handles it; don't strip it down to a bare pronoun yourself.
++- If a tool comes back saying it had nothing to resolve a reference against, don't guess — ask the owner who/what they mean.
++
++CLARIFICATION — ask only when the answer genuinely isn't already available
++- Enough information (a unique name, or a reference that resolves) → act or answer directly, don't ask to confirm the obvious.
++- Ambiguous (a tool returns ambiguous_member / ambiguous_expense / ambiguous_team_member) → list the matches plainly and ask which one; don't pick one yourself even if one seems more likely.
++- Missing a required detail (e.g. no new phone number given for a change) → ask for exactly that detail, nothing else.
++- Never invent or guess a name, ID, amount, phone number or date to avoid asking — a wrong guess on a write action is worse than one extra question.
++- Once the owner resolves an earlier ambiguity or supplies a missing detail, don't ask them to restate the original request — carry it forward and finish the action.
++
+ RESPONSE LENGTH
+ - Simple factual question (one number, one name, one date, one yes/no — e.g. "aaj kitne present hain", "Rahul ka phone number") → exactly ONE line. No bullets, no headings, no sub-points, no follow-up offer.
+ - A question that starts with "kitne" / "how many" / "kitna" asks for a count or amount only: answer with the number in one line and do NOT list the underlying members unless the user asked who they are.
+diff --git a/lib/pypus/tools/fuzzy-match.ts b/lib/pypus/tools/fuzzy-match.ts
+new file mode 100644
+index 0000000..c40cee4
+--- /dev/null
++++ b/lib/pypus/tools/fuzzy-match.ts
+@@ -0,0 +1,77 @@
++/**
++ * Typo tolerance for name/title lookups (members, expenses, team). One
++ * shared implementation — every resolver imports this rather than rolling
++ * its own distance function.
++ *
++ * Deliberately conservative: this exists to survive things like "sharmaa"
++ * vs "Sharma", not to guess between genuinely different names. It only
++ * kicks in after exact/substring/token matching has already come back
++ * empty, and it only returns a hit when there is a single closest match —
++ * ties are returned as-is so the caller can treat them as ambiguous rather
++ * than silently picking one.
++ */
++
++/** Case-insensitive Levenshtein edit distance. */
++function levenshtein(a: string, b: string): number {
++  const m = a.length;
++  const n = b.length;
++  if (m === 0) return n;
++  if (n === 0) return m;
++
++  let prevRow = Array.from({ length: n + 1 }, (_, j) => j);
++  for (let i = 1; i <= m; i++) {
++    const curRow = [i];
++    for (let j = 1; j <= n; j++) {
++      curRow[j] =
++        a[i - 1] === b[j - 1]
++          ? prevRow[j - 1]
++          : 1 + Math.min(prevRow[j - 1], prevRow[j], curRow[j - 1]);
++    }
++    prevRow = curRow;
++  }
++  return prevRow[n];
++}
++
++/**
++ * How many edits to tolerate, scaled to word length so short words don't
++ * get blurred into unrelated short words (e.g. "Om" must never fuzzy-match
++ * "Am") while longer names get a little more slack for a dropped/doubled
++ * letter or two.
++ */
++function tolerance(len: number): number {
++  if (len <= 3) return 0;
++  if (len <= 6) return 1;
++  return 2;
++}
++
++export interface FuzzyCandidate<T> {
++  item: T;
++  label: string;
++}
++
++export interface FuzzyHit<T> extends FuzzyCandidate<T> {
++  distance: number;
++}
++
++/**
++ * Fuzzy-matches `query` against `candidates` by their `label`. Returns only
++ * the candidate(s) tied for the closest edit distance within tolerance —
++ * empty if nothing is close enough, one item if there's a confident single
++ * match, or several if it's a genuine tie (caller should treat that as
++ * ambiguous, not pick one).
++ *
++ * Distance 0 (exact match) is excluded on purpose — that belongs to the
++ * exact-match tier callers already run before reaching this one.
++ */
++export function fuzzyFind<T>(query: string, candidates: FuzzyCandidate<T>[]): FuzzyHit<T>[] {
++  const q = query.trim().toLowerCase();
++  if (!q) return [];
++
++  const scored = candidates
++    .map(({ item, label }) => ({ item, label, distance: levenshtein(q, label.toLowerCase()) }))
++    .filter((c) => c.distance > 0 && c.distance <= tolerance(Math.min(q.length, c.label.length)));
++
++  if (!scored.length) return [];
++  const best = Math.min(...scored.map((c) => c.distance));
++  return scored.filter((c) => c.distance === best);
++}
+diff --git a/lib/pypus/tools/resolved-context.ts b/lib/pypus/tools/resolved-context.ts
+new file mode 100644
+index 0000000..4160873
+--- /dev/null
++++ b/lib/pypus/tools/resolved-context.ts
+@@ -0,0 +1,56 @@
++/**
++ * Cross-turn "who/what are we talking about" — lets the user say "usko",
++ * "iska", "ye wala" without re-stating a name every turn.
++ *
++ * Threaded through the request/response body exactly like `history` already
++ * is (see app/api/pypus/chat/route.ts and AssistantChat.tsx): no DB table,
++ * no server-side session store, just one small object carried forward by
++ * the client and updated by whichever resolver last found a single
++ * confident entity.
++ */
++
++export type ResolvedEntityType = "member" | "expense" | "team_member";
++
++export interface ResolvedContext {
++  entityType: ResolvedEntityType;
++  entityId: string;
++  entityName: string;
++}
++
++/**
++ * True when `query` is (almost) entirely a pronoun/reference word rather than
++ * an actual name — "usko", "iska number", "ye wala", "" — as opposed to
++ * "Shukla wala", which still carries a real name token ("Shukla") and should
++ * go through normal name matching instead of falling back to context.
++ *
++ * Deliberately conservative: only strips known reference words, so a real
++ * name is never mistaken for a pronoun.
++ */
++const REFERENCE_WORDS =
++  /\b(ye|yeh|woh|wo|iska|uska|isska|isko|usko|isse|usse|isski|usski|inka|unka|wala|wali|wale|hi|bhi|same|wahi|previous|last|pichla|pichli|pichle|abhi\s*wala)\b/gi;
++
++export function isPureReference(query: string): boolean {
++  const q = query.trim();
++  if (!q) return true;
++  const stripped = q
++    .replace(REFERENCE_WORDS, "")
++    .replace(/[^a-zA-Z\s]/g, "")
++    .trim();
++  return stripped.length === 0;
++}
++
++/**
++ * Record the entity a resolver just landed on, so the next turn's pronoun
++ * can find it. Called by resolvers on their single-hit success path — never
++ * on an error, an ambiguous match, or a not-found.
++ *
++ * ctx.resolvedContext is a plain mutable field on the same ToolContext
++ * object threaded through every tool call in this request, so the update is
++ * visible to the route handler once the LLM's tool loop finishes.
++ */
++export function setResolvedContext<T extends { resolvedContext?: ResolvedContext | null }>(
++  ctx: T,
++  value: ResolvedContext
++): void {
++  ctx.resolvedContext = value;
++}
+diff --git a/lib/pypus/tools/shared.ts b/lib/pypus/tools/shared.ts
+index 547375d..983a079 100644
+--- a/lib/pypus/tools/shared.ts
++++ b/lib/pypus/tools/shared.ts
+@@ -1,5 +1,6 @@
+ import type { createClient } from "@/lib/supabase/server";
+ import { getISTDateString } from "@/lib/utils/date";
++import type { ResolvedContext } from "./resolved-context";
+ 
+ export type Supabase = Awaited<ReturnType<typeof createClient>>;
+ 
+@@ -24,6 +25,16 @@ export interface PypusTool {
+ export interface ToolContext {
+   supabase: Supabase;
+   workspaceId: string;
++  /**
++   * The entity ("usko"/"iska"/"ye wala") the conversation last resolved,
++   * carried in from the client's previous turn. Resolvers read this to
++   * answer pure-pronoun references, and overwrite it (via
++   * setResolvedContext in ./resolved-context) whenever they land on a
++   * single confident match, so it's always current by the time the route
++   * handler reads it back after the tool loop finishes. Absent/null means
++   * there's nothing to fall back to yet.
++   */
++  resolvedContext?: ResolvedContext | null;
+ }
+ 
+ /**

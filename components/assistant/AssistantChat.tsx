@@ -10,6 +10,13 @@ interface Message {
   timestamp: string
 }
 
+/** Mirrors lib/pypus/tools/resolved-context.ts — kept in sync with the server's shape. */
+interface ResolvedContext {
+  entityType: 'member' | 'expense' | 'team_member'
+  entityId: string
+  entityName: string
+}
+
 const INITIAL_MESSAGES: Message[] = [
   {
     id: '1',
@@ -37,6 +44,9 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
+  // Carried the same way `history` is (client state, round-tripped every
+  // turn) so "usko"/"iska" keeps working across messages without a DB table.
+  const resolvedContextRef = useRef<ResolvedContext | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -64,7 +74,12 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
       const res = await fetch('/api/pypus/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, message: text, history }),
+        body: JSON.stringify({
+          workspaceId,
+          message: text,
+          history,
+          resolvedContext: resolvedContextRef.current,
+        }),
       })
       const data = await res.json()
       reply =
@@ -72,6 +87,10 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
         (res.status === 401
           ? 'Your session expired — please sign in again.'
           : 'Something went wrong. Please try again.')
+      // Server only ever returns a value here when a resolver actually
+      // landed on something this turn or is passing the prior one through —
+      // never overwrite a good context with a stray undefined.
+      if ('resolvedContext' in data) resolvedContextRef.current = data.resolvedContext ?? null
     } catch {
       reply = "I couldn't reach the server. Check your connection and try again."
     }

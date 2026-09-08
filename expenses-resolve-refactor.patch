@@ -1,0 +1,185 @@
+diff --git a/lib/pypus/tools/expenses.ts b/lib/pypus/tools/expenses.ts
+index a48f034..6fa8d82 100644
+--- a/lib/pypus/tools/expenses.ts
++++ b/lib/pypus/tools/expenses.ts
+@@ -1,4 +1,6 @@
+ import { type PypusTool, type ToolContext, monthRange, today, needsConfirmation } from "./shared";
++import { isPureReference, setResolvedContext } from "./resolved-context";
++import { fuzzyFind } from "./fuzzy-match";
+ import {
+   createExpenseCategory,
+   updateExpenseCategory,
+@@ -9,6 +11,95 @@ import {
+   deleteExpense as deleteExpenseAction,
+ } from "@/app/actions/expense-admin";
+ 
++/** Full row shape every update/mark-paid/delete call site needs, in one place. */
++interface ResolvedExpenseRow {
++  id: string;
++  title: string;
++  amount: number;
++  status: "paid" | "pending" | "overdue";
++  type: "one_time" | "fixed" | "monthly_variable";
++  due_date: string;
++  category_id: string;
++  expense_categories?: { name?: string } | null;
++}
++
++const EXPENSE_SELECT = "id, title, amount, status, type, due_date, category_id, expense_categories(name)";
++
++/**
++ * Shared resolve step for every expense-title lookup (update_expense,
++ * mark_expense_paid, delete_expense): an ilike substring match, with a
++ * fuzzy-typo fallback tier, plus "usko"/"iska" pronoun resolution against
++ * ctx.resolvedContext. Mirrors resolveMember()'s error/success shape
++ * ({ error: ... } | { expense: ... }) so call sites can `if ("error" in
++ * found) return found;` the same way.
++ */
++async function resolveExpense(ctx: ToolContext, rawTitle: unknown) {
++  const query = String(rawTitle ?? "").trim();
++
++  if (isPureReference(query)) {
++    if (ctx.resolvedContext?.entityType === "expense") {
++      const { data, error } = await ctx.supabase
++        .from("expenses")
++        .select(EXPENSE_SELECT)
++        .eq("workspace_id", ctx.workspaceId)
++        .eq("id", ctx.resolvedContext.entityId)
++        .maybeSingle();
++      if (error) return { error: `Could not search expenses: ${error.message}` };
++      if (data) {
++        const expense = data as unknown as ResolvedExpenseRow;
++        setResolvedContext(ctx, { entityType: "expense", entityId: expense.id, entityName: expense.title });
++        return { expense };
++      }
++    }
++    // Nothing to resolve the reference against — don't guess.
++    return { error: "expense_title is required" };
++  }
++
++  const searchTitle = query.toLowerCase();
++  const { data: matches, error: findErr } = await ctx.supabase
++    .from("expenses")
++    .select(EXPENSE_SELECT)
++    .eq("workspace_id", ctx.workspaceId)
++    .ilike("title", `%${searchTitle}%`);
++  if (findErr) return { error: `Could not search expenses: ${findErr.message}` };
++
++  let hits = (matches ?? []) as unknown as ResolvedExpenseRow[];
++
++  if (hits.length === 0) {
++    // Fallback tier: fuzzy match against every title in this workspace —
++    // small per-gym datasets, so a plain select is fine.
++    const { data: allTitles, error: allErr } = await ctx.supabase
++      .from("expenses")
++      .select("id, title")
++      .eq("workspace_id", ctx.workspaceId);
++    if (allErr) return { error: `Could not search expenses: ${allErr.message}` };
++
++    const candidates = (allTitles ?? []).map((r) => ({ item: r as { id: string; title: string }, label: r.title }));
++    const fuzzyHits = fuzzyFind(query, candidates);
++    if (fuzzyHits.length !== 1) {
++      return { error: "expense_not_found" as const, searched: rawTitle };
++    }
++
++    const { data: full, error: fullErr } = await ctx.supabase
++      .from("expenses")
++      .select(EXPENSE_SELECT)
++      .eq("workspace_id", ctx.workspaceId)
++      .eq("id", fuzzyHits[0].item.id)
++      .maybeSingle();
++    if (fullErr) return { error: `Could not search expenses: ${fullErr.message}` };
++    if (!full) return { error: "expense_not_found" as const, searched: rawTitle };
++    hits = [full as unknown as ResolvedExpenseRow];
++  }
++
++  if (hits.length > 1) {
++    return { error: "ambiguous_expense" as const, matches: hits.map((m) => m.title) };
++  }
++
++  const expense = hits[0];
++  setResolvedContext(ctx, { entityType: "expense", entityId: expense.id, entityName: expense.title });
++  return { expense };
++}
++
+ // ── READ ────────────────────────────────────────────────────────────
+ 
+ const expenseCategoriesList: PypusTool = {
+@@ -236,28 +327,10 @@ const updateExpense: PypusTool = {
+     required: ["expense_title"],
+   },
+   async run(ctx, args) {
+-    const searchTitle = typeof args.expense_title === "string" ? args.expense_title.trim().toLowerCase() : "";
+-    if (!searchTitle) return { error: "expense_title is required" };
++    const found = await resolveExpense(ctx, args.expense_title);
++    if ("error" in found) return found;
+ 
+-    const { data: matches, error: findErr } = await ctx.supabase
+-      .from("expenses")
+-      .select("id, title, amount, status, type, due_date, category_id, expense_categories(name)")
+-      .eq("workspace_id", ctx.workspaceId)
+-      .ilike("title", `%${searchTitle}%`);
+-    if (findErr) return { error: `Could not search expenses: ${findErr.message}` };
+-    if (!matches || matches.length === 0) return { error: "expense_not_found" as const, searched: args.expense_title };
+-    if (matches.length > 1) return { error: "ambiguous_expense" as const, matches: matches.map((m) => m.title) };
+-
+-    const expense = matches[0] as {
+-      id: string;
+-      title: string;
+-      amount: number;
+-      status: "paid" | "pending" | "overdue";
+-      type: "one_time" | "fixed" | "monthly_variable";
+-      due_date: string;
+-      category_id: string;
+-      expense_categories?: { name?: string } | null;
+-    };
++    const expense = found.expense;
+     let categoryId = expense.category_id;
+     let categoryName = expense.expense_categories?.name ?? "Uncategorized";
+     if (typeof args.category_name === "string" && args.category_name.trim()) {
+@@ -313,19 +386,10 @@ const markExpensePaid: PypusTool = {
+     required: ["expense_title"],
+   },
+   async run(ctx, args) {
+-    const searchTitle = typeof args.expense_title === "string" ? args.expense_title.trim().toLowerCase() : "";
+-    if (!searchTitle) return { error: "expense_title is required" };
+-
+-    const { data: matches, error: findErr } = await ctx.supabase
+-      .from("expenses")
+-      .select("id, title, amount, status")
+-      .eq("workspace_id", ctx.workspaceId)
+-      .ilike("title", `%${searchTitle}%`);
+-    if (findErr) return { error: `Could not search expenses: ${findErr.message}` };
+-    if (!matches || matches.length === 0) return { error: "expense_not_found" as const, searched: args.expense_title };
+-    if (matches.length > 1) return { error: "ambiguous_expense" as const, matches: matches.map((m) => m.title) };
++    const found = await resolveExpense(ctx, args.expense_title);
++    if ("error" in found) return found;
+ 
+-    const expense = matches[0];
++    const expense = found.expense;
+     if (expense.status === "paid") return { error: "already_paid" as const, expense: expense.title };
+ 
+     const result = await markExpensePaidAction(ctx.workspaceId, expense.id);
+@@ -349,19 +413,10 @@ const deleteExpense: PypusTool = {
+     required: ["expense_title"],
+   },
+   async run(ctx, args) {
+-    const searchTitle = typeof args.expense_title === "string" ? args.expense_title.trim().toLowerCase() : "";
+-    if (!searchTitle) return { error: "expense_title is required" };
+-
+-    const { data: matches, error: findErr } = await ctx.supabase
+-      .from("expenses")
+-      .select("id, title, amount, status, due_date")
+-      .eq("workspace_id", ctx.workspaceId)
+-      .ilike("title", `%${searchTitle}%`);
+-    if (findErr) return { error: `Could not search expenses: ${findErr.message}` };
+-    if (!matches || matches.length === 0) return { error: "expense_not_found" as const, searched: args.expense_title };
+-    if (matches.length > 1) return { error: "ambiguous_expense" as const, matches: matches.map((m) => m.title) };
++    const found = await resolveExpense(ctx, args.expense_title);
++    if ("error" in found) return found;
+ 
+-    const expense = matches[0];
++    const expense = found.expense;
+     const preview = {
+       title: expense.title,
+       amount: expense.amount,

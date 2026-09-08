@@ -1,0 +1,59 @@
+diff --git a/lib/pypus/tools/team.ts b/lib/pypus/tools/team.ts
+index 9ec2e3c..e1edbca 100644
+--- a/lib/pypus/tools/team.ts
++++ b/lib/pypus/tools/team.ts
+@@ -1,5 +1,7 @@
+ import { type PypusTool, type ToolContext, needsConfirmation } from "./shared";
+ import { generateInvite, removeMember } from "@/app/actions/invites";
++import { isPureReference, setResolvedContext } from "./resolved-context";
++import { fuzzyFind } from "./fuzzy-match";
+ 
+ type TeamRow = {
+   id: string;
+@@ -56,13 +58,32 @@ async function loadTeam(ctx: ToolContext): Promise<TeamRow[]> {
+ }
+ 
+ async function resolveTeamMember(ctx: ToolContext, rawName: unknown) {
+-  const query = String(rawName ?? "").trim().toLowerCase();
+-  if (!query) return { error: "member_name is required" as const };
++  const query = String(rawName ?? "").trim();
+ 
++  if (isPureReference(query)) {
++    if (ctx.resolvedContext?.entityType === "team_member") {
++      const team = await loadTeam(ctx);
++      const found = team.find((m) => m.id === ctx.resolvedContext!.entityId);
++      if (found) {
++        setResolvedContext(ctx, { entityType: "team_member", entityId: found.id, entityName: found.fullName });
++        return { member: found };
++      }
++    }
++    return { error: "member_name is required" as const };
++  }
++
++  const lowered = query.toLowerCase();
+   const team = await loadTeam(ctx);
+-  const exact = team.filter((m) => m.fullName.toLowerCase() === query);
+-  const partial = team.filter((m) => m.fullName.toLowerCase().includes(query));
+-  const hits = exact.length ? exact : partial;
++  const exact = team.filter((m) => m.fullName.toLowerCase() === lowered);
++  const partial = team.filter((m) => m.fullName.toLowerCase().includes(lowered));
++  let hits = exact.length ? exact : partial;
++
++  if (!hits.length) {
++    const fuzzy = fuzzyFind(query, team.map((m) => ({ item: m, label: m.fullName })));
++    if (fuzzy.length === 1) {
++      hits = [fuzzy[0].item];
++    }
++  }
+ 
+   if (!hits.length) {
+     return { error: "team_member_not_found" as const, searched: String(rawName ?? ""), availableTeamMembers: team.map((m) => m.fullName) };
+@@ -70,6 +91,8 @@ async function resolveTeamMember(ctx: ToolContext, rawName: unknown) {
+   if (hits.length > 1) {
+     return { error: "ambiguous_team_member" as const, matches: hits.map((m) => m.fullName) };
+   }
++
++  setResolvedContext(ctx, { entityType: "team_member", entityId: hits[0].id, entityName: hits[0].fullName });
+   return { member: hits[0] };
+ }
+ 

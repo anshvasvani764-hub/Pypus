@@ -1,0 +1,82 @@
+diff --git a/lib/pypus/tools/shared.ts b/lib/pypus/tools/shared.ts
+index 547375d..daf2949 100644
+--- a/lib/pypus/tools/shared.ts
++++ b/lib/pypus/tools/shared.ts
+@@ -1,5 +1,7 @@
+ import type { createClient } from "@/lib/supabase/server";
+ import { getISTDateString } from "@/lib/utils/date";
++import { isPureReference, setResolvedContext, type ResolvedContext } from "./resolved-context";
++import { fuzzyFind } from "./fuzzy-match";
+ 
+ export type Supabase = Awaited<ReturnType<typeof createClient>>;
+ 
+@@ -24,6 +26,16 @@ export interface PypusTool {
+ export interface ToolContext {
+   supabase: Supabase;
+   workspaceId: string;
++  /**
++   * The entity ("usko"/"iska"/"ye wala") the conversation last resolved,
++   * carried in from the client's previous turn. Resolvers read this to
++   * answer pure-pronoun references, and overwrite it (via
++   * setResolvedContext in ./resolved-context) whenever they land on a
++   * single confident match, so it's always current by the time the route
++   * handler reads it back after the tool loop finishes. Absent/null means
++   * there's nothing to fall back to yet.
++   */
++  resolvedContext?: ResolvedContext | null;
+ }
+ 
+ /**
+@@ -144,7 +156,25 @@ export async function loadPlanNames({ supabase, workspaceId }: ToolContext) {
+  */
+ export async function resolveMember(ctx: ToolContext, rawName: unknown) {
+   const query = String(rawName ?? "").trim().toLowerCase();
+-  if (!query) return { error: "member_name is required" as const };
++
++  // Pure pronoun/reference ("usko", "iska number", "ye wala", "") — no real
++  // name token left to match on, so fall back to whatever the conversation
++  // last resolved to a member instead of guessing.
++  if (isPureReference(query)) {
++    if (ctx.resolvedContext?.entityType === "member") {
++      const { data, error } = await ctx.supabase
++        .from("members")
++        .select("id, name, email, phone, plan_id, trainer_id, joined_at")
++        .eq("workspace_id", ctx.workspaceId)
++        .eq("id", ctx.resolvedContext.entityId)
++        .maybeSingle();
++      if (!error && data) {
++        setResolvedContext(ctx, { entityType: "member", entityId: data.id, entityName: data.name });
++        return { member: data };
++      }
++    }
++    return { error: "member_name is required" as const };
++  }
+ 
+   const members = await loadMembers(ctx);
+   const exact = members.filter((m) => m.name.toLowerCase() === query);
+@@ -152,7 +182,17 @@ export async function resolveMember(ctx: ToolContext, rawName: unknown) {
+   const byToken = members.filter((m) =>
+     query.split(/\s+/).some((t) => t.length > 2 && m.name.toLowerCase().split(/\s+/).includes(t))
+   );
+-  const hits = exact.length ? exact : partial.length ? partial : byToken;
++  let hits = exact.length ? exact : partial.length ? partial : byToken;
++
++  // Fourth tier: typo tolerance, only when exact/substring/token all missed,
++  // and only when it lands on a single confident candidate — a fuzzy tie is
++  // never treated as a match.
++  if (!hits.length) {
++    const fuzzyHits = fuzzyFind(query, members.map((m) => ({ item: m, label: m.name })));
++    if (fuzzyHits.length === 1) {
++      hits = [fuzzyHits[0].item];
++    }
++  }
+ 
+   if (!hits.length) {
+     return {
+@@ -164,5 +204,6 @@ export async function resolveMember(ctx: ToolContext, rawName: unknown) {
+   if (hits.length > 1) {
+     return { error: "ambiguous_member" as const, matches: hits.map((m) => m.name) };
+   }
++  setResolvedContext(ctx, { entityType: "member", entityId: hits[0].id, entityName: hits[0].name });
+   return { member: hits[0] };
+ }
