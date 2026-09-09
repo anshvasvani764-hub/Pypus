@@ -22,7 +22,6 @@ interface NavigationSuggestion {
 
 interface UsePypusVoiceOptions {
   workspaceId: string | null
-  /** Read the latest resolvedContext at call time — always the current value, not a stale closure. */
   getResolvedContext: () => ResolvedContext | null
   onResolvedContext: (ctx: ResolvedContext | null) => void
   onNavigationSuggestion: (nav: NavigationSuggestion) => void
@@ -206,15 +205,20 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       if (!sessionRes.ok) throw new Error(sessionData.error || 'Could not start voice mode')
 
       const ai = new GoogleGenAI({ apiKey: sessionData.token, httpOptions: { apiVersion: 'v1alpha' } })
+      const liveConfig = {
+        responseModalities: [Modality.AUDIO],
+        systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
+        tools: [{ functionDeclarations: sessionData.tools }],
+        // The installed LiveConnectConfig type does not expose toolConfig, but the
+        // Live API accepts functionCallingConfig. Keep the runtime field while
+        // avoiding a TypeScript-only SDK limitation.
+        toolConfig: { functionCallingConfig: { mode: 'ANY' } },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
+      } as any
       const session = await ai.live.connect({
         model: sessionData.model,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
-          tools: [{ functionDeclarations: sessionData.tools }],
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        },
+        config: liveConfig,
         callbacks: {
           onopen: () => setStatus('listening'),
           onmessage: handleServerMessage,
