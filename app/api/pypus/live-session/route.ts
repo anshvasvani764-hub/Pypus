@@ -47,6 +47,12 @@ export async function POST() {
         newSessionExpireTime,
         liveConnectConstraints: {
           model: PYPUS_LIVE_MODEL,
+          // Must mirror what the browser passes to ai.live.connect() below —
+          // an ephemeral token with no locked config defaults to TEXT-only,
+          // which the audio-native live model rejects outright, killing the
+          // session right after it opens ("response modalities (TEXT) not
+          // supported"). Locking it here keeps the token's constraint and
+          // the client's actual connect config in agreement.
           config: {
             responseModalities: [Modality.AUDIO],
             inputAudioTranscription: {},
