@@ -128,11 +128,12 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
           const reply = data.result?.reply
           const query = (fc.args as Record<string, unknown> | undefined)?.query
           if (fc.name === 'pypus_brain' && typeof query === 'string' && typeof reply === 'string') {
-            voiceHistoryRef.current = [
+            const newHistory: VoiceHistoryMessage[] = [
               ...voiceHistoryRef.current,
               { role: 'user', content: query },
               { role: 'assistant', content: reply },
-            ].slice(-MAX_VOICE_HISTORY_TURNS)
+            ]
+            voiceHistoryRef.current = newHistory.slice(-MAX_VOICE_HISTORY_TURNS)
           }
 
           return { id: fc.id, name: fc.name, response: { result: data.result } }
