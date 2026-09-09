@@ -1,14 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Send, Bot, User } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Send, Bot, User, ArrowRight } from 'lucide-react'
 import { usePypusUIContext } from '@/context/PypusUIContext'
+
+interface NavigationSuggestion {
+  route: string
+  label: string
+}
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  navigation?: NavigationSuggestion | null
 }
 
 /** Mirrors lib/pypus/tools/resolved-context.ts — kept in sync with the server's shape. */
@@ -49,6 +56,16 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
   // turn) so "usko"/"iska" keeps working across messages without a DB table.
   const resolvedContextRef = useRef<ResolvedContext | null>(null)
   const { uiContext } = usePypusUIContext()
+  const router = useRouter()
+  // Route always arrives as "/{workspaceSlug}/..." (see lib/pypus/ui-context.ts) —
+  // reused here so a suggested page key can be turned into a real link without
+  // this component needing its own workspaceSlug prop.
+  const workspaceSlug = uiContext.route.split('/').filter(Boolean)[0] ?? null
+
+  const goToSuggestedPage = (nav: NavigationSuggestion) => {
+    if (!workspaceSlug) return
+    router.push(`/${workspaceSlug}${nav.route ? `/${nav.route}` : ''}`)
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -71,6 +88,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
     setIsTyping(true)
 
     let reply: string
+    let navigation: NavigationSuggestion | null = null
     try {
       const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }))
       const res = await fetch('/api/pypus/chat', {
@@ -94,6 +112,9 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
       // landed on something this turn or is passing the prior one through —
       // never overwrite a good context with a stray undefined.
       if ('resolvedContext' in data) resolvedContextRef.current = data.resolvedContext ?? null
+      if (data.navigationSuggestion && typeof data.navigationSuggestion.route === 'string') {
+        navigation = data.navigationSuggestion
+      }
     } catch {
       reply = "I couldn't reach the server. Check your connection and try again."
     }
@@ -105,6 +126,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
         role: 'assistant',
         content: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navigation,
       },
     ])
     setIsTyping(false)
@@ -149,6 +171,15 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
               }`}
             >
               <div className="whitespace-pre-line leading-relaxed">{msg.content}</div>
+              {msg.navigation && workspaceSlug && (
+                <button
+                  onClick={() => goToSuggestedPage(msg.navigation!)}
+                  className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+                >
+                  {msg.navigation.label}
+                  <ArrowRight size={13} />
+                </button>
+              )}
             </div>
           </div>
         ))}

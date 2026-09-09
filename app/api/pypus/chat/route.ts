@@ -131,6 +131,7 @@ export async function POST(request: Request) {
     supabase,
     workspaceId,
     resolvedContext: sanitizeResolvedContext(resolvedContext),
+    navigationSuggestion: null,
   };
 
   try {
@@ -141,7 +142,11 @@ export async function POST(request: Request) {
       (name, args) => runPypusTool(name, args, ctx),
       sanitizeHistory(history)
     );
-    return NextResponse.json({ reply, resolvedContext: ctx.resolvedContext ?? null });
+    return NextResponse.json({
+      reply,
+      resolvedContext: ctx.resolvedContext ?? null,
+      navigationSuggestion: ctx.navigationSuggestion ?? null,
+    });
   } catch (err) {
     // Pass resolvedContext through unchanged on failure — a transient LLM
     // error shouldn't wipe out "who we were just talking about".
@@ -149,12 +154,14 @@ export async function POST(request: Request) {
       return NextResponse.json({
         reply: "AI provider not configured yet — add LLM_API_KEY and LLM_PROVIDER in .env.local",
         resolvedContext: ctx.resolvedContext ?? null,
+        navigationSuggestion: null,
       });
     }
     console.error("pypus/chat: LLM call failed", err);
     return NextResponse.json({
       reply: "I ran into a problem reaching the AI provider. Please try again shortly.",
       resolvedContext: ctx.resolvedContext ?? null,
+      navigationSuggestion: null,
     });
   }
 }

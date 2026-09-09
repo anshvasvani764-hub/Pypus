@@ -4,6 +4,9 @@ import { FEES_TOOLS } from "./fees";
 import { ATTENDANCE_TOOLS } from "./attendance";
 import { EXPENSES_TOOLS } from "./expenses";
 import { TEAM_TOOLS } from "./team";
+import { NAVIGATION_TOOLS } from "./navigation";
+import { AUTOMATION_TOOLS } from "./automations";
+import { SETTINGS_TOOLS } from "./settings";
 
 export type { PypusTool, ToolContext } from "./shared";
 
@@ -16,6 +19,9 @@ export const PYPUS_TOOLS: PypusTool[] = [
   ...ATTENDANCE_TOOLS,
   ...EXPENSES_TOOLS,
   ...TEAM_TOOLS,
+  ...NAVIGATION_TOOLS,
+  ...AUTOMATION_TOOLS,
+  ...SETTINGS_TOOLS,
 ];
 
 export async function runPypusTool(

@@ -36,6 +36,14 @@ export interface ToolContext {
    * there's nothing to fall back to yet.
    */
   resolvedContext?: ResolvedContext | null;
+  /**
+   * Set by the suggest_page tool (./navigation.ts) when the agent points the
+   * owner to a specific screen. A plain mutable field on the same shared
+   * ToolContext, exactly like resolvedContext above — the route handler
+   * reads it back once the tool loop finishes and returns it to the client
+   * so the chat UI can render a "go there" button next to the reply.
+   */
+  navigationSuggestion?: { route: string; label: string } | null;
 }
 
 /**
@@ -148,6 +156,14 @@ export async function loadPlanNames({ supabase, workspaceId }: ToolContext) {
     .eq("workspace_id", workspaceId);
   if (error) throw error;
   return new Map((data ?? []).map((p) => [p.id, p]));
+}
+
+/** Workspace display name — needed as a WhatsApp template param wherever a
+ * message is sent (reminders, receipts), so it's a shared loader rather
+ * than each tool re-querying the workspaces table itself. */
+export async function loadWorkspaceName({ supabase, workspaceId }: ToolContext): Promise<string> {
+  const { data } = await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
+  return data?.name ?? "";
 }
 
 /**

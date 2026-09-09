@@ -1,0 +1,433 @@
+diff --git a/lib/pypus/prompt.ts b/lib/pypus/prompt.ts
+index 2424e50..70d0934 100644
+--- a/lib/pypus/prompt.ts
++++ b/lib/pypus/prompt.ts
+@@ -42,17 +42,21 @@ ACTIONS (write tools)
+ - Expenses (records): add_expense, update_expense, mark_expense_paid, delete_expense
+ - Expenses (categories): add_expense_category, update_expense_category, delete_expense_category
+ - Team: invite_team_member, update_team_member_role, remove_team_member
++- Fee reminders (automation): update_fee_reminder_settings, send_fee_reminder
++- Receipts (automation): update_receipt_agent_settings, send_receipt, dismiss_receipt, update_receipt_message
++- Workspace settings: update_workspace_settings
+ 
+-- These tools change real data. Only call one when the owner's message is clearly an instruction to do that action (e.g. "Rahul ko present maar do", "naya member add karo", "Rahul ko Gold plan de do", "is expense ko paid maar do"), never as a side effect of a question.
++- These tools change real data — or, for send_fee_reminder/send_receipt, send a real WhatsApp message to the member. Only call one when the owner's message is clearly an instruction to do that action (e.g. "Rahul ko present maar do", "naya member add karo", "Rahul ko Gold plan de do", "is expense ko paid maar do", "Ramesh ko reminder bhej do"), never as a side effect of a question.
+ - RISK LEVEL is fixed per tool (see riskLevel on each tool definition) — don't infer it yourself:
+   - LOW-RISK tools execute immediately, no confirmation needed. After acting, confirm in one line what you did (e.g. "Rahul ko aaj present maar diya.").
+-    add_member, update_member, mark_attendance, mark_bulk_attendance, update_attendance, add_plan, update_plan, assign_plan_to_member, record_fee_payment, add_expense, mark_expense_paid, add_expense_category, update_expense_category, invite_team_member, update_team_member_role.
+-  - HIGH-RISK tools are either permanent deletions or financial corrections (editing a fee/expense record after the fact), so ALL of them are two-step:
+-    delete_member, delete_plan, update_fee_payment, delete_fee_payment, delete_attendance, update_expense, delete_expense, delete_expense_category, remove_team_member.
+-    1. Call it WITHOUT confirmed:true. It returns a preview — show that preview to the owner in one short line (for a deletion, mention any related records it affects) and ask them to explicitly confirm.
++    add_member, update_member, mark_attendance, mark_bulk_attendance, update_attendance, add_plan, update_plan, assign_plan_to_member, record_fee_payment, add_expense, mark_expense_paid, add_expense_category, update_expense_category, invite_team_member, update_team_member_role, update_fee_reminder_settings, update_receipt_agent_settings, send_receipt, dismiss_receipt, update_receipt_message, update_workspace_settings.
++  - HIGH-RISK tools are either permanent deletions, financial corrections (editing a fee/expense record after the fact), or sending a real WhatsApp message to one specific member (send_fee_reminder) — irreversible once sent, and worth a beat of confirmation on exactly who and what — so ALL of them are two-step:
++    delete_member, delete_plan, update_fee_payment, delete_fee_payment, delete_attendance, update_expense, delete_expense, delete_expense_category, remove_team_member, send_fee_reminder.
++    1. Call it WITHOUT confirmed:true. It returns a preview — show that preview to the owner in one short line (for a deletion, mention any related records it affects; for send_fee_reminder, state the member and which reminder type — before-due or overdue — it worked out from their actual fee) and ask them to explicitly confirm.
+     2. Only if the owner's very next message clearly confirms (e.g. "haan", "yes", "confirm", "kar do", "sahi hai") call it again with confirmed:true, using the exact same target/values, and report what was done.
+     3. If the owner's reply doesn't confirm, don't call it again — just note that it wasn't done. Never proceed on a vague or ambiguous reply — when in doubt, ask again instead of guessing.
+-- If a write tool returns an error (member_not_found, ambiguous_member, duplicate_phone, no_due_fee, plan_not_found, expense_not_found, ambiguous_expense, category_not_found, team_member_not_found, ambiguous_team_member, role_not_found), relay that plainly and ask for the missing detail — don't guess or retry blindly.
++  - send_receipt is low-risk/immediate even for a bulk send ("sabko bhej do") because it only ever sends receipts already sitting in the queue (nothing new is generated or guessed) — report how many sent vs failed in one line.
++- If a write tool returns an error (member_not_found, ambiguous_member, duplicate_phone, no_due_fee, plan_not_found, expense_not_found, ambiguous_expense, category_not_found, team_member_not_found, ambiguous_team_member, role_not_found, no_phone_on_file, no_pending_receipt_for_member), relay that plainly and ask for the missing detail — don't guess or retry blindly.
+ 
+ INTENT — question vs action vs answering your own clarification
+ - Every message is one of three things: a question (wants information), an instruction (wants a write tool called), or the owner answering a clarification you just asked (a bare name, a number, "haan"/"yes", a plan/date/amount with no verb). Read the last one or two turns to tell which — a bare "Shukla wala" or "98XXXXXXXX" right after you asked something is almost never a new question on its own.
+diff --git a/lib/pypus/tools/automations.ts b/lib/pypus/tools/automations.ts
+new file mode 100644
+index 0000000..606f1f2
+--- /dev/null
++++ b/lib/pypus/tools/automations.ts
+@@ -0,0 +1,298 @@
++import {
++  getFeeReminderSettings,
++  saveFeeReminderSettings,
++  sendFeeReminderNow,
++} from "@/app/actions/fee-reminders";
++import { getReceiptWorklist } from "@/lib/agent/queries";
++import { sendAgentReceipt } from "@/app/actions/agent";
++import {
++  saveReceiptAgentSettings,
++  dismissReceiptFromQueue,
++  updateReceiptTemplateVars,
++} from "@/app/actions/receipt-agent";
++import type { ReceiptTemplateVars } from "@/lib/receipts/template-vars";
++import { type PypusTool, resolveMember, loadWorkspaceName, today, daysBetween, needsConfirmation } from "./shared";
++
++// ── FEE REMINDERS ──────────────────────────────────────────────────
++
++const updateFeeReminderSettings: PypusTool = {
++  name: "update_fee_reminder_settings",
++  riskLevel: "low",
++  description:
++    "Changes the fee-reminder automation config: whether it's on/off, how many days before the due date the soft reminder goes out, how many hours after the due date the first overdue reminder fires, how often it repeats after that (min 24h), and whether sends are automatic or require a manual tap. Pass only the field(s) being changed. Use for 'reminder schedule change karo', 'auto reminder on/off karo' type requests.",
++  parameters: {
++    type: "object",
++    properties: {
++      enabled: { type: "boolean", description: "Turn the whole automation on/off" },
++      before_due_days: { type: "integer", description: "Days before due date to send the soft reminder" },
++      after_due_hours: { type: "integer", description: "Hours after due date before the first overdue reminder" },
++      repeat_interval_hours: { type: "integer", description: "Hours between repeat overdue reminders, minimum 24" },
++      send_mode: { type: "string", enum: ["manual", "auto"], description: "Whether reminders fire automatically or wait for a manual send" },
++    },
++  },
++  async run(ctx, args) {
++    const current = await getFeeReminderSettings(ctx.workspaceId);
++    const next = {
++      enabled: typeof args.enabled === "boolean" ? args.enabled : current.enabled,
++      beforeDueDays: Number.isFinite(Number(args.before_due_days)) ? Number(args.before_due_days) : current.beforeDueDays,
++      afterDueHours: Number.isFinite(Number(args.after_due_hours)) ? Number(args.after_due_hours) : current.afterDueHours,
++      repeatIntervalHours: Number.isFinite(Number(args.repeat_interval_hours))
++        ? Number(args.repeat_interval_hours)
++        : current.repeatIntervalHours,
++      sendMode: args.send_mode === "auto" || args.send_mode === "manual" ? args.send_mode : current.sendMode,
++    };
++
++    const result = await saveFeeReminderSettings(ctx.workspaceId, next);
++    if (!result.success) return { error: result.error ?? "Could not update fee reminder settings" };
++    return { success: true, ...next };
++  },
++};
++
++const sendFeeReminder: PypusTool = {
++  name: "send_fee_reminder",
++  riskLevel: "high",
++  description:
++    "Sends a WhatsApp fee reminder to one member right now, using their real due/overdue fee to pick the correct approved template — a soft 'coming due' message if their fee isn't due yet, or an overdue message (with days overdue) if it already is. You never choose which template; it's decided from the member's actual fee status. Two-step: call first without confirmed:true to preview which member and which reminder type will be used, then call again with confirmed:true only after the owner confirms.",
++  parameters: {
++    type: "object",
++    properties: {
++      member_name: { type: "string" },
++      confirmed: { type: "boolean", description: "Set true only after the owner has explicitly confirmed this exact member and reminder." },
++    },
++    required: ["member_name"],
++  },
++  async run(ctx, args) {
++    const found = await resolveMember(ctx, args.member_name);
++    if ("error" in found) return found;
++
++    if (!found.member.phone) {
++      return { error: "no_phone_on_file" as const, member: found.member.name };
++    }
++
++    const { data: fees, error: feesErr } = await ctx.supabase
++      .from("fees")
++      .select("id, amount_snapshot, paid_amount, due_date, status")
++      .eq("workspace_id", ctx.workspaceId)
++      .eq("member_id", found.member.id)
++      .in("status", ["due", "overdue"])
++      .order("due_date", { ascending: true })
++      .limit(1);
++    if (feesErr) return { error: `Could not load fee record: ${feesErr.message}` };
++    if (!fees || fees.length === 0) {
++      return { error: "no_due_fee" as const, member: found.member.name, note: "This member has no due/overdue fee to remind about." };
++    }
++
++    const fee = fees[0];
++    const stage: "before_due" | "overdue" = fee.status === "overdue" ? "overdue" : "before_due";
++    const daysOverdue = stage === "overdue" ? daysBetween(fee.due_date, today()) : 0;
++    const outstanding = (fee.amount_snapshot ?? 0) - (fee.paid_amount ?? 0);
++
++    const preview = {
++      member: found.member.name,
++      phone: found.member.phone,
++      dueDate: fee.due_date,
++      outstandingAmount: outstanding,
++      reminderType: stage === "overdue" ? "overdue" : "before_due (soft, coming due)",
++      daysOverdue,
++    };
++
++    const gate = needsConfirmation(args, preview);
++    if (gate) return gate;
++
++    const workspaceName = await loadWorkspaceName(ctx);
++    const result = await sendFeeReminderNow({
++      workspaceId: ctx.workspaceId,
++      workspaceName,
++      memberId: found.member.id,
++      memberPhone: found.member.phone,
++      memberName: found.member.name,
++      feeId: fee.id,
++      stage,
++      amount: outstanding,
++      dueDate: fee.due_date,
++      daysOverdue,
++    });
++    if (!result.success) return { error: result.error ?? "Could not send reminder" };
++
++    return { success: true, ...preview };
++  },
++};
++
++// ── RECEIPTS ────────────────────────────────────────────────────────
++
++const receiptQueue: PypusTool = {
++  name: "get_receipt_queue",
++  riskLevel: "low",
++  description:
++    "Lists payment receipts currently waiting to be sent on WhatsApp — member, amount, receipt number, paid date, payment method. Use for 'kitni receipts pending hain', 'kiski receipt bhejni baaki hai' questions.",
++  parameters: { type: "object", properties: {} },
++  async run(ctx) {
++    const workspaceName = await loadWorkspaceName(ctx);
++    const queue = await getReceiptWorklist(ctx.workspaceId, workspaceName);
++    return {
++      pendingCount: queue.length,
++      receipts: queue.map((r) => ({
++        member: r.memberName,
++        amount: r.amount,
++        receiptNumber: r.receiptNumber,
++        paidDate: r.paidDate,
++        paymentMethod: r.paymentMethod,
++      })),
++    };
++  },
++};
++
++const updateReceiptAgentSettings: PypusTool = {
++  name: "update_receipt_agent_settings",
++  riskLevel: "low",
++  description:
++    "Sets whether payment receipts are sent automatically the moment a fee is marked paid ('auto'), or held in a queue for the owner to send manually ('manual'). Use for 'receipt automatic bhejo' / 'receipt manually bhejenge' type requests.",
++  parameters: {
++    type: "object",
++    properties: {
++      send_mode: { type: "string", enum: ["manual", "auto"] },
++    },
++    required: ["send_mode"],
++  },
++  async run(ctx, args) {
++    if (args.send_mode !== "auto" && args.send_mode !== "manual") {
++      return { error: "send_mode must be 'manual' or 'auto'" };
++    }
++    const result = await saveReceiptAgentSettings(ctx.workspaceId, { sendMode: args.send_mode });
++    if (!result.success) return { error: result.error ?? "Could not update receipt settings" };
++    return { success: true, sendMode: args.send_mode };
++  },
++};
++
++const sendReceipt: PypusTool = {
++  name: "send_receipt",
++  riskLevel: "low",
++  description:
++    "Sends payment receipt(s) on WhatsApp that are already sitting in the pending queue. Pass member_name to send just that member's queued receipt; omit it to send every receipt currently waiting ('sabko bhej do', 'jitni receipts pending hai sab bhej do'). Only sends what's already queued — never generates a new receipt.",
++  parameters: {
++    type: "object",
++    properties: {
++      member_name: { type: "string", description: "Send only this member's pending receipt. Omit to send the whole queue." },
++    },
++  },
++  async run(ctx, args) {
++    const workspaceName = await loadWorkspaceName(ctx);
++    const queue = await getReceiptWorklist(ctx.workspaceId, workspaceName);
++
++    let targets = queue;
++    let requestedFor = "entire queue";
++    if (typeof args.member_name === "string" && args.member_name.trim()) {
++      const found = await resolveMember(ctx, args.member_name);
++      if ("error" in found) return found;
++      requestedFor = found.member.name;
++      targets = queue.filter((r) => r.memberId === found.member.id);
++      if (targets.length === 0) {
++        return { error: "no_pending_receipt_for_member" as const, member: found.member.name };
++      }
++    }
++
++    if (targets.length === 0) {
++      return { success: true, requestedFor, sentCount: 0, note: "Receipt queue is already empty." };
++    }
++
++    const results = await Promise.all(
++      targets.map(async (r) => {
++        const res = await sendAgentReceipt({
++          receiptId: r.receiptId,
++          memberPhone: r.memberPhone,
++          templateVars: r.templateVars,
++          receiptImageUrl: r.receiptImageUrl,
++        });
++        return { member: r.memberName, amount: r.amount, success: res.success, error: res.error };
++      })
++    );
++
++    return {
++      requestedFor,
++      sentCount: results.filter((r) => r.success).length,
++      failedCount: results.filter((r) => !r.success).length,
++      results,
++    };
++  },
++};
++
++const dismissReceipt: PypusTool = {
++  name: "dismiss_receipt",
++  riskLevel: "low",
++  description:
++    "Removes one member's receipt from the pending queue without sending it on WhatsApp — for when it was already shared some other way. Use for 'iski receipt hata do queue se' type requests.",
++  parameters: {
++    type: "object",
++    properties: { member_name: { type: "string" } },
++    required: ["member_name"],
++  },
++  async run(ctx, args) {
++    const workspaceName = await loadWorkspaceName(ctx);
++    const queue = await getReceiptWorklist(ctx.workspaceId, workspaceName);
++    const found = await resolveMember(ctx, args.member_name);
++    if ("error" in found) return found;
++
++    const item = queue.find((r) => r.memberId === found.member.id);
++    if (!item) return { error: "no_pending_receipt_for_member" as const, member: found.member.name };
++
++    const result = await dismissReceiptFromQueue(item.receiptId);
++    if (!result.success) return { error: result.error ?? "Could not remove receipt from queue" };
++    return { success: true, member: found.member.name, receiptNumber: item.receiptNumber };
++  },
++};
++
++const updateReceiptMessage: PypusTool = {
++  name: "update_receipt_message",
++  riskLevel: "low",
++  description:
++    "Overrides the exact amount-paid, remaining-balance, payment method or valid-till text that will go out on a member's still-queued receipt WhatsApp message. Use only when the owner explicitly wants to correct what an unsent receipt message will say — has no effect on a receipt already sent.",
++  parameters: {
++    type: "object",
++    properties: {
++      member_name: { type: "string" },
++      amount_paid: { type: "number", description: "Override for the amount-paid line" },
++      remaining_amount: { type: "number", description: "Override for the remaining-balance line" },
++      payment_method: { type: "string" },
++      valid_till_date: { type: "string", description: "YYYY-MM-DD override for the valid-till line" },
++    },
++    required: ["member_name"],
++  },
++  async run(ctx, args) {
++    const workspaceName = await loadWorkspaceName(ctx);
++    const queue = await getReceiptWorklist(ctx.workspaceId, workspaceName);
++    const found = await resolveMember(ctx, args.member_name);
++    if ("error" in found) return found;
++
++    const item = queue.find((r) => r.memberId === found.member.id);
++    if (!item) return { error: "no_pending_receipt_for_member" as const, member: found.member.name };
++
++    const vars: ReceiptTemplateVars = {
++      ...item.templateVars,
++      amountPaid: typeof args.amount_paid === "number" ? args.amount_paid : item.templateVars.amountPaid,
++      remainingAmount:
++        typeof args.remaining_amount === "number" ? args.remaining_amount : item.templateVars.remainingAmount,
++      paymentMethod:
++        typeof args.payment_method === "string" && args.payment_method.trim()
++          ? args.payment_method.trim()
++          : item.templateVars.paymentMethod,
++      validTillDate:
++        typeof args.valid_till_date === "string" && args.valid_till_date.trim()
++          ? args.valid_till_date.trim()
++          : item.templateVars.validTillDate,
++    };
++
++    const result = await updateReceiptTemplateVars(item.receiptId, vars);
++    if (!result.success) return { error: result.error ?? "Could not update receipt message" };
++    return { success: true, member: found.member.name, updatedTo: vars };
++  },
++};
++
++export const AUTOMATION_TOOLS: PypusTool[] = [
++  updateFeeReminderSettings,
++  sendFeeReminder,
++  receiptQueue,
++  updateReceiptAgentSettings,
++  sendReceipt,
++  dismissReceipt,
++  updateReceiptMessage,
++];
+diff --git a/lib/pypus/tools/index.ts b/lib/pypus/tools/index.ts
+index ef7d9ed..90279a7 100644
+--- a/lib/pypus/tools/index.ts
++++ b/lib/pypus/tools/index.ts
+@@ -5,6 +5,8 @@ import { ATTENDANCE_TOOLS } from "./attendance";
+ import { EXPENSES_TOOLS } from "./expenses";
+ import { TEAM_TOOLS } from "./team";
+ import { NAVIGATION_TOOLS } from "./navigation";
++import { AUTOMATION_TOOLS } from "./automations";
++import { SETTINGS_TOOLS } from "./settings";
+ 
+ export type { PypusTool, ToolContext } from "./shared";
+ 
+@@ -18,6 +20,8 @@ export const PYPUS_TOOLS: PypusTool[] = [
+   ...EXPENSES_TOOLS,
+   ...TEAM_TOOLS,
+   ...NAVIGATION_TOOLS,
++  ...AUTOMATION_TOOLS,
++  ...SETTINGS_TOOLS,
+ ];
+ 
+ export async function runPypusTool(
+diff --git a/lib/pypus/tools/settings.ts b/lib/pypus/tools/settings.ts
+new file mode 100644
+index 0000000..e60aeaf
+--- /dev/null
++++ b/lib/pypus/tools/settings.ts
+@@ -0,0 +1,50 @@
++import { updateProfileSettings } from "@/app/actions/settings";
++import type { PypusTool } from "./shared";
++
++const updateWorkspaceSettings: PypusTool = {
++  name: "update_workspace_settings",
++  riskLevel: "low",
++  description:
++    "Updates the owner's display name and/or the gym/business name shown across the app. Pass at least one of full_name or business_name. Use for 'mera naam change karo' / 'gym ka naam change karo' type requests.",
++  parameters: {
++    type: "object",
++    properties: {
++      full_name: { type: "string", description: "New owner display name, if changing" },
++      business_name: { type: "string", description: "New gym/business name, if changing" },
++    },
++  },
++  async run(ctx, args) {
++    const newFullName = typeof args.full_name === "string" && args.full_name.trim() ? args.full_name.trim() : null;
++    const newBusinessName =
++      typeof args.business_name === "string" && args.business_name.trim() ? args.business_name.trim() : null;
++    if (!newFullName && !newBusinessName) {
++      return { error: "Nothing to update — pass full_name and/or business_name" };
++    }
++
++    const {
++      data: { user },
++    } = await ctx.supabase.auth.getUser();
++    if (!user) return { error: "Not signed in" };
++
++    // updateProfileSettings writes both fields together, so an
++    // unchanged field is re-saved with its current value rather than
++    // being cleared.
++    const [{ data: userRow }, { data: wsRow }] = await Promise.all([
++      ctx.supabase.from("users").select("full_name").eq("id", user.id).maybeSingle(),
++      ctx.supabase.from("workspaces").select("name").eq("id", ctx.workspaceId).maybeSingle(),
++    ]);
++
++    const fullName = newFullName ?? userRow?.full_name ?? "";
++    const businessName = newBusinessName ?? wsRow?.name ?? "";
++    if (!fullName || !businessName) {
++      return { error: "Could not resolve the current name(s) to update" };
++    }
++
++    const result = await updateProfileSettings({ workspaceId: ctx.workspaceId, fullName, businessName });
++    if (!result.success) return { error: result.error ?? "Could not update settings" };
++
++    return { success: true, fullName, businessName };
++  },
++};
++
++export const SETTINGS_TOOLS: PypusTool[] = [updateWorkspaceSettings];
+diff --git a/lib/pypus/tools/shared.ts b/lib/pypus/tools/shared.ts
+index 7a072c7..be577d9 100644
+--- a/lib/pypus/tools/shared.ts
++++ b/lib/pypus/tools/shared.ts
+@@ -158,6 +158,14 @@ export async function loadPlanNames({ supabase, workspaceId }: ToolContext) {
+   return new Map((data ?? []).map((p) => [p.id, p]));
+ }
+ 
++/** Workspace display name — needed as a WhatsApp template param wherever a
++ * message is sent (reminders, receipts), so it's a shared loader rather
++ * than each tool re-querying the workspaces table itself. */
++export async function loadWorkspaceName({ supabase, workspaceId }: ToolContext): Promise<string> {
++  const { data } = await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
++  return data?.name ?? "";
++}
++
+ /**
+  * Members are addressed by name in chat, so every member-scoped tool resolves a
+  * free-text name first. Ambiguity is returned to the model rather than guessed.

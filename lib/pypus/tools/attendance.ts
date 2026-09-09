@@ -52,6 +52,54 @@ const attendanceToday: PypusTool = {
   },
 };
 
+const attendanceOnDate: PypusTool = {
+  name: "get_attendance_on_date",
+  riskLevel: "low",
+  description:
+    "Attendance for any one specific date (past or future), across every member — who was present with check-in time, who was absent, who has no record for that date. Use for 'X tarikh ko kaun aaya tha', '29 ko attendance kaisi thi' — any date other than today. For today, get_attendance_today is simpler.",
+  parameters: {
+    type: "object",
+    properties: {
+      date: { type: "string", description: "ISO date YYYY-MM-DD to look up attendance for." },
+    },
+    required: ["date"],
+  },
+  async run(ctx, args) {
+    const date = String(args.date ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { error: "invalid_date" as const, expectedFormat: "YYYY-MM-DD" };
+    }
+    const [members, attRes] = await Promise.all([
+      loadMembers(ctx),
+      ctx.supabase
+        .from("attendance")
+        .select("member_id, status, check_in, check_out")
+        .eq("workspace_id", ctx.workspaceId)
+        .eq("date", date),
+    ]);
+    if (attRes.error) throw attRes.error;
+
+    const nameById = new Map(members.map((m) => [m.id, m.name]));
+    const rows = attRes.data ?? [];
+    const marked = new Set(rows.map((r) => r.member_id));
+
+    return {
+      date,
+      weekday: weekdayOf(date),
+      totalActiveMembers: members.length,
+      present: rows
+        .filter((r) => r.status === "present")
+        .map((r) => ({
+          member: nameById.get(r.member_id) ?? "Unknown member",
+          checkIn: r.check_in ? formatISTTime(r.check_in) : null,
+          checkOut: r.check_out ? formatISTTime(r.check_out) : null,
+        })),
+      absent: rows.filter((r) => r.status === "absent").map((r) => nameById.get(r.member_id) ?? "Unknown member"),
+      noRecordForDate: members.filter((m) => !marked.has(m.id)).map((m) => m.name),
+    };
+  },
+};
+
 const attendanceStats: PypusTool = {
   name: "get_attendance_stats",
   riskLevel: "low",
@@ -502,6 +550,7 @@ const deleteAttendance: PypusTool = {
 
 export const ATTENDANCE_TOOLS: PypusTool[] = [
   attendanceToday,
+  attendanceOnDate,
   attendanceStats,
   memberAttendance,
   inactiveMembers,

@@ -224,6 +224,111 @@ const paymentPunctuality: PypusTool = {
   },
 };
 
+const paymentsOnDate: PypusTool = {
+  name: "get_payments_on_date",
+  riskLevel: "low",
+  description:
+    "All payments actually received on one specific calendar date, across every member — member name, amount, plan and payment method. Use for '29 ko kiski payment aayi', 'us din kitni payment aayi' — any question about who paid on a given day. Resolve relative dates ('kal', 'parso', '29 tarikh') to an ISO date yourself before calling.",
+  parameters: {
+    type: "object",
+    properties: {
+      date: { type: "string", description: "ISO date YYYY-MM-DD to look up payments for." },
+    },
+    required: ["date"],
+  },
+  async run(ctx, args) {
+    const date = String(args.date ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { error: "invalid_date" as const, expectedFormat: "YYYY-MM-DD" };
+    }
+    const [members, feesRes] = await Promise.all([
+      loadMembers(ctx),
+      ctx.supabase
+        .from("fees")
+        .select("member_id, plan_name_snapshot, paid_amount, payment_method")
+        .eq("workspace_id", ctx.workspaceId)
+        .eq("paid_date", date)
+        .gt("paid_amount", 0),
+    ]);
+    if (feesRes.error) throw feesRes.error;
+
+    const nameById = new Map(members.map((m) => [m.id, m.name]));
+    const payments = (feesRes.data ?? []).map((f) => ({
+      member: nameById.get(f.member_id) ?? "Unknown member",
+      amount: f.paid_amount,
+      plan: f.plan_name_snapshot,
+      method: f.payment_method,
+    }));
+
+    return {
+      date,
+      currency: "INR",
+      paymentCount: payments.length,
+      totalCollected: payments.reduce((s, p) => s + (p.amount ?? 0), 0),
+      payments: payments.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0)),
+    };
+  },
+};
+
+const paymentsInRange: PypusTool = {
+  name: "get_payments_in_range",
+  riskLevel: "low",
+  description:
+    "Total collected and the full list of payments between two dates (inclusive), across every member — for any custom period like 'iss hafte ka collection', 'is week ka total', '1 se 7 tak kitna aaya'. For a whole calendar month use get_fees_summary instead; for one single day, get_payments_on_date is simpler.",
+  parameters: {
+    type: "object",
+    properties: {
+      from_date: { type: "string", description: "ISO date YYYY-MM-DD, inclusive lower bound on paid_date." },
+      to_date: { type: "string", description: "ISO date YYYY-MM-DD, inclusive upper bound on paid_date." },
+    },
+    required: ["from_date", "to_date"],
+  },
+  async run(ctx, args) {
+    const from = String(args.from_date ?? "").trim();
+    const to = String(args.to_date ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return { error: "invalid_date" as const, expectedFormat: "YYYY-MM-DD" };
+    }
+    const [members, feesRes] = await Promise.all([
+      loadMembers(ctx),
+      ctx.supabase
+        .from("fees")
+        .select("member_id, plan_name_snapshot, paid_amount, payment_method, paid_date")
+        .eq("workspace_id", ctx.workspaceId)
+        .gte("paid_date", from)
+        .lte("paid_date", to)
+        .gt("paid_amount", 0)
+        .order("paid_date", { ascending: true }),
+    ]);
+    if (feesRes.error) throw feesRes.error;
+
+    const nameById = new Map(members.map((m) => [m.id, m.name]));
+    const payments = (feesRes.data ?? []).map((f) => ({
+      member: nameById.get(f.member_id) ?? "Unknown member",
+      amount: f.paid_amount,
+      plan: f.plan_name_snapshot,
+      method: f.payment_method,
+      paidDate: f.paid_date,
+    }));
+
+    const byDate: Record<string, number> = {};
+    for (const p of payments) {
+      if (!p.paidDate) continue;
+      byDate[p.paidDate] = (byDate[p.paidDate] ?? 0) + (p.amount ?? 0);
+    }
+
+    return {
+      from,
+      to,
+      currency: "INR",
+      paymentCount: payments.length,
+      totalCollected: payments.reduce((s, p) => s + (p.amount ?? 0), 0),
+      collectedByDate: byDate,
+      payments,
+    };
+  },
+};
+
 const memberFeeHistory: PypusTool = {
   name: "get_member_fee_history",
   riskLevel: "low",
@@ -650,6 +755,8 @@ export const FEES_TOOLS: PypusTool[] = [
   revenueByPlan,
   paymentPunctuality,
   memberFeeHistory,
+  paymentsOnDate,
+  paymentsInRange,
   recordFeePayment,
   updateFeePayment,
   deleteFeePayment,

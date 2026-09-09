@@ -1,16 +1,23 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Bot, Send, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Bot, Send, RotateCcw, ArrowRight } from 'lucide-react'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { usePypusUIContext } from '@/context/PypusUIContext'
+
+interface NavigationSuggestion {
+  route: string
+  label: string
+}
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  navigation?: NavigationSuggestion | null
 }
 
 const INITIAL_MESSAGES: Message[] = [
@@ -32,6 +39,11 @@ const QUICK_PROMPTS = [
 export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
   const { workspace } = useWorkspace(workspaceSlug)
   const { uiContext } = usePypusUIContext()
+  const router = useRouter()
+
+  const goToSuggestedPage = (nav: NavigationSuggestion) => {
+    router.push(`/${workspaceSlug}${nav.route ? `/${nav.route}` : ''}`)
+  }
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -63,6 +75,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
     setIsTyping(true)
 
     let reply: string
+    let navigation: NavigationSuggestion | null = null
     try {
       // Last few turns only — just enough for the assistant to remember a
       // pending "please confirm this payment" from its previous reply.
@@ -79,6 +92,9 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
         (res.status === 401
           ? 'Your session expired — please sign in again.'
           : 'Something went wrong. Please try again.')
+      if (data.navigationSuggestion && typeof data.navigationSuggestion.route === 'string') {
+        navigation = data.navigationSuggestion
+      }
     } catch {
       reply = "I couldn't reach the server. Check your connection and try again."
     }
@@ -90,6 +106,7 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
         role: 'assistant',
         content: reply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navigation,
       },
     ])
     setIsTyping(false)
@@ -126,6 +143,15 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
               </div>
               <div className="bg-ve-surface-container-high rounded-2xl rounded-bl-none p-4 text-ve-on-surface text-sm leading-relaxed shadow-sm">
                 <p>{m.content}</p>
+                {m.navigation && (
+                  <button
+                    onClick={() => goToSuggestedPage(m.navigation!)}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ve-primary px-3.5 py-2 text-xs font-bold text-white active:scale-95 transition-transform"
+                  >
+                    {m.navigation.label}
+                    <ArrowRight size={13} />
+                  </button>
+                )}
               </div>
             </div>
           ) : (
