@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Bot, User, ArrowRight } from 'lucide-react'
+import { Send, Bot, User, ArrowRight, Mic, Square } from 'lucide-react'
 import { usePypusUIContext } from '@/context/PypusUIContext'
+import { usePypusVoice } from '@/hooks/usePypusVoice'
 
 interface NavigationSuggestion {
   route: string
@@ -73,6 +74,46 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
     if (!workspaceSlug) return
     router.push(`/${workspaceSlug}${nav.route ? `/${nav.route}` : ''}`)
   }
+
+  // A navigation suggestion can arrive (from a tool call) before the utterance
+  // it belongs to has finished being transcribed — held here so it can be
+  // attached to the right message once the assistant's turn actually flushes.
+  const pendingNavRef = useRef<NavigationSuggestion | null>(null)
+
+  const appendMessage = (role: Message['role'], content: string, navigation: NavigationSuggestion | null = null) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: String(nextIdRef.current++),
+        role,
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navigation,
+      },
+    ])
+  }
+
+  const voice = usePypusVoice({
+    workspaceId,
+    getResolvedContext: () => resolvedContextRef.current,
+    onResolvedContext: (ctx) => {
+      resolvedContextRef.current = ctx
+    },
+    onNavigationSuggestion: (nav) => {
+      pendingNavRef.current = nav
+    },
+    onUserUtterance: (text) => appendMessage('user', text),
+    onAssistantUtterance: (text) => {
+      appendMessage('assistant', text, pendingNavRef.current)
+      pendingNavRef.current = null
+    },
+    onErrorMessage: (message) => appendMessage('assistant', message),
+  })
+
+  useEffect(() => {
+    return () => voice.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -151,6 +192,19 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
         ))}
       </div>
 
+      {voice.status !== 'idle' && (
+        <div className="flex shrink-0 items-center justify-center gap-2 border-b border-gray-100 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+          </span>
+          {voice.status === 'connecting' && 'Connect ho raha hai...'}
+          {voice.status === 'listening' && 'Sun raha hoon...'}
+          {voice.status === 'speaking' && 'Bol raha hoon...'}
+          {voice.status === 'error' && 'Voice mode mein error aa gaya — mic dabao aur try karo'}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {messages.map((msg) => (
           <div
@@ -211,6 +265,19 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
         className="shrink-0 border-t border-gray-100 p-3"
       >
         <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-xs transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
+          <button
+            type="button"
+            onClick={() => (voice.status === 'idle' || voice.status === 'error' ? voice.start() : voice.stop())}
+            disabled={!workspaceId}
+            aria-label={voice.status === 'idle' || voice.status === 'error' ? 'Start voice mode' : 'Stop voice mode'}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              voice.status === 'listening' || voice.status === 'speaking' || voice.status === 'connecting'
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {voice.status === 'idle' || voice.status === 'error' ? <Mic size={17} /> : <Square size={15} />}
+          </button>
           <input
             type="text"
             value={input}
@@ -223,7 +290,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
             type="submit"
             disabled={!input.trim() || isTyping || !workspaceId}
             aria-label="Send message"
-            className="shrink-0 rounded-xl bg-blue-600 p-2.5 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-blue-600"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-blue-600"
           >
             <Send size={16} />
           </button>
