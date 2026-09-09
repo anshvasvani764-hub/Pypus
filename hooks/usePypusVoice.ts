@@ -11,6 +11,7 @@ import {
 } from '@/lib/utils/pcm-audio'
 import { PYPUS_LIVE_OUTPUT_SAMPLE_RATE, PYPUS_LIVE_INPUT_SAMPLE_RATE } from '@/lib/pypus/live'
 import type { ResolvedContext } from '@/lib/pypus/tools/resolved-context'
+import { usePypusUIContext } from '@/context/PypusUIContext'
 
 export type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error'
 
@@ -30,31 +31,24 @@ interface UsePypusVoiceOptions {
   onErrorMessage: (message: string) => void
 }
 
-/** How long to wait with no new transcript fragment before flushing anyway — the
- *  Live API doesn't always send a clean turnComplete, so this is the safety net. */
 const TRANSCRIPT_FLUSH_IDLE_MS = 2000
 
 export function usePypusVoice(opts: UsePypusVoiceOptions) {
   const [status, setStatus] = useState<VoiceStatus>('idle')
+  const { uiContext } = usePypusUIContext()
 
   const sessionRef = useRef<Session | null>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
   const inputCtxRef = useRef<AudioContext | null>(null)
   const processorRef = useRef<ScriptProcessorNode | null>(null)
-
   const outputCtxRef = useRef<AudioContext | null>(null)
   const playingSourcesRef = useRef<AudioBufferSourceNode[]>([])
   const nextPlayAtRef = useRef(0)
-
   const inputBufferRef = useRef('')
   const outputBufferRef = useRef('')
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const optsRef = useRef(opts)
   optsRef.current = opts
-
-  /** True while stop() itself is closing the session — lets onclose tell a
-   *  user-initiated hangup apart from the server dropping the connection. */
   const manualStopRef = useRef(false)
 
   const scheduleFlush = useCallback(() => {
@@ -75,14 +69,9 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     if (assistantText) optsRef.current.onAssistantUtterance(assistantText)
   }
 
-  /** Stops whatever model audio is mid-flight — called on barge-in (VAD interruption). */
   function clearPlayback() {
     for (const src of playingSourcesRef.current) {
-      try {
-        src.stop()
-      } catch {
-        // already finished — fine to ignore
-      }
+      try { src.stop() } catch {}
     }
     playingSourcesRef.current = []
     nextPlayAtRef.current = outputCtxRef.current?.currentTime ?? 0
@@ -94,11 +83,9 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     const samples = pcm16ToFloat32(base64ToArrayBuffer(base64))
     const buffer = ctx.createBuffer(1, samples.length, PYPUS_LIVE_OUTPUT_SAMPLE_RATE)
     buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0)
-
     const source = ctx.createBufferSource()
     source.buffer = buffer
     source.connect(ctx.destination)
-
     const startAt = Math.max(nextPlayAtRef.current, ctx.currentTime)
     source.start(startAt)
     nextPlayAtRef.current = startAt + buffer.duration
@@ -144,14 +131,11 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
 
   function handleServerMessage(message: LiveServerMessage) {
     const content = message.serverContent
-
     if (content?.interrupted) {
       clearPlayback()
-      // Whatever the model had said before being cut off is still worth logging.
       flushTranscripts()
       setStatus('listening')
     }
-
     if (content?.inputTranscription?.text) {
       inputBufferRef.current += content.inputTranscription.text
       scheduleFlush()
@@ -160,14 +144,11 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       outputBufferRef.current += content.outputTranscription.text
       scheduleFlush()
     }
-
     const parts = content?.modelTurn?.parts ?? []
     for (const part of parts) {
       if (part.inlineData?.data) playChunk(part.inlineData.data)
     }
-
     if (content?.turnComplete) flushTranscripts()
-
     if (message.toolCall) void handleToolCall(message.toolCall)
   }
 
@@ -175,35 +156,36 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     manualStopRef.current = true
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
     flushTranscripts()
-
     processorRef.current?.disconnect()
     processorRef.current = null
     inputCtxRef.current?.close().catch(() => {})
     inputCtxRef.current = null
     micStreamRef.current?.getTracks().forEach((t) => t.stop())
     micStreamRef.current = null
-
     clearPlayback()
     outputCtxRef.current?.close().catch(() => {})
     outputCtxRef.current = null
-
     sessionRef.current?.close()
     sessionRef.current = null
-
     setStatus('idle')
   }, [])
 
   const start = useCallback(async () => {
     if (!opts.workspaceId) return
     setStatus('connecting')
-
     try {
-      const sessionRes = await fetch('/api/pypus/live-session', { method: 'POST' })
+      const sessionRes = await fetch('/api/pypus/live-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uiContext,
+          resolvedContext: optsRef.current.getResolvedContext(),
+        }),
+      })
       const sessionData = await sessionRes.json()
       if (!sessionRes.ok) throw new Error(sessionData.error || 'Could not start voice mode')
 
       const ai = new GoogleGenAI({ apiKey: sessionData.token, httpOptions: { apiVersion: 'v1alpha' } })
-
       const session = await ai.live.connect({
         model: sessionData.model,
         config: {
@@ -241,7 +223,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       micStreamRef.current = stream
-
       const inputCtx = new AudioContext()
       inputCtxRef.current = inputCtx
       const source = inputCtx.createMediaStreamSource(stream)
@@ -270,8 +251,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       stop()
       setStatus('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.workspaceId])
+  }, [opts.workspaceId, uiContext, stop])
 
   return { status, start, stop }
 }
