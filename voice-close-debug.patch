@@ -1,0 +1,54 @@
+diff --git a/hooks/usePypusVoice.ts b/hooks/usePypusVoice.ts
+index 8bc1407..7f2d2e9 100644
+--- a/hooks/usePypusVoice.ts
++++ b/hooks/usePypusVoice.ts
+@@ -53,6 +53,10 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+   const optsRef = useRef(opts)
+   optsRef.current = opts
+ 
++  /** True while stop() itself is closing the session — lets onclose tell a
++   *  user-initiated hangup apart from the server dropping the connection. */
++  const manualStopRef = useRef(false)
++
+   const scheduleFlush = useCallback(() => {
+     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+     flushTimerRef.current = setTimeout(flushTranscripts, TRANSCRIPT_FLUSH_IDLE_MS)
+@@ -168,6 +172,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+   }
+ 
+   const stop = useCallback(() => {
++    manualStopRef.current = true
+     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+     flushTranscripts()
+ 
+@@ -212,11 +217,28 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+           onopen: () => setStatus('listening'),
+           onmessage: handleServerMessage,
+           onerror: (e: ErrorEvent) => {
+-            console.error('pypus voice: session error', e)
++            console.error('pypus voice: session error', e.message, e)
+             optsRef.current.onErrorMessage("Voice session hit an error. Tap the mic to try again.")
+             setStatus('error')
+           },
+-          onclose: () => setStatus('idle'),
++          onclose: (e: CloseEvent) => {
++            // The socket can close on its own — e.g. the server rejected the
++            // session setup (bad tool schema, bad model name, expired token)
++            // right after accepting the connection, which looks identical to
++            // a clean hangup unless we log/surface the code + reason here.
++            if (!manualStopRef.current) {
++              console.error('pypus voice: session closed unexpectedly', e.code, e.reason)
++              optsRef.current.onErrorMessage(
++                e.reason
++                  ? `Voice session band ho gaya: ${e.reason}. Tap the mic to try again.`
++                  : 'Voice session achanak band ho gaya. Tap the mic to try again.'
++              )
++              setStatus('error')
++            } else {
++              setStatus('idle')
++            }
++            manualStopRef.current = false
++          },
+         },
+       })
+       sessionRef.current = session
