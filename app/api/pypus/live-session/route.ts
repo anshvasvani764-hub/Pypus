@@ -66,7 +66,17 @@ export async function POST() {
       token: token.name,
       model: PYPUS_LIVE_MODEL,
       systemPrompt: PYPUS_SYSTEM_PROMPT,
-      tools: PYPUS_TOOLS.map(({ name, description, parameters }) => ({ name, description, parameters })),
+      // Send as parametersJsonSchema, NOT parameters — PYPUS_TOOLS schemas are
+      // plain JSON Schema (lowercase "object"/"string"/...), and Live API's
+      // FunctionDeclaration.parameters expects Google's own uppercase Schema
+      // type (Type.OBJECT etc). Mixing the two silently breaks tool
+      // registration on the Live session, so the model has no working tools
+      // and falls back to "I don't have access to that."
+      tools: PYPUS_TOOLS.map(({ name, description, parameters }) => ({
+        name,
+        description,
+        parametersJsonSchema: parameters,
+      })),
     });
   } catch (err) {
     console.error("pypus/live-session: failed to mint ephemeral token", err);
