@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
 import { PYPUS_TOOLS } from "@/lib/pypus/tools";
 import { PYPUS_SYSTEM_PROMPT } from "@/lib/pypus/prompt";
@@ -45,7 +45,14 @@ export async function POST() {
         uses: 1,
         expireTime,
         newSessionExpireTime,
-        liveConnectConstraints: { model: PYPUS_LIVE_MODEL },
+        liveConnectConstraints: {
+          model: PYPUS_LIVE_MODEL,
+          config: {
+            responseModalities: [Modality.AUDIO],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          },
+        },
       },
     });
 
