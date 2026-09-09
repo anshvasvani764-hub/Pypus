@@ -222,10 +222,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
             setStatus('error')
           },
           onclose: (e: CloseEvent) => {
-            // The socket can close on its own — e.g. the server rejected the
-            // session setup (bad tool schema, bad model name, expired token)
-            // right after accepting the connection, which looks identical to
-            // a clean hangup unless we log/surface the code + reason here.
             if (!manualStopRef.current) {
               console.error('pypus voice: session closed unexpectedly', e.code, e.reason)
               optsRef.current.onErrorMessage(
@@ -243,15 +239,12 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       })
       sessionRef.current = session
 
-      // Mic capture: native sample rate in, downsampled to 16kHz PCM16 out.
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       micStreamRef.current = stream
 
       const inputCtx = new AudioContext()
       inputCtxRef.current = inputCtx
       const source = inputCtx.createMediaStreamSource(stream)
-      // ScriptProcessorNode is deprecated but remains the simplest cross-browser
-      // way to get raw PCM frames without shipping a separate worklet file.
       const processor = inputCtx.createScriptProcessor(4096, 1, 1)
       processorRef.current = processor
       processor.onaudioprocess = (e) => {
@@ -262,8 +255,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
           audio: { data: arrayBufferToBase64(pcm), mimeType: `audio/pcm;rate=${PYPUS_LIVE_INPUT_SAMPLE_RATE}` },
         })
       }
-      // Route through a silent gain node — Chrome only fires onaudioprocess
-      // once the node is connected somewhere, but we don't want mic echo.
       const silentGain = inputCtx.createGain()
       silentGain.gain.value = 0
       source.connect(processor)
