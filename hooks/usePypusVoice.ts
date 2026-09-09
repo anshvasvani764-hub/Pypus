@@ -212,7 +212,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
           responseModalities: [Modality.AUDIO],
           systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
           tools: [{ functionDeclarations: sessionData.tools }],
-          toolConfig: { functionCallingConfig: { mode: 'ANY' } },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
