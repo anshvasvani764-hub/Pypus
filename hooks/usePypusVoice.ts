@@ -32,6 +32,9 @@ interface UsePypusVoiceOptions {
 }
 
 const TRANSCRIPT_FLUSH_IDLE_MS = 2000
+const MAX_VOICE_HISTORY_TURNS = 8
+
+type VoiceHistoryMessage = { role: 'user' | 'assistant'; content: string }
 
 export function usePypusVoice(opts: UsePypusVoiceOptions) {
   const [status, setStatus] = useState<VoiceStatus>('idle')
@@ -50,6 +53,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
   const optsRef = useRef(opts)
   optsRef.current = opts
   const manualStopRef = useRef(false)
+  const voiceHistoryRef = useRef<VoiceHistoryMessage[]>([])
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
@@ -113,11 +117,24 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
               name: fc.name,
               args: fc.args ?? {},
               resolvedContext: getResolvedContext(),
+              uiContext,
+              history: voiceHistoryRef.current.slice(-MAX_VOICE_HISTORY_TURNS),
             }),
           })
           const data = await res.json()
           onResolvedContext(data.resolvedContext ?? null)
           if (data.navigationSuggestion?.route) onNavigationSuggestion(data.navigationSuggestion)
+
+          const reply = data.result?.reply
+          const query = (fc.args as Record<string, unknown> | undefined)?.query
+          if (fc.name === 'pypus_brain' && typeof query === 'string' && typeof reply === 'string') {
+            voiceHistoryRef.current = [
+              ...voiceHistoryRef.current,
+              { role: 'user', content: query },
+              { role: 'assistant', content: reply },
+            ].slice(-MAX_VOICE_HISTORY_TURNS)
+          }
+
           return { id: fc.id, name: fc.name, response: { result: data.result } }
         } catch (err) {
           console.error('pypus voice: tool call failed', fc.name, err)
@@ -167,12 +184,14 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     outputCtxRef.current = null
     sessionRef.current?.close()
     sessionRef.current = null
+    voiceHistoryRef.current = []
     setStatus('idle')
   }, [])
 
   const start = useCallback(async () => {
     if (!opts.workspaceId) return
     setStatus('connecting')
+    voiceHistoryRef.current = []
     try {
       const sessionRes = await fetch('/api/pypus/live-session', {
         method: 'POST',
@@ -192,6 +211,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
           responseModalities: [Modality.AUDIO],
           systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
           tools: [{ functionDeclarations: sessionData.tools }],
+          toolConfig: { functionCallingConfig: { mode: 'ANY' } },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
