@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Bot, User, ArrowRight } from 'lucide-react'
 import { usePypusUIContext } from '@/context/PypusUIContext'
@@ -41,6 +41,18 @@ const QUICK_PROMPTS = [
   'Is mahine ka collection kitna hua?',
 ]
 
+function renderMessageContent(content: string) {
+  const parts = content.split(/(\*\*[^*]+\*\*)/g)
+
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>
+    }
+
+    return <Fragment key={index}>{part}</Fragment>
+  })
+}
+
 /**
  * Chat body only — no chrome (title bar / close / maximize). The caller
  * (full page or floating panel) is responsible for the surrounding frame.
@@ -52,14 +64,9 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
-  // Carried the same way `history` is (client state, round-tripped every
-  // turn) so "usko"/"iska" keeps working across messages without a DB table.
   const resolvedContextRef = useRef<ResolvedContext | null>(null)
   const { uiContext } = usePypusUIContext()
   const router = useRouter()
-  // Route always arrives as "/{workspaceSlug}/..." (see lib/pypus/ui-context.ts) —
-  // reused here so a suggested page key can be turned into a real link without
-  // this component needing its own workspaceSlug prop.
   const workspaceSlug = uiContext.route.split('/').filter(Boolean)[0] ?? null
 
   const goToSuggestedPage = (nav: NavigationSuggestion) => {
@@ -108,9 +115,6 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
         (res.status === 401
           ? 'Your session expired — please sign in again.'
           : 'Something went wrong. Please try again.')
-      // Server only ever returns a value here when a resolver actually
-      // landed on something this turn or is passing the prior one through —
-      // never overwrite a good context with a stray undefined.
       if ('resolvedContext' in data) resolvedContextRef.current = data.resolvedContext ?? null
       if (data.navigationSuggestion && typeof data.navigationSuggestion.route === 'string') {
         navigation = data.navigationSuggestion
@@ -170,7 +174,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
                   : 'rounded-tl-none border-gray-200 bg-white text-gray-800'
               }`}
             >
-              <div className="whitespace-pre-line leading-relaxed">{msg.content}</div>
+              <div className="whitespace-pre-line leading-relaxed">{renderMessageContent(msg.content)}</div>
               {msg.navigation && workspaceSlug && (
                 <button
                   onClick={() => goToSuggestedPage(msg.navigation!)}
