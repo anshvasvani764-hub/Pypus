@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { createClient } from "@/lib/supabase/server";
-import { PYPUS_TOOLS } from "@/lib/pypus/tools";
 import { PYPUS_SYSTEM_PROMPT } from "@/lib/pypus/prompt";
 import { PYPUS_LIVE_MODEL } from "@/lib/pypus/live";
 import { getISTDateString } from "@/lib/utils/date";
+
+const VOICE_BRAIN_TOOL = {
+  name: "pypus_brain",
+  description:
+    "MANDATORY gateway for every user turn. Send the user's request exactly as heard. The server runs the same Pypus Chat brain with the same system prompt, business tools, workspace data, UI context, resolved context, language rules, confirmation rules and response style. Never answer the user directly before calling this tool.",
+  parametersJsonSchema: {
+    type: "OBJECT",
+    properties: {
+      query: {
+        type: "STRING",
+        description: "The user's exact request, preserving their language and wording as closely as possible.",
+      },
+    },
+    required: ["query"],
+  },
+};
 
 function sanitizeRuntimeContext(raw: unknown) {
   if (!raw || typeof raw !== "object") return null;
@@ -49,7 +64,7 @@ function sanitizeRuntimeContext(raw: unknown) {
 function buildVoiceSystemPrompt(uiContext: unknown, resolvedContext: unknown) {
   const safeUIContext = sanitizeRuntimeContext(uiContext);
   const safeResolvedContext = resolvedContext && typeof resolvedContext === "object" ? resolvedContext : null;
-  return `${PYPUS_SYSTEM_PROMPT}\n\nVOICE RUNTIME CONTEXT\nToday is ${getISTDateString()} (Asia/Kolkata).\n\nCURRENT UI CONTEXT (live app state; use it for references and navigation, but verify mutable business facts with tools):\n${JSON.stringify(safeUIContext ?? "Not available")}\n\nCURRENT RESOLVED ENTITY CONTEXT (use for references like ye/iska/usko/wala; tools remain the source of truth):\n${JSON.stringify(safeResolvedContext ?? "None")}\n\nVOICE BEHAVIOUR\nYou are the same Pypus assistant as text chat. Do not switch to generic AI/chatbot behaviour.\nFor business data questions, use the available Pypus tools and answer from their results. Never invent data or say you lack access when a relevant tool can answer.\nFor Pypus navigation/how-to questions, use the UI context and embedded navigation guide. Do not ask which app or website the user means: you are already inside Pypus.\nKeep responses short, natural, and conversational while preserving the same factual and action rules as text chat.\n`;
+  return `${PYPUS_SYSTEM_PROMPT}\n\nVOICE RUNTIME CONTEXT\nToday is ${getISTDateString()} (Asia/Kolkata).\n\nCURRENT UI CONTEXT (live app state; use it for references and navigation; the shared Pypus brain also receives this context):\n${JSON.stringify(safeUIContext ?? "Not available")}\n\nCURRENT RESOLVED ENTITY CONTEXT:\n${JSON.stringify(safeResolvedContext ?? "None")}\n\nVOICE TRANSPORT RULES\n- You are only the voice transport for Pypus, not a separate assistant brain.\n- For EVERY user turn, call pypus_brain first. Do not answer, clarify, explain, or guess before calling it.\n- Pass the user's request exactly as heard in the query field.\n- After pypus_brain returns, speak the returned reply exactly as provided. Do not paraphrase it, add filler, change its language, or invent anything.\n- The shared Pypus brain is responsible for tool selection, business data, navigation, language, confirmations, and response style.\n`;
 }
 
 export async function POST(request: Request) {
@@ -89,7 +104,7 @@ export async function POST(request: Request) {
       token: token.name,
       model: PYPUS_LIVE_MODEL,
       systemPrompt: buildVoiceSystemPrompt(uiContext, resolvedContext),
-      tools: PYPUS_TOOLS.map(({ name, description, parameters }) => ({ name, description, parametersJsonSchema: parameters })),
+      tools: [VOICE_BRAIN_TOOL],
     });
   } catch (err) {
     console.error("pypus/live-session: failed to mint ephemeral token", err);
