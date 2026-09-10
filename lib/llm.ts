@@ -166,6 +166,10 @@ async function geminiToolLoop(
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents,
           tools: round < MAX_TOOL_ROUNDS ? [{ functionDeclarations: tools }] : undefined,
+          toolConfig:
+            round === 0 && round < MAX_TOOL_ROUNDS
+              ? { functionCallingConfig: { mode: "ANY" } }
+              : undefined,
           generationConfig: { temperature: 0 },
         }),
       }
@@ -235,6 +239,7 @@ async function openAIToolLoop(
                 function: { name: t.name, description: t.description, parameters: t.parameters },
               }))
             : undefined,
+        tool_choice: round === 0 && round < MAX_TOOL_ROUNDS ? "required" : undefined,
       }),
     });
 
