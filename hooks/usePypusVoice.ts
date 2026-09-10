@@ -53,6 +53,8 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
   optsRef.current = opts
   const manualStopRef = useRef(false)
   const voiceHistoryRef = useRef<VoiceHistoryMessage[]>([])
+  const turnToolCalledRef = useRef(false)
+  const turnCorrectedRef = useRef(false)
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
@@ -108,6 +110,223 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     setStatus('speaking')
   }
 
+  async function handleToolCall(toolCall: NonNullable<LiveServerMessage['toolCall']>) {
+    const session = sessionRef.current
+    if (!session) return
+    const { workspaceId, getResolvedContext, onResolvedContext, onNavigationSuggestion } = optsRef.current
+
+    const functionResponses = await Promise.all(
+      (toolCall.functionCalls ?? []).map(async (fc) => {
+        try {
+          const res = await fetch('/api/pypus/live-tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              workspaceId,
+              name: fc.name,
+              args: fc.args ?? {},
+              resolvedContext: getResolvedContext(),
+              uiContext,
+              history: voiceHistoryRef.current.slice(-MAX_VOICE_HISTORY_TURNS),
+            }),
+          })
+          const data = await res.json()
+          onResolvedContext(data.resolvedContext ?? null)
+          if (data.navigationSuggestion?.route) onNavigationSuggestion(data.navigationSuggestion)
+
+          const reply = data.result?.reply
+          const query = (fc.args as Record<string, unknown> | undefined)?.query
+          if (fc.name === 'pypus_brain' && typeof query === 'string' && typeof reply === 'string') {
+            const newHistory: VoiceHistoryMessage[] = [
+              ...voiceHistoryRef.current,
+              { role: 'user', content: query },
+              { role: 'assistant', content: reply },
+            ]
+            voiceHistoryRef.current = newHistory.slice(-MAX_VOICE_HISTORY_TURNS)
+          }
+
+          return { id: fc.id, name: fc.name, response: { result: data.result } }
+        } catch (err) {
+          console.error('pypus voice: tool call failed', fc.name, err)
+          return { id: fc.id, name: fc.name, response: { result: { error: 'Tool call failed.' } } }
+        }
+      })
+    )
+
+    session.sendToolResponse({ functionResponses })
+  }
+
+  /**
+   * The Live API's JS SDK (@google/genai 2.21.0) silently drops
+   * `toolConfig`/`functionCallingConfig` for live sessions — there is no
+   * client-level way to force the model to call pypus_brain. So we enforce
+   * it ourselves: if a turn produces audio without a preceding toolCall,
+   * we swallow that audio and nudge the model, once, to redo it properly.
+   */
+  function sendBrainCorrection() {
+    turnCorrectedRef.current = true
+    sessionRef.current?.sendClientContent({
+      turns: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'You answered without calling pypus_brain. Call pypus_brain now with my last message as the query, then speak only its returned reply.',
+            },
+          ],
+        },
+      ],
+      turnComplete: true,
+    })
+  }
+
+  function handleServerMessage(message: LiveServerMessage) {
+    const content = message.serverContent
+    if (content?.interrupted) {
+      clearPlayback()
+      flushTranscripts()
+      setStatus('listening')
+      turnToolCalledRef.current = false
+      turnCorrectedRef.current = false
+    }
+    if (message.toolCall) turnToolCalledRef.current = true
+    if (content?.inputTranscription?.text) {
+      inputBufferRef.current += content.inputTranscription.text
+      scheduleFlush()
+    }
+    if (content?.outputTranscription?.text) {
+      outputBufferRef.current += content.outputTranscription.text
+      scheduleFlush()
+    }
+    const parts = content?.modelTurn?.parts ?? []
+    for (const part of parts) {
+      if (!part.inlineData?.data) continue
+      if (!turnToolCalledRef.current) {
+        // Model spoke without going through the shared brain — drop it.
+        if (!turnCorrectedRef.current) sendBrainCorrection()
+        continue
+      }
+      playChunk(part.inlineData.data)
+    }
+    if (content?.turnComplete) {
+      flushTranscripts()
+      turnToolCalledRef.current = false
+      turnCorrectedRef.current = false
+    }
+    if (message.toolCall) void handleToolCall(message.toolCall)
+  }
+
+  const stop = useCallback(() => {
+    manualStopRef.current = true
+    if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+    flushTranscripts()
+    processorRef.current?.disconnect()
+    processorRef.current = null
+    inputCtxRef.current?.close().catch(() => {})
+    inputCtxRef.current = null
+    micStreamRef.current?.getTracks().forEach((t) => t.stop())
+    micStreamRef.current = null
+    clearPlayback()
+    outputCtxRef.current?.close().catch(() => {})
+    outputCtxRef.current = null
+    sessionRef.current?.close()
+    sessionRef.current = null
+    voiceHistoryRef.current = []
+    setStatus('idle')
+  }, [])
+
+  const start = useCallback(async () => {
+    if (!opts.workspaceId) return
+    setStatus('connecting')
+    voiceHistoryRef.current = []
+    try {
+      const sessionRes = await fetch('/api/pypus/live-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uiContext,
+          resolvedContext: optsRef.current.getResolvedContext(),
+        }),
+      })
+      const sessionData = await sessionRes.json()
+      if (!sessionRes.ok) throw new Error(sessionData.error || 'Could not start voice mode')
+
+      const ai = new GoogleGenAI({ apiKey: sessionData.token, httpOptions: { apiVersion: 'v1alpha' } })
+      const liveConfig = {
+        responseModalities: [Modality.AUDIO],
+        systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
+        tools: [{ functionDeclarations: sessionData.tools }],
+        // NOTE: @google/genai's live serializer silently drops `toolConfig` —
+        // there is no way to force tool-calling for live sessions from here.
+        // Enforcement instead happens in handleServerMessage (see
+        // turnToolCalledRef) which drops any audio that skipped pypus_brain.
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
+      } as any
+      const session = await ai.live.connect({
+        model: sessionData.model,
+        config: liveConfig,
+        callbacks: {
+          onopen: () => setStatus('listening'),
+          onmessage: handleServerMessage,
+          onerror: (e: ErrorEvent) => {
+            console.error('pypus voice: session error', e.message, e)
+            optsRef.current.onErrorMessage("Voice session hit an error. Tap the mic to try again.")
+            setStatus('error')
+          },
+          onclose: (e: CloseEvent) => {
+            if (!manualStopRef.current) {
+              console.error('pypus voice: session closed unexpectedly', e.code, e.reason)
+              optsRef.current.onErrorMessage(
+                e.reason
+                  ? `Voice session band ho gaya: ${e.reason}. Tap the mic to try again.`
+                  : 'Voice session achanak band ho gaya. Tap the mic to try again.'
+              )
+              setStatus('error')
+            } else {
+              setStatus('idle')
+            }
+            manualStopRef.current = false
+          },
+        },
+      })
+      sessionRef.current = session
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micStreamRef.current = stream
+      const inputCtx = new AudioContext()
+      inputCtxRef.current = inputCtx
+      const source = inputCtx.createMediaStreamSource(stream)
+      const processor = inputCtx.createScriptProcessor(4096, 1, 1)
+      processorRef.current = processor
+      processor.onaudioprocess = (e) => {
+        const raw = e.inputBuffer.getChannelData(0)
+        const resampled = resampleFloat32(raw, inputCtx.sampleRate, PYPUS_LIVE_INPUT_SAMPLE_RATE)
+        const pcm = float32ToPCM16(resampled)
+        sessionRef.current?.sendRealtimeInput({
+          audio: { data: arrayBufferToBase64(pcm), mimeType: `audio/pcm;rate=${PYPUS_LIVE_INPUT_SAMPLE_RATE}` },
+        })
+      }
+      const silentGain = inputCtx.createGain()
+      silentGain.gain.value = 0
+      source.connect(processor)
+      processor.connect(silentGain)
+      silentGain.connect(inputCtx.destination)
+
+      const outputCtx = new AudioContext()
+      outputCtxRef.current = outputCtx
+      nextPlayAtRef.current = 0
+    } catch (err) {
+      console.error('pypus voice: failed to start', err)
+      optsRef.current.onErrorMessage(err instanceof Error ? err.message : 'Could not start voice mode.')
+      stop()
+      setStatus('error')
+    }
+  }, [opts.workspaceId, uiContext, stop])
+
+  return { status, start, stop }
+      }
+                                            
   async function handleToolCall(toolCall: NonNullable<LiveServerMessage['toolCall']>) {
     const session = sessionRef.current
     if (!session) return
