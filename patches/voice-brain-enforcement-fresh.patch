@@ -1,0 +1,88 @@
+diff --git a/hooks/usePypusVoice.ts b/hooks/usePypusVoice.ts
+index 51173ec..b508df5 100644
+--- a/hooks/usePypusVoice.ts
++++ b/hooks/usePypusVoice.ts
+@@ -53,6 +53,8 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+   optsRef.current = opts
+   const manualStopRef = useRef(false)
+   const voiceHistoryRef = useRef<VoiceHistoryMessage[]>([])
++  const turnToolCalledRef = useRef(false)
++  const turnCorrectedRef = useRef(false)
+
+   const scheduleFlush = useCallback(() => {
+     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
+@@ -154,13 +156,40 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+     session.sendToolResponse({ functionResponses })
+   }
+
++  /**
++   * The Live API's JS SDK (@google/genai 2.21.0) silently drops
++   * `toolConfig`/`functionCallingConfig` for live sessions — there is no
++   * client-level way to force the model to call pypus_brain. So we enforce
++   * it ourselves: if a turn produces audio without a preceding toolCall,
++   * we swallow that audio and nudge the model, once, to redo it properly.
++   */
++  function sendBrainCorrection() {
++    turnCorrectedRef.current = true
++    sessionRef.current?.sendClientContent({
++      turns: [
++        {
++          role: 'user',
++          parts: [
++            {
++              text: 'You answered without calling pypus_brain. Call pypus_brain now with my last message as the query, then speak only its returned reply.',
++            },
++          ],
++        },
++      ],
++      turnComplete: true,
++    })
++  }
++
+   function handleServerMessage(message: LiveServerMessage) {
+     const content = message.serverContent
+     if (content?.interrupted) {
+       clearPlayback()
+       flushTranscripts()
+       setStatus('listening')
++      turnToolCalledRef.current = false
++      turnCorrectedRef.current = false
+     }
++    if (message.toolCall) turnToolCalledRef.current = true
+     if (content?.inputTranscription?.text) {
+       inputBufferRef.current += content.inputTranscription.text
+       scheduleFlush()
+@@ -171,9 +200,19 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+    }
+     const parts = content?.modelTurn?.parts ?? []
+     for (const part of parts) {
+-      if (part.inlineData?.data) playChunk(part.inlineData.data)
++      if (!part.inlineData?.data) continue
++      if (!turnToolCalledRef.current) {
++        // Model spoke without going through the shared brain — drop it.
++        if (!turnCorrectedRef.current) sendBrainCorrection()
++        continue
++      }
++      playChunk(part.inlineData.data)
++    }
++    if (content?.turnComplete) {
++      flushTranscripts()
++      turnToolCalledRef.current = false
++      turnCorrectedRef.current = false
+     }
+-    if (content?.turnComplete) flushTranscripts()
+     if (message.toolCall) void handleToolCall(message.toolCall)
+   }
+
+@@ -217,7 +256,10 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+         responseModalities: [Modality.AUDIO],
+         systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
+         tools: [{ functionDeclarations: sessionData.tools }],
+-        toolConfig: { functionCallingConfig: { mode: 'ANY' } },
++        // NOTE: @google/genai's live serializer silently drops `toolConfig` —
++        // there is no way to force tool-calling for live sessions from here.
++        // Enforcement instead happens in handleServerMessage (see
++        // turnToolCalledRef) which drops any audio that skipped pypus_brain.
+         inputAudioTranscription: {},
+         outputAudioTranscription: {},
+       } as any
