@@ -88,10 +88,18 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0)
     const source = ctx.createBufferSource()
     source.buffer = buffer
-    source.connect(ctx.destination)
+    const fadeGain = ctx.createGain()
+    source.connect(fadeGain)
+    fadeGain.connect(ctx.destination)
     const startAt = Math.max(nextPlayAtRef.current, ctx.currentTime)
+    const FADE_S = 0.004
+    const endAt = startAt + buffer.duration
+    fadeGain.gain.setValueAtTime(0, startAt)
+    fadeGain.gain.linearRampToValueAtTime(1, startAt + FADE_S)
+    fadeGain.gain.setValueAtTime(1, Math.max(startAt + FADE_S, endAt - FADE_S))
+    fadeGain.gain.linearRampToValueAtTime(0, endAt)
     source.start(startAt)
-    nextPlayAtRef.current = startAt + buffer.duration
+    nextPlayAtRef.current = endAt
     playingSourcesRef.current.push(source)
     source.onended = () => {
       playingSourcesRef.current = playingSourcesRef.current.filter((s) => s !== source)
@@ -209,9 +217,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
         responseModalities: [Modality.AUDIO],
         systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
         tools: [{ functionDeclarations: sessionData.tools }],
-        // The installed LiveConnectConfig type does not expose toolConfig, but the
-        // Live API accepts functionCallingConfig. Keep the runtime field while
-        // avoiding a TypeScript-only SDK limitation.
         toolConfig: { functionCallingConfig: { mode: 'ANY' } },
         inputAudioTranscription: {},
         outputAudioTranscription: {},
