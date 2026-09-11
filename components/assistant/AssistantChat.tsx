@@ -199,6 +199,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
             <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
           </span>
           {voice.status === 'connecting' && 'Connect ho raha hai...'}
+          {voice.status === 'thinking' && 'Soch raha hoon...'}
           {voice.status === 'listening' && 'Sun raha hoon...'}
           {voice.status === 'speaking' && 'Bol raha hoon...'}
           {voice.status === 'error' && 'Voice mode mein error aa gaya — mic dabao aur try karo'}
@@ -271,7 +272,7 @@ export function AssistantChat({ workspaceId }: { workspaceId: string | null }) {
             disabled={!workspaceId}
             aria-label={voice.status === 'idle' || voice.status === 'error' ? 'Start voice mode' : 'Stop voice mode'}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              voice.status === 'listening' || voice.status === 'speaking' || voice.status === 'connecting'
+              voice.status === 'listening' || voice.status === 'speaking' || voice.status === 'connecting' || voice.status === 'thinking'
                 ? 'bg-red-500 text-white hover:bg-red-600'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
