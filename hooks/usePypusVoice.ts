@@ -178,9 +178,38 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.audio) throw new Error(data.error || 'TTS failed')
-      playChunk(data.audio)
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'TTS failed')
+      }
+
+      // Play each chunk as it streams in rather than waiting for the whole
+      // reply to finish synthesizing — this is what makes speaking start
+      // right after the reply, instead of several seconds later.
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let gotAudio = false
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            const parsed = JSON.parse(line)
+            if (parsed.audio) {
+              gotAudio = true
+              playChunk(parsed.audio)
+            }
+          } catch {
+            // Ignore a malformed line — a single dropped chunk isn't fatal.
+          }
+        }
+      }
+      if (!gotAudio) setStatus('listening')
     } catch (err) {
       console.error('pypus voice: tts failed', err)
       setStatus('listening')
