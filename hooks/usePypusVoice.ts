@@ -54,7 +54,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
   const manualStopRef = useRef(false)
   const voiceHistoryRef = useRef<VoiceHistoryMessage[]>([])
   const turnToolCalledRef = useRef(false)
-  const turnCorrectedRef = useRef(false)
+  const turnCorrectionAttemptsRef = useRef(0)
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current) clearTimeout(flushTimerRef.current)
@@ -161,17 +161,21 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
    * `toolConfig`/`functionCallingConfig` for live sessions — there is no
    * client-level way to force the model to call pypus_brain. So we enforce
    * it ourselves: if a turn produces audio without a preceding toolCall,
-   * we swallow that audio and nudge the model, once, to redo it properly.
+   * we swallow that audio and nudge the model once per user utterance.
+   * If it STILL skips the tool after that one nudge, we stop intervening
+   * and just play whatever it says — retrying forever on every failed
+   * turn is what caused the endless text-only loop, so this is capped
+   * at exactly one automatic retry per user utterance.
    */
   function sendBrainCorrection() {
-    turnCorrectedRef.current = true
+    turnCorrectionAttemptsRef.current += 1
     sessionRef.current?.sendClientContent({
       turns: [
         {
           role: 'user',
           parts: [
             {
-              text: 'You answered without calling pypus_brain. Call pypus_brain now with my last message as the query, then speak only its returned reply.',
+              text: 'You answered without calling pypus_brain. Call pypus_brain now with my last message as the query (in the same language I used), then speak only its returned reply.',
             },
           ],
         },
@@ -187,10 +191,13 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       flushTranscripts()
       setStatus('listening')
       turnToolCalledRef.current = false
-      turnCorrectedRef.current = false
+      turnCorrectionAttemptsRef.current = 0
     }
     if (message.toolCall) turnToolCalledRef.current = true
     if (content?.inputTranscription?.text) {
+      // A fresh chunk of real user speech starting after a flushed turn
+      // means a new utterance — reset the retry budget for it.
+      if (!inputBufferRef.current) turnCorrectionAttemptsRef.current = 0
       inputBufferRef.current += content.inputTranscription.text
       scheduleFlush()
     }
@@ -201,9 +208,9 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     const parts = content?.modelTurn?.parts ?? []
     for (const part of parts) {
       if (!part.inlineData?.data) continue
-      if (!turnToolCalledRef.current) {
-        // Model spoke without going through the shared brain — drop it.
-        if (!turnCorrectedRef.current) sendBrainCorrection()
+      if (!turnToolCalledRef.current && turnCorrectionAttemptsRef.current < 1) {
+        // First offence this utterance — drop the audio and nudge once.
+        sendBrainCorrection()
         continue
       }
       playChunk(part.inlineData.data)
@@ -211,7 +218,6 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
     if (content?.turnComplete) {
       flushTranscripts()
       turnToolCalledRef.current = false
-      turnCorrectedRef.current = false
     }
     if (message.toolCall) void handleToolCall(message.toolCall)
   }
@@ -325,4 +331,4 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
   }, [opts.workspaceId, uiContext, stop])
 
   return { status, start, stop }
-        }
+}
