@@ -1,0 +1,29 @@
+diff --git a/app/api/pypus/live-session/route.ts b/app/api/pypus/live-session/route.ts
+index b744dcd..fe6e1cf 100644
+--- a/app/api/pypus/live-session/route.ts
++++ b/app/api/pypus/live-session/route.ts
+@@ -35,7 +35,10 @@ export async function POST(request: Request) {
+         newSessionExpireTime,
+         liveConnectConstraints: {
+           model: PYPUS_LIVE_MODEL,
+-          config: { responseModalities: [Modality.TEXT], inputAudioTranscription: {} },
++          // This model only supports AUDIO responseModalities (TEXT-only is
++          // rejected). We never read the model's own audio output anyway —
++          // see hooks/usePypusVoice.ts, which only consumes inputTranscription.
++          config: { responseModalities: [Modality.AUDIO], inputAudioTranscription: {} },
+         },
+       },
+     });
+diff --git a/hooks/usePypusVoice.ts b/hooks/usePypusVoice.ts
+index 68b0422..ac8b9a7 100644
+--- a/hooks/usePypusVoice.ts
++++ b/hooks/usePypusVoice.ts
+@@ -235,7 +235,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
+       const session = await ai.live.connect({
+         model: sessionData.model,
+         config: {
+-          responseModalities: [Modality.TEXT],
++          responseModalities: [Modality.AUDIO],
+           systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
+           inputAudioTranscription: {},
+         },

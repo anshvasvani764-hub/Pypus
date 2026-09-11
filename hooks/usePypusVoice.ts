@@ -235,7 +235,7 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       const session = await ai.live.connect({
         model: sessionData.model,
         config: {
-          responseModalities: [Modality.TEXT],
+          responseModalities: [Modality.AUDIO],
           systemInstruction: { parts: [{ text: sessionData.systemPrompt }] },
           inputAudioTranscription: {},
         },

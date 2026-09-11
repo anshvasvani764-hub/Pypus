@@ -35,7 +35,10 @@ export async function POST(request: Request) {
         newSessionExpireTime,
         liveConnectConstraints: {
           model: PYPUS_LIVE_MODEL,
-          config: { responseModalities: [Modality.TEXT], inputAudioTranscription: {} },
+          // This model only supports AUDIO responseModalities (TEXT-only is
+          // rejected). We never read the model's own audio output anyway —
+          // see hooks/usePypusVoice.ts, which only consumes inputTranscription.
+          config: { responseModalities: [Modality.AUDIO], inputAudioTranscription: {} },
         },
       },
     });
