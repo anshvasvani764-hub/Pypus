@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Send, Bot, User, Sparkles, RefreshCw } from 'lucide-react'
+import { Send, Bot, User, Sparkles, RefreshCw, Mic, Square } from 'lucide-react'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { usePypusUIContext } from '@/context/PypusUIContext'
+import { usePypusVoice } from '@/hooks/usePypusVoice'
+import type { ResolvedContext } from '@/lib/pypus/tools/resolved-context'
 
 interface Message {
   id: string
@@ -39,10 +41,40 @@ export function AssistantViewDesktop() {
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
+  const resolvedContextRef = useRef<ResolvedContext | null>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  const appendMessage = (role: Message['role'], content: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: String(nextIdRef.current++),
+        role,
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ])
+  }
+
+  const voice = usePypusVoice({
+    workspaceId: workspace?.id ?? null,
+    getResolvedContext: () => resolvedContextRef.current,
+    onResolvedContext: (ctx) => {
+      resolvedContextRef.current = ctx
+    },
+    onNavigationSuggestion: () => {},
+    onUserUtterance: (text) => appendMessage('user', text),
+    onAssistantUtterance: (text) => appendMessage('assistant', text),
+    onErrorMessage: (message) => appendMessage('assistant', message),
+  })
+
+  useEffect(() => {
+    return () => voice.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
@@ -136,6 +168,20 @@ export function AssistantViewDesktop() {
         ))}
       </div>
 
+      {voice.status !== 'idle' && (
+        <div className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-medium text-red-700 mb-2">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+          </span>
+          {voice.status === 'connecting' && 'Connect ho raha hai...'}
+          {voice.status === 'thinking' && 'Soch raha hoon...'}
+          {voice.status === 'listening' && 'Sun raha hoon...'}
+          {voice.status === 'speaking' && 'Bol raha hoon...'}
+          {voice.status === 'error' && 'Voice mode mein error aa gaya — mic dabao aur try karo'}
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto space-y-4 pr-1 my-2">
         {messages.map((msg) => (
           <div
@@ -196,8 +242,21 @@ export function AssistantViewDesktop() {
             e.preventDefault()
             handleSend()
           }}
-          className="relative flex items-center bg-white rounded-2xl border border-gray-200 shadow-xs focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all p-1.5"
+          className="relative flex items-center gap-1.5 bg-white rounded-2xl border border-gray-200 shadow-xs focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all p-1.5"
         >
+          <button
+            type="button"
+            onClick={() => (voice.status === 'idle' || voice.status === 'error' ? voice.start() : voice.stop())}
+            disabled={!workspace}
+            aria-label={voice.status === 'idle' || voice.status === 'error' ? 'Start voice mode' : 'Stop voice mode'}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              voice.status === 'listening' || voice.status === 'speaking' || voice.status === 'connecting' || voice.status === 'thinking'
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {voice.status === 'idle' || voice.status === 'error' ? <Mic size={17} /> : <Square size={15} />}
+          </button>
           <input
             type="text"
             value={input}
@@ -208,7 +267,7 @@ export function AssistantViewDesktop() {
           <button
             type="submit"
             disabled={!input.trim() || isTyping || !workspace}
-            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white transition-colors shrink-0 cursor-pointer disabled:cursor-not-allowed"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
             aria-label="Send message"
           >
             <Send size={16} />

@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bot, Send, RotateCcw, ArrowRight } from 'lucide-react'
+import { Bot, Send, RotateCcw, ArrowRight, Mic, Square } from 'lucide-react'
 import { MobileTopBar } from '@/components/mobile/MobileTopBar'
 import { useWorkspace } from '@/hooks/useWorkspace'
 import { usePypusUIContext } from '@/context/PypusUIContext'
+import { usePypusVoice } from '@/hooks/usePypusVoice'
+import type { ResolvedContext } from '@/lib/pypus/tools/resolved-context'
 
 interface NavigationSuggestion {
   route: string
@@ -49,10 +51,47 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const nextIdRef = useRef(INITIAL_MESSAGES.length + 1)
+  const resolvedContextRef = useRef<ResolvedContext | null>(null)
+  const pendingNavRef = useRef<NavigationSuggestion | null>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  const appendMessage = (role: Message['role'], content: string, navigation: NavigationSuggestion | null = null) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: String(nextIdRef.current++),
+        role,
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        navigation,
+      },
+    ])
+  }
+
+  const voice = usePypusVoice({
+    workspaceId: workspace?.id ?? null,
+    getResolvedContext: () => resolvedContextRef.current,
+    onResolvedContext: (ctx) => {
+      resolvedContextRef.current = ctx
+    },
+    onNavigationSuggestion: (nav) => {
+      pendingNavRef.current = nav
+    },
+    onUserUtterance: (text) => appendMessage('user', text),
+    onAssistantUtterance: (text) => {
+      appendMessage('assistant', text, pendingNavRef.current)
+      pendingNavRef.current = null
+    },
+    onErrorMessage: (message) => appendMessage('assistant', message),
+  })
+
+  useEffect(() => {
+    return () => voice.stop()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
@@ -186,6 +225,20 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
 
       {/* Floating Bottom Input Area */}
       <div className="fixed left-0 w-full z-40 bg-gradient-to-t from-ve-surface via-ve-surface/95 to-transparent pt-4" style={{ bottom: 'calc(72px + max(1rem, env(safe-area-inset-bottom)))' }}>
+        {voice.status !== 'idle' && (
+          <div className="mx-5 mb-2 flex items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs font-bold text-red-700">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+            </span>
+            {voice.status === 'connecting' && 'Connect ho raha hai...'}
+            {voice.status === 'thinking' && 'Soch raha hoon...'}
+            {voice.status === 'listening' && 'Sun raha hoon...'}
+            {voice.status === 'speaking' && 'Bol raha hoon...'}
+            {voice.status === 'error' && 'Voice mode mein error aa gaya — mic dabao aur try karo'}
+          </div>
+        )}
+
         {/* Quick Prompts */}
         <div className="flex gap-2 px-5 overflow-x-auto no-scrollbar pb-2">
           {QUICK_PROMPTS.map((prompt) => (
@@ -208,6 +261,18 @@ export function AssistantView({ workspaceSlug }: { workspaceSlug: string }) {
             }}
             className="bg-white/90 backdrop-blur-md shadow-xl rounded-2xl p-1.5 flex items-center gap-2 border-2 border-ve-outline-variant/40 focus-within:border-ve-primary transition-colors"
           >
+            <button
+              type="button"
+              onClick={() => (voice.status === 'idle' || voice.status === 'error' ? voice.start() : voice.stop())}
+              aria-label={voice.status === 'idle' || voice.status === 'error' ? 'Start voice mode' : 'Stop voice mode'}
+              className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-transform active:scale-90 ${
+                voice.status === 'listening' || voice.status === 'speaking' || voice.status === 'connecting' || voice.status === 'thinking'
+                  ? 'bg-red-500 text-white'
+                  : 'bg-ve-surface-container-high text-ve-primary'
+              }`}
+            >
+              {voice.status === 'idle' || voice.status === 'error' ? <Mic size={18} /> : <Square size={16} />}
+            </button>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
