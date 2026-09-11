@@ -153,11 +153,12 @@ export function usePypusVoice(opts: UsePypusVoiceOptions) {
       if ('resolvedContext' in data) onResolvedContext(data.resolvedContext ?? null)
       if (data.navigationSuggestion?.route) onNavigationSuggestion(data.navigationSuggestion)
 
-      voiceHistoryRef.current = [
+      const newHistory: VoiceHistoryMessage[] = [
         ...voiceHistoryRef.current,
         { role: 'user', content: userText },
         { role: 'assistant', content: reply },
-      ].slice(-MAX_VOICE_HISTORY_TURNS)
+      ]
+      voiceHistoryRef.current = newHistory.slice(-MAX_VOICE_HISTORY_TURNS)
 
       onAssistantUtterance(reply)
       await speak(reply)
