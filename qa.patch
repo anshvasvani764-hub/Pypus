@@ -1,0 +1,1494 @@
+diff --git a/app/[app]/business-brain-test/page.tsx b/app/[app]/business-brain-test/page.tsx
+new file mode 100644
+index 0000000..6d1dbc7
+--- /dev/null
++++ b/app/[app]/business-brain-test/page.tsx
+@@ -0,0 +1,18 @@
++import { getCurrentWorkspaceContext } from "@/lib/auth/get-current-workspace-context";
++import { BusinessBrainTestPage } from "@/components/business-brain/BusinessBrainTestPage";
++
++/**
++ * TEST/LAB route only — not the final onboarding UX.
++ * /<workspace-slug>/business-brain-test
++ *
++ * Reuses the same workspace-slug -> workspace_id resolution every other
++ * workspace-scoped page in app/[app]/* uses, so this inherits the same
++ * (documented, pre-existing) auth posture as the rest of the app rather
++ * than introducing a second way of deriving a workspace.
++ */
++export default async function Page({ params }: { params: Promise<{ app: string }> }) {
++  const { app: workspaceSlug } = await params;
++  const { workspaceId } = await getCurrentWorkspaceContext(workspaceSlug);
++
++  return <BusinessBrainTestPage workspaceId={workspaceId} workspaceSlug={workspaceSlug} />;
++}
+diff --git a/app/api/pypus/business-brain/chat/route.ts b/app/api/pypus/business-brain/chat/route.ts
+new file mode 100644
+index 0000000..fa88c0a
+--- /dev/null
++++ b/app/api/pypus/business-brain/chat/route.ts
+@@ -0,0 +1,69 @@
++import { NextResponse } from "next/server";
++import { checkWorkspaceAccess } from "@/lib/business-brain/access";
++import { callBusinessBrainLLM, type BusinessBrainHistoryTurn } from "@/lib/business-brain/gemini";
++import { emptyDraft } from "@/lib/business-brain/types";
++
++const MAX_HISTORY_TURNS = 12;
++
++function sanitizeHistory(raw: unknown): BusinessBrainHistoryTurn[] {
++  if (!Array.isArray(raw)) return [];
++  return raw
++    .filter(
++      (m): m is BusinessBrainHistoryTurn =>
++        !!m &&
++        (m.role === "user" || m.role === "assistant") &&
++        typeof m.content === "string" &&
++        m.content.trim().length > 0
++    )
++    .slice(-MAX_HISTORY_TURNS);
++}
++
++export async function POST(request: Request) {
++  let workspaceId: unknown;
++  let message: unknown;
++  let history: unknown;
++  try {
++    ({ workspaceId, message, history } = await request.json());
++  } catch {
++    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
++  }
++
++  if (typeof workspaceId !== "string" || typeof message !== "string" || !message.trim()) {
++    return NextResponse.json({ error: "workspaceId and message are required" }, { status: 400 });
++  }
++
++  const access = await checkWorkspaceAccess(workspaceId);
++  if (!access.ok) {
++    return NextResponse.json({ error: access.error }, { status: access.status });
++  }
++
++  try {
++    const result = await callBusinessBrainLLM(message, sanitizeHistory(history));
++    return NextResponse.json(result);
++  } catch (err) {
++    if (err instanceof Error && err.message === "LLM_API_KEY not set yet") {
++      return NextResponse.json({
++        reply: "AI provider not configured yet — add LLM_API_KEY (and optionally LLM_MODEL) in .env.local",
++        readyToSave: false,
++        draft: emptyDraft(),
++        error: "LLM_NOT_CONFIGURED",
++      });
++    }
++    if (err instanceof Error && err.message === "MALFORMED_JSON") {
++      console.error("business-brain/chat: model returned malformed JSON");
++      return NextResponse.json({
++        reply: "Maaf karo, mujhe ek malformed response mila — dobara try karo.",
++        readyToSave: false,
++        draft: emptyDraft(),
++        error: "MALFORMED_JSON",
++      });
++    }
++    console.error("business-brain/chat: LLM call failed", err);
++    return NextResponse.json({
++      reply: "I ran into a problem reaching the AI provider. Please try again shortly.",
++      readyToSave: false,
++      draft: emptyDraft(),
++      error: "LLM_ERROR",
++    });
++  }
++}
+diff --git a/app/api/pypus/business-brain/save/route.ts b/app/api/pypus/business-brain/save/route.ts
+new file mode 100644
+index 0000000..c6754fa
+--- /dev/null
++++ b/app/api/pypus/business-brain/save/route.ts
+@@ -0,0 +1,140 @@
++import { NextResponse } from "next/server";
++import { checkWorkspaceAccess } from "@/lib/business-brain/access";
++import { saveBusinessBrainDraft } from "@/lib/business-brain/save";
++import type { BusinessBrainDraft } from "@/lib/business-brain/types";
++
++/** Minimal structural validation — this is a lab/test page, not a public API,
++ *  so this only guards against obviously malformed input, not every edge case. */
++function validateDraft(raw: unknown): { ok: true; draft: BusinessBrainDraft } | { ok: false; error: string } {
++  if (!raw || typeof raw !== "object") return { ok: false, error: "draft is required" };
++  const d = raw as Record<string, unknown>;
++
++  const business = d.business as Record<string, unknown> | undefined;
++  if (!business || typeof business.name !== "string" || !business.name.trim()) {
++    return { ok: false, error: "draft.business.name is required" };
++  }
++
++  const arrays = ["entities", "relationships", "rules", "workflows", "terms", "knowledge"] as const;
++  for (const key of arrays) {
++    if (d[key] !== undefined && !Array.isArray(d[key])) {
++      return { ok: false, error: `draft.${key} must be an array` };
++    }
++  }
++
++  const entities = Array.isArray(d.entities) ? (d.entities as Record<string, unknown>[]) : [];
++  for (const e of entities) {
++    if (typeof e.key !== "string" || !e.key.trim()) {
++      return { ok: false, error: "every entity needs a non-empty key" };
++    }
++  }
++
++  return {
++    ok: true,
++    draft: {
++      business: {
++        name: String(business.name),
++        type: typeof business.type === "string" ? business.type : "",
++        description: typeof business.description === "string" ? business.description : "",
++      },
++      entities: entities.map((e) => ({
++        key: String(e.key),
++        name: typeof e.name === "string" ? e.name : String(e.key),
++        display_name: typeof e.display_name === "string" ? e.display_name : undefined,
++        description: typeof e.description === "string" ? e.description : undefined,
++        fields: Array.isArray(e.fields)
++          ? (e.fields as Record<string, unknown>[]).map((f) => ({
++              key: String(f.key ?? ""),
++              label: typeof f.label === "string" ? f.label : String(f.key ?? ""),
++              description: typeof f.description === "string" ? f.description : undefined,
++              data_type: typeof f.data_type === "string" ? f.data_type : "text",
++              required: typeof f.required === "boolean" ? f.required : false,
++              default_value: f.default_value ?? null,
++              options: f.options ?? [],
++              validation: f.validation ?? {},
++            }))
++          : [],
++      })),
++      relationships: Array.isArray(d.relationships)
++        ? (d.relationships as Record<string, unknown>[]).map((r) => ({
++            source_key: String(r.source_key ?? ""),
++            target_key: String(r.target_key ?? ""),
++            relationship_type: typeof r.relationship_type === "string" ? r.relationship_type : "related_to",
++            source_label: typeof r.source_label === "string" ? r.source_label : undefined,
++            target_label: typeof r.target_label === "string" ? r.target_label : undefined,
++            config: r.config ?? {},
++          }))
++        : [],
++      rules: Array.isArray(d.rules)
++        ? (d.rules as Record<string, unknown>[]).map((r) => ({
++            name: String(r.name ?? ""),
++            description: typeof r.description === "string" ? r.description : undefined,
++            rule_type: typeof r.rule_type === "string" ? r.rule_type : undefined,
++            trigger: typeof r.trigger === "string" ? r.trigger : undefined,
++            conditions: r.conditions ?? {},
++            actions: r.actions ?? [],
++            priority: typeof r.priority === "number" ? r.priority : 0,
++          }))
++        : [],
++      workflows: Array.isArray(d.workflows)
++        ? (d.workflows as Record<string, unknown>[]).map((w) => ({
++            name: String(w.name ?? ""),
++            description: typeof w.description === "string" ? w.description : undefined,
++            trigger: typeof w.trigger === "string" ? w.trigger : undefined,
++            steps: w.steps ?? [],
++          }))
++        : [],
++      terms: Array.isArray(d.terms)
++        ? (d.terms as Record<string, unknown>[]).map((t) => ({
++            system_term: String(t.system_term ?? ""),
++            business_term: String(t.business_term ?? ""),
++            plural_term: typeof t.plural_term === "string" ? t.plural_term : undefined,
++            description: typeof t.description === "string" ? t.description : undefined,
++          }))
++        : [],
++      knowledge: Array.isArray(d.knowledge)
++        ? (d.knowledge as Record<string, unknown>[]).map((k) => ({
++            category: typeof k.category === "string" ? k.category : "general",
++            title: String(k.title ?? ""),
++            content: String(k.content ?? ""),
++            metadata: k.metadata ?? {},
++            source: typeof k.source === "string" ? k.source : "onboarding",
++          }))
++        : [],
++    },
++  };
++}
++
++export async function POST(request: Request) {
++  let workspaceId: unknown;
++  let draft: unknown;
++  try {
++    ({ workspaceId, draft } = await request.json());
++  } catch {
++    return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
++  }
++
++  if (typeof workspaceId !== "string" || !workspaceId) {
++    return NextResponse.json({ success: false, error: "workspaceId is required" }, { status: 400 });
++  }
++
++  const access = await checkWorkspaceAccess(workspaceId);
++  if (!access.ok) {
++    return NextResponse.json({ success: false, error: access.error }, { status: access.status });
++  }
++
++  const validated = validateDraft(draft);
++  if (!validated.ok) {
++    return NextResponse.json({ success: false, error: validated.error }, { status: 400 });
++  }
++
++  try {
++    const result = await saveBusinessBrainDraft(workspaceId, validated.draft);
++    return NextResponse.json(result, { status: result.success ? 200 : 500 });
++  } catch (err) {
++    console.error("business-brain/save: unexpected error", err);
++    return NextResponse.json(
++      { success: false, error: err instanceof Error ? err.message : "Unexpected error while saving" },
++      { status: 500 }
++    );
++  }
++}
+diff --git a/components/business-brain/BusinessBrainTestPage.tsx b/components/business-brain/BusinessBrainTestPage.tsx
+new file mode 100644
+index 0000000..19db230
+--- /dev/null
++++ b/components/business-brain/BusinessBrainTestPage.tsx
+@@ -0,0 +1,494 @@
++"use client";
++
++import { useEffect, useRef, useState } from "react";
++import {
++  Send,
++  Bot,
++  User,
++  RotateCcw,
++  ChevronDown,
++  ChevronRight,
++  Copy,
++  Check,
++  AlertTriangle,
++  Database,
++  Loader2,
++} from "lucide-react";
++import type { BusinessBrainDraft, BusinessBrainSaveResult } from "@/lib/business-brain/types";
++import { emptyDraft } from "@/lib/business-brain/types";
++
++interface ChatMessage {
++  id: string;
++  role: "user" | "assistant";
++  content: string;
++}
++
++const INTRO: ChatMessage = {
++  id: "intro",
++  role: "assistant",
++  content:
++    "Bataiye aapka business kaise chalta hai — jitna khul ke bataenge, utna accha samjhunga. (e.g. \"Main wedding decoration ka business chalata hoon...\")",
++};
++
++function newId() {
++  return Math.random().toString(36).slice(2);
++}
++
++function Counter({ label, value }: { label: string; value: number }) {
++  return (
++    <div className="flex flex-col items-center rounded-xl border border-gray-200 bg-white px-3 py-2 min-w-[76px]">
++      <span className="text-lg font-semibold text-gray-900">{value}</span>
++      <span className="text-[11px] text-gray-500">{label}</span>
++    </div>
++  );
++}
++
++function Section({
++  title,
++  count,
++  children,
++  defaultOpen = true,
++}: {
++  title: string;
++  count: number;
++  children: React.ReactNode;
++  defaultOpen?: boolean;
++}) {
++  const [open, setOpen] = useState(defaultOpen);
++  return (
++    <div className="rounded-xl border border-gray-200 bg-white">
++      <button
++        type="button"
++        onClick={() => setOpen((o) => !o)}
++        aria-expanded={open}
++        className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
++      >
++        <span className="text-sm font-medium text-gray-900">
++          {title} <span className="text-gray-400">({count})</span>
++        </span>
++        {open ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
++      </button>
++      {open && <div className="border-t border-gray-100 px-3 py-2.5">{children}</div>}
++    </div>
++  );
++}
++
++function Empty({ text }: { text: string }) {
++  return <p className="text-xs text-gray-400">{text}</p>;
++}
++
++export function BusinessBrainTestPage({
++  workspaceId,
++  workspaceSlug,
++}: {
++  workspaceId: string;
++  workspaceSlug: string;
++}) {
++  const [messages, setMessages] = useState<ChatMessage[]>([INTRO]);
++  const [input, setInput] = useState("");
++  const [isSending, setIsSending] = useState(false);
++  const [chatError, setChatError] = useState<string | null>(null);
++  const [draft, setDraft] = useState<BusinessBrainDraft>(emptyDraft());
++  const [readyToSave, setReadyToSave] = useState(false);
++  const [showRawJson, setShowRawJson] = useState(false);
++  const [copied, setCopied] = useState(false);
++  const [isSaving, setIsSaving] = useState(false);
++  const [saveResult, setSaveResult] = useState<BusinessBrainSaveResult | null>(null);
++  const endRef = useRef<HTMLDivElement>(null);
++
++  useEffect(() => {
++    endRef.current?.scrollIntoView({ behavior: "smooth" });
++  }, [messages, isSending]);
++
++  const resetTest = () => {
++    setMessages([INTRO]);
++    setInput("");
++    setChatError(null);
++    setDraft(emptyDraft());
++    setReadyToSave(false);
++    setSaveResult(null);
++    setShowRawJson(false);
++  };
++
++  const send = async (text: string) => {
++    const trimmed = text.trim();
++    if (!trimmed || isSending) return;
++
++    const userMsg: ChatMessage = { id: newId(), role: "user", content: trimmed };
++    setMessages((prev) => [...prev, userMsg]);
++    setInput("");
++    setIsSending(true);
++    setChatError(null);
++
++    try {
++      const history = messages
++        .filter((m) => m.id !== "intro")
++        .slice(-12)
++        .map((m) => ({ role: m.role, content: m.content }));
++
++      const res = await fetch("/api/pypus/business-brain/chat", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ workspaceId, message: trimmed, history }),
++      });
++      const data = await res.json();
++
++      if (!res.ok) {
++        setChatError(data?.error || `Request failed (${res.status})`);
++        setIsSending(false);
++        return;
++      }
++
++      setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: data.reply ?? "..." }]);
++      if (data.draft) setDraft(data.draft as BusinessBrainDraft);
++      setReadyToSave(Boolean(data.readyToSave));
++      if (data.error) setChatError(data.error);
++    } catch {
++      setChatError("Could not reach the server. Check your connection and try again.");
++    } finally {
++      setIsSending(false);
++    }
++  };
++
++  const confirmAndSave = async () => {
++    setIsSaving(true);
++    setSaveResult(null);
++    try {
++      const res = await fetch("/api/pypus/business-brain/save", {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: JSON.stringify({ workspaceId, draft }),
++      });
++      const data = (await res.json()) as BusinessBrainSaveResult;
++      setSaveResult(data);
++    } catch {
++      setSaveResult({ success: false, error: "Could not reach the server while saving." });
++    } finally {
++      setIsSaving(false);
++    }
++  };
++
++  const copyJson = async () => {
++    try {
++      await navigator.clipboard.writeText(JSON.stringify(draft, null, 2));
++      setCopied(true);
++      setTimeout(() => setCopied(false), 1500);
++    } catch {
++      // clipboard API unavailable — no-op, this is a dev tool
++    }
++  };
++
++  const fieldCount = draft.entities.reduce((n, e) => n + e.fields.length, 0);
++
++  return (
++    <div className="flex min-h-screen flex-col bg-[#FAFAF7]">
++      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 sm:px-6">
++        <div>
++          <h1 className="text-sm font-semibold text-gray-900">Business Brain — Test Console</h1>
++          <p className="text-xs text-gray-500">
++            Internal lab page for <span className="font-mono">{workspaceSlug}</span> — not the final onboarding UX.
++          </p>
++        </div>
++        <button
++          type="button"
++          onClick={resetTest}
++          className="flex h-11 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
++        >
++          <RotateCcw size={15} />
++          New Test
++        </button>
++      </header>
++
++      <div className="grid flex-1 grid-cols-1 gap-4 p-4 sm:p-6 lg:grid-cols-3">
++        {/* LEFT — Conversation */}
++        <div className="flex min-h-[480px] flex-col rounded-2xl border border-gray-200 bg-white lg:min-h-0">
++          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
++            {messages.map((m) => (
++              <div key={m.id} className={`flex items-start gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
++                <div
++                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white ${
++                    m.role === "assistant" ? "bg-gray-900" : "bg-emerald-600"
++                  }`}
++                  aria-hidden="true"
++                >
++                  {m.role === "assistant" ? <Bot size={14} /> : <User size={14} />}
++                </div>
++                <div
++                  className={`max-w-[85%] whitespace-pre-line rounded-2xl border px-3.5 py-2.5 text-sm leading-relaxed ${
++                    m.role === "user"
++                      ? "rounded-tr-none border-gray-900 bg-gray-900 text-white"
++                      : "rounded-tl-none border-gray-200 bg-gray-50 text-gray-800"
++                  }`}
++                >
++                  {m.content}
++                </div>
++              </div>
++            ))}
++            {isSending && (
++              <div className="flex items-center gap-2 text-xs text-gray-400">
++                <Loader2 size={14} className="animate-spin" />
++                Soch raha hoon...
++              </div>
++            )}
++            <div ref={endRef} />
++          </div>
++
++          {chatError && (
++            <p role="alert" className="flex items-center gap-1.5 border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
++              <AlertTriangle size={13} className="shrink-0" />
++              {chatError}
++            </p>
++          )}
++
++          <form
++            onSubmit={(e) => {
++              e.preventDefault();
++              send(input);
++            }}
++            className="shrink-0 border-t border-gray-100 p-3"
++          >
++            <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white p-1.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
++              <input
++                type="text"
++                value={input}
++                onChange={(e) => setInput(e.target.value)}
++                placeholder="Apna business explain karo..."
++                aria-label="Message"
++                className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
++              />
++              <button
++                type="submit"
++                disabled={!input.trim() || isSending}
++                aria-label="Send message"
++                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
++              >
++                <Send size={16} />
++              </button>
++            </div>
++          </form>
++        </div>
++
++        {/* MIDDLE — What Pypus Understands */}
++        <div className="flex min-h-0 flex-col gap-3">
++          <div className="flex flex-wrap gap-2 overflow-x-auto">
++            <Counter label="Entities" value={draft.entities.length} />
++            <Counter label="Fields" value={fieldCount} />
++            <Counter label="Relations" value={draft.relationships.length} />
++            <Counter label="Rules" value={draft.rules.length} />
++            <Counter label="Workflows" value={draft.workflows.length} />
++            <Counter label="Terms" value={draft.terms.length} />
++            <Counter label="Knowledge" value={draft.knowledge.length} />
++          </div>
++
++          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
++            <div className="rounded-xl border border-gray-200 bg-white p-3.5">
++              <h2 className="mb-2 text-sm font-medium text-gray-900">Business</h2>
++              {draft.business.name || draft.business.type || draft.business.description ? (
++                <dl className="space-y-1 text-xs text-gray-600">
++                  <div><dt className="inline font-medium text-gray-800">Name: </dt><dd className="inline">{draft.business.name || "—"}</dd></div>
++                  <div><dt className="inline font-medium text-gray-800">Type: </dt><dd className="inline">{draft.business.type || "—"}</dd></div>
++                  <div><dt className="inline font-medium text-gray-800">Description: </dt><dd className="inline">{draft.business.description || "—"}</dd></div>
++                </dl>
++              ) : (
++                <Empty text="Still gathering information." />
++              )}
++            </div>
++
++            <Section title="Entities" count={draft.entities.length}>
++              {draft.entities.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-2.5">
++                  {draft.entities.map((e) => (
++                    <li key={e.key} className="text-xs">
++                      <p className="font-medium text-gray-900">{e.display_name || e.name} <span className="font-mono text-gray-400">({e.key})</span></p>
++                      {e.description && <p className="text-gray-500">{e.description}</p>}
++                      {e.fields.length > 0 && (
++                        <p className="mt-0.5 text-gray-500">Fields: {e.fields.map((f) => f.label).join(", ")}</p>
++                      )}
++                    </li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <Section title="Relationships" count={draft.relationships.length} defaultOpen={false}>
++              {draft.relationships.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-1.5 text-xs text-gray-700">
++                  {draft.relationships.map((r, i) => (
++                    <li key={i}>
++                      {r.source_key} <span className="text-gray-400">→ {r.relationship_type} →</span> {r.target_key}
++                    </li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <Section title="Rules" count={draft.rules.length} defaultOpen={false}>
++              {draft.rules.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-2 text-xs">
++                  {draft.rules.map((r, i) => (
++                    <li key={i}>
++                      <p className="font-medium text-gray-900">{r.name}</p>
++                      {r.trigger && <p className="text-gray-500">Trigger: {r.trigger}</p>}
++                    </li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <Section title="Workflows" count={draft.workflows.length} defaultOpen={false}>
++              {draft.workflows.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-1.5 text-xs text-gray-700">
++                  {draft.workflows.map((w, i) => (
++                    <li key={i}>{w.name}</li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <Section title="Terms" count={draft.terms.length} defaultOpen={false}>
++              {draft.terms.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-1 text-xs text-gray-700">
++                  {draft.terms.map((t, i) => (
++                    <li key={i}>{t.system_term} → {t.business_term}</li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <Section title="Knowledge" count={draft.knowledge.length} defaultOpen={false}>
++              {draft.knowledge.length === 0 ? (
++                <Empty text="None yet." />
++              ) : (
++                <ul className="space-y-1.5 text-xs text-gray-700">
++                  {draft.knowledge.map((k, i) => (
++                    <li key={i}><span className="font-medium">{k.title}</span> — {k.content}</li>
++                  ))}
++                </ul>
++              )}
++            </Section>
++
++            <div className="rounded-xl border border-gray-200 bg-white">
++              <button
++                type="button"
++                onClick={() => setShowRawJson((o) => !o)}
++                aria-expanded={showRawJson}
++                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
++              >
++                <span className="text-sm font-medium text-gray-900">Raw Business Brain JSON</span>
++                {showRawJson ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
++              </button>
++              {showRawJson && (
++                <div className="border-t border-gray-100 p-3">
++                  <div className="mb-2 flex justify-end">
++                    <button
++                      type="button"
++                      onClick={copyJson}
++                      className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
++                    >
++                      {copied ? <Check size={13} /> : <Copy size={13} />}
++                      {copied ? "Copied" : "Copy"}
++                    </button>
++                  </div>
++                  <pre className="max-h-96 overflow-auto rounded-lg bg-gray-900 p-3 text-[11px] leading-relaxed text-gray-100">
++                    {JSON.stringify(draft, null, 2)}
++                  </pre>
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++
++        {/* RIGHT — Supabase Preview */}
++        <div className="flex min-h-0 flex-col gap-3">
++          <div className="rounded-xl border border-gray-200 bg-white p-3.5">
++            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-gray-900">
++              <Database size={15} className="text-gray-400" />
++              Supabase Preview
++            </h2>
++            <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600">
++              <li>Business Model: {draft.business.name ? 1 : 0}</li>
++              <li>Entities: {draft.entities.length}</li>
++              <li>Fields: {fieldCount}</li>
++              <li>Relationships: {draft.relationships.length}</li>
++              <li>Rules: {draft.rules.length}</li>
++              <li>Workflows: {draft.workflows.length}</li>
++              <li>Terms: {draft.terms.length}</li>
++              <li>Knowledge: {draft.knowledge.length}</li>
++            </ul>
++
++            <p
++              className={`mt-3 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ${
++                readyToSave ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
++              }`}
++            >
++              {readyToSave ? "Ready to save" : "Still gathering information"}
++            </p>
++
++            <button
++              type="button"
++              onClick={confirmAndSave}
++              disabled={!readyToSave || isSaving || !draft.business.name}
++              className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gray-900 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
++            >
++              {isSaving && <Loader2 size={15} className="animate-spin" />}
++              Confirm &amp; Save
++            </button>
++          </div>
++
++          <div className="rounded-xl border border-gray-200 bg-white p-3.5">
++            {!saveResult && <Empty text="Save result will appear here." />}
++
++            {saveResult?.success && (
++              <div className="space-y-2 text-xs">
++                <p className="flex items-center gap-1.5 font-medium text-emerald-700">
++                  <Check size={14} />
++                  Saved successfully
++                </p>
++                <p className="font-mono text-gray-500 break-all">business_model_id: {saveResult.businessModelId}</p>
++                {saveResult.counts && (
++                  <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-600">
++                    {Object.entries(saveResult.counts).map(([table, count]) => (
++                      <li key={table}>
++                        {table}: {count}
++                      </li>
++                    ))}
++                  </ul>
++                )}
++              </div>
++            )}
++
++            {saveResult && !saveResult.success && (
++              <div className="space-y-1.5 text-xs" role="alert">
++                <p className="flex items-center gap-1.5 font-medium text-red-700">
++                  <AlertTriangle size={14} />
++                  Save failed
++                </p>
++                {saveResult.failedStep && <p className="text-gray-600">Failed at: {saveResult.failedStep}</p>}
++                {saveResult.error && <p className="text-gray-600">{saveResult.error}</p>}
++                {saveResult.counts && (
++                  <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-500">
++                    {Object.entries(saveResult.counts).map(([table, count]) => (
++                      <li key={table}>
++                        {table}: {count}
++                      </li>
++                    ))}
++                  </ul>
++                )}
++              </div>
++            )}
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/lib/business-brain/access.ts b/lib/business-brain/access.ts
+new file mode 100644
+index 0000000..8af2c64
+--- /dev/null
++++ b/lib/business-brain/access.ts
+@@ -0,0 +1,49 @@
++import { createClient } from "@/lib/supabase/server";
++
++export interface BusinessBrainAccessResult {
++  ok: boolean;
++  status: number;
++  error?: string;
++  userId?: string;
++}
++
++/**
++ * Confirms the request has a real logged-in session AND that user is an
++ * active member of the workspace_id it's asking to act on — never trusts
++ * workspace_id from the browser on its own. Uses the session-scoped
++ * (RLS-respecting) Supabase client, so this piggybacks on the workspace
++ * membership policies that already exist for workspace_members — no new
++ * auth code path, no service-role key involved in the check itself.
++ */
++export async function checkWorkspaceAccess(workspaceId: string): Promise<BusinessBrainAccessResult> {
++  if (!workspaceId || typeof workspaceId !== "string") {
++    return { ok: false, status: 400, error: "workspaceId is required" };
++  }
++
++  const supabase = await createClient();
++  const {
++    data: { user },
++  } = await supabase.auth.getUser();
++
++  if (!user) {
++    return { ok: false, status: 401, error: "Unauthorized" };
++  }
++
++  const { data: membership, error } = await supabase
++    .from("workspace_members")
++    .select("id")
++    .eq("workspace_id", workspaceId)
++    .eq("user_id", user.id)
++    .eq("is_active", true)
++    .maybeSingle();
++
++  if (error) {
++    return { ok: false, status: 500, error: "Could not verify workspace access" };
++  }
++
++  if (!membership) {
++    return { ok: false, status: 403, error: "You do not have access to this workspace" };
++  }
++
++  return { ok: true, status: 200, userId: user.id };
++}
+diff --git a/lib/business-brain/gemini.ts b/lib/business-brain/gemini.ts
+new file mode 100644
+index 0000000..a4a0f3e
+--- /dev/null
++++ b/lib/business-brain/gemini.ts
+@@ -0,0 +1,200 @@
++import { BUSINESS_BRAIN_SYSTEM_PROMPT } from "./prompt";
++import { emptyDraft, type BusinessBrainChatResult, type BusinessBrainDraft } from "./types";
++
++/**
++ * Standalone Gemini caller for the Business Brain test agent.
++ *
++ * Deliberately NOT added to lib/llm.ts: that file is shared by the live
++ * Pypus assistant/voice agent and this needs a different system prompt,
++ * a JSON-only response mode, and its own conversation shape. Reuses the
++ * same env vars (LLM_API_KEY, LLM_MODEL) so it stays on the same Gemini
++ * model family as the rest of the app without a second config surface.
++ */
++
++export interface BusinessBrainHistoryTurn {
++  role: "user" | "assistant";
++  content: string;
++}
++
++const GEMINI_MODEL = () => process.env.LLM_MODEL || "gemini-3-flash-preview";
++
++function stripCodeFences(text: string): string {
++  const trimmed = text.trim();
++  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
++  return fenced ? fenced[1] : trimmed;
++}
++
++/** Finds the first balanced {...} block — a defensive fallback in case the
++ *  model adds any stray text around the JSON despite instructions. */
++function extractJsonObject(text: string): string | null {
++  const start = text.indexOf("{");
++  if (start === -1) return null;
++  let depth = 0;
++  for (let i = start; i < text.length; i++) {
++    if (text[i] === "{") depth++;
++    else if (text[i] === "}") {
++      depth--;
++      if (depth === 0) return text.slice(start, i + 1);
++    }
++  }
++  return null;
++}
++
++function coerceDraft(raw: unknown): BusinessBrainDraft {
++  const base = emptyDraft();
++  if (!raw || typeof raw !== "object") return base;
++  const r = raw as Record<string, unknown>;
++
++  const business = r.business as Record<string, unknown> | undefined;
++  if (business && typeof business === "object") {
++    base.business = {
++      name: typeof business.name === "string" ? business.name : "",
++      type: typeof business.type === "string" ? business.type : "",
++      description: typeof business.description === "string" ? business.description : "",
++    };
++  }
++
++  const arr = (v: unknown) => (Array.isArray(v) ? v : []);
++  base.entities = arr(r.entities)
++    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
++    .map((e) => ({
++      key: String(e.key ?? "").trim(),
++      name: String(e.name ?? e.key ?? "").trim(),
++      display_name: typeof e.display_name === "string" ? e.display_name : undefined,
++      description: typeof e.description === "string" ? e.description : undefined,
++      fields: arr(e.fields)
++        .filter((f): f is Record<string, unknown> => !!f && typeof f === "object")
++        .map((f) => ({
++          key: String(f.key ?? "").trim(),
++          label: String(f.label ?? f.key ?? "").trim(),
++          description: typeof f.description === "string" ? f.description : undefined,
++          data_type: typeof f.data_type === "string" ? f.data_type : "text",
++          required: typeof f.required === "boolean" ? f.required : false,
++          default_value: f.default_value ?? null,
++          options: f.options ?? [],
++          validation: f.validation ?? {},
++        })),
++    }))
++    .filter((e) => e.key);
++
++  base.relationships = arr(r.relationships)
++    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
++    .map((x) => ({
++      source_key: String(x.source_key ?? "").trim(),
++      target_key: String(x.target_key ?? "").trim(),
++      relationship_type: typeof x.relationship_type === "string" ? x.relationship_type : "related_to",
++      source_label: typeof x.source_label === "string" ? x.source_label : undefined,
++      target_label: typeof x.target_label === "string" ? x.target_label : undefined,
++      config: x.config ?? {},
++    }))
++    .filter((x) => x.source_key && x.target_key);
++
++  base.rules = arr(r.rules)
++    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
++    .map((x) => ({
++      name: String(x.name ?? "").trim(),
++      description: typeof x.description === "string" ? x.description : undefined,
++      rule_type: typeof x.rule_type === "string" ? x.rule_type : undefined,
++      trigger: typeof x.trigger === "string" ? x.trigger : undefined,
++      conditions: x.conditions ?? {},
++      actions: x.actions ?? [],
++      priority: typeof x.priority === "number" ? x.priority : 0,
++    }))
++    .filter((x) => x.name);
++
++  base.workflows = arr(r.workflows)
++    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
++    .map((x) => ({
++      name: String(x.name ?? "").trim(),
++      description: typeof x.description === "string" ? x.description : undefined,
++      trigger: typeof x.trigger === "string" ? x.trigger : undefined,
++      steps: x.steps ?? [],
++    }))
++    .filter((x) => x.name);
++
++  base.terms = arr(r.terms)
++    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
++    .map((x) => ({
++      system_term: String(x.system_term ?? "").trim(),
++      business_term: String(x.business_term ?? "").trim(),
++      plural_term: typeof x.plural_term === "string" ? x.plural_term : undefined,
++      description: typeof x.description === "string" ? x.description : undefined,
++    }))
++    .filter((x) => x.system_term && x.business_term);
++
++  base.knowledge = arr(r.knowledge)
++    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
++    .map((x) => ({
++      category: String(x.category ?? "general").trim() || "general",
++      title: String(x.title ?? "").trim(),
++      content: String(x.content ?? "").trim(),
++      metadata: x.metadata ?? {},
++      source: typeof x.source === "string" ? x.source : "onboarding",
++    }))
++    .filter((x) => x.title && x.content);
++
++  return base;
++}
++
++export async function callBusinessBrainLLM(
++  userMessage: string,
++  history: BusinessBrainHistoryTurn[]
++): Promise<BusinessBrainChatResult> {
++  const apiKey = process.env.LLM_API_KEY;
++  if (!apiKey) {
++    throw new Error("LLM_API_KEY not set yet");
++  }
++
++  const contents = [
++    ...history.map((m) => ({
++      role: m.role === "assistant" ? "model" : "user",
++      parts: [{ text: m.content }],
++    })),
++    { role: "user", parts: [{ text: userMessage }] },
++  ];
++
++  const res = await fetch(
++    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent`,
++    {
++      method: "POST",
++      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
++      body: JSON.stringify({
++        systemInstruction: { parts: [{ text: BUSINESS_BRAIN_SYSTEM_PROMPT }] },
++        contents,
++        generationConfig: {
++          temperature: 0.2,
++          responseMimeType: "application/json",
++        },
++      }),
++    }
++  );
++
++  if (!res.ok) {
++    throw new Error(`LLM request failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
++  }
++
++  const json = await res.json();
++  const text: string = (json?.candidates?.[0]?.content?.parts ?? [])
++    .map((p: { text?: string }) => p.text ?? "")
++    .join("");
++
++  if (!text.trim()) {
++    throw new Error("LLM returned an empty response");
++  }
++
++  const jsonText = extractJsonObject(stripCodeFences(text)) ?? stripCodeFences(text);
++
++  let parsed: unknown;
++  try {
++    parsed = JSON.parse(jsonText);
++  } catch {
++    throw new Error("MALFORMED_JSON");
++  }
++
++  const p = (parsed ?? {}) as Record<string, unknown>;
++  return {
++    reply: typeof p.reply === "string" && p.reply.trim() ? p.reply.trim() : "Samajh gaya.",
++    readyToSave: p.readyToSave === true,
++    draft: coerceDraft(p.draft),
++  };
++}
+diff --git a/lib/business-brain/prompt.ts b/lib/business-brain/prompt.ts
+new file mode 100644
+index 0000000..702f8c2
+--- /dev/null
++++ b/lib/business-brain/prompt.ts
+@@ -0,0 +1,93 @@
++/**
++ * System prompt for the Business Brain onboarding TEST agent.
++ * Completely separate from lib/pypus/prompt.ts (the real Pypus assistant) —
++ * different job (structured extraction, not gym Q&A/actions) and must never
++ * be merged with it.
++ */
++export const BUSINESS_BRAIN_SYSTEM_PROMPT = `You are a business analyst helping a small-business owner explain how their
++business works, so a software system can be configured for them. You are NOT
++a generic chatbot and you are NOT limited to any one industry (gym, agency,
++coaching, etc.) — the owner may describe a business you have never seen a
++template for. Your job is to understand it from what they actually say.
++
++LANGUAGE
++- The owner may write in Hindi, Hinglish, or English, with typos and casual
++  phrasing. Understand all of it.
++- Understand pronouns like "ye", "iska", "usko", "wala" by resolving them
++  against whatever was discussed most recently.
++- Reply in the same language/style the owner is using (Hinglish is fine).
++
++BEHAVIOUR
++- Ask ONE useful question at a time. Never ask about something already clear
++  from the conversation.
++- Never force the business into a predefined industry template, and never
++  reject a business because it's unfamiliar. Infer reasonable structure
++  (entities, fields, relationships) from what the owner describes.
++- Do NOT hardcode or assume industry-specific entities. Do not think "gym ->
++  members" or "agency -> clients" as fixed rules — derive entities fresh from
++  what's said every time, even if it happens to look like a gym or agency.
++- NEVER invent a business rule, workflow, fee, tax, or policy the owner did
++  not state. If they say "30% advance ke baad production start hota hai",
++  record exactly that — do not add GST rules, cancellation policies, staff
++  salaries, or payment deadlines they never mentioned.
++- Clearly keep separate in your own reasoning: information the owner
++  confirmed, information you are reasonably inferring (e.g. a field type),
++  and information that is still unknown. Only put things in the draft you
++  are reasonably confident about; ask about the rest.
++- When you have enough information for a first useful draft, produce it and
++  tell the owner to review it. You do not need every possible detail — a
++  partial-but-accurate draft with readyToSave true is better than endless
++  questions. Keep refining the draft on later turns if the owner adds more.
++
++OUTPUT FORMAT
++You must respond with ONLY a single JSON object, no markdown code fences, no
++commentary before or after it, matching exactly this shape:
++
++{
++  "reply": "<your natural-language reply to the owner, in their language>",
++  "readyToSave": <true if the draft below is a coherent first structure the
++                   owner could review and save, false if you are still only
++                   gathering basics>,
++  "draft": {
++    "business": { "name": "", "type": "", "description": "" },
++    "entities": [
++      {
++        "key": "client",
++        "name": "Client",
++        "display_name": "Client",
++        "description": "",
++        "fields": [
++          { "key": "name", "label": "Name", "description": "", "data_type": "text", "required": true, "options": [], "validation": {} }
++        ]
++      }
++    ],
++    "relationships": [
++      { "source_key": "client", "target_key": "project", "relationship_type": "one_to_many", "source_label": "has", "target_label": "belongs to" }
++    ],
++    "rules": [
++      { "name": "", "description": "", "rule_type": "", "trigger": "", "conditions": {}, "actions": [], "priority": 0 }
++    ],
++    "workflows": [
++      { "name": "", "description": "", "trigger": "", "steps": [] }
++    ],
++    "terms": [
++      { "system_term": "client", "business_term": "", "plural_term": "", "description": "" }
++    ],
++    "knowledge": [
++      { "category": "", "title": "", "content": "", "metadata": {}, "source": "onboarding" }
++    ]
++  }
++}
++
++RULES ON THE DRAFT
++- "draft" must always be present and always be the FULL current understanding
++  so far (not just what changed this turn) — later turns replace it entirely.
++- Every entity needs a short, stable, lowercase "key" (snake_case, no spaces)
++  — reuse the same key across turns once you've introduced an entity so
++  relationships keep resolving correctly.
++- "relationships[].source_key" / "target_key" must reference an entities[].key
++  from this same draft.
++- Leave any list empty ([]) rather than inventing entries.
++- Never fabricate fields, rules, or workflows that weren't stated or clearly
++  implied by what was stated.
++- Return valid JSON only — no trailing commas, no comments, no markdown.`;
+diff --git a/lib/business-brain/save.ts b/lib/business-brain/save.ts
+new file mode 100644
+index 0000000..33dff40
+--- /dev/null
++++ b/lib/business-brain/save.ts
+@@ -0,0 +1,256 @@
++import { createServiceClient } from "@/lib/supabase/service";
++import type { BusinessBrainDraft, BusinessBrainSaveResult } from "./types";
++
++/**
++ * Writes a reviewed/confirmed draft into the 8 EXISTING Business Brain
++ * tables (business_models, business_entities, entity_fields,
++ * entity_relationships, business_rules, business_workflows, business_terms,
++ * business_knowledge). Does not create, rename, or alter any table.
++ *
++ * Uses the service-role client for the writes themselves (same pattern as
++ * app/actions/import-members.ts and friends) because these 8 tables were
++ * created with RLS enabled but no policies yet — caller MUST have already
++ * verified workspace access with checkWorkspaceAccess() before calling this.
++ *
++ * No RPC/transaction exists yet for this, so this is a plain sequence of
++ * inserts. If a step fails partway through, whatever was already inserted
++ * stays (traceable via the returned businessModelId) and the response says
++ * exactly which step and table failed — see acceptance criteria in the
++ * original request. A future version could wrap this in a Postgres function
++ * for atomicity; out of scope for this lab/test page.
++ */
++export async function saveBusinessBrainDraft(
++  workspaceId: string,
++  draft: BusinessBrainDraft
++): Promise<BusinessBrainSaveResult> {
++  const supabase = createServiceClient();
++  const counts = {
++    business_models: 0,
++    business_entities: 0,
++    entity_fields: 0,
++    entity_relationships: 0,
++    business_rules: 0,
++    business_workflows: 0,
++    business_terms: 0,
++    business_knowledge: 0,
++  };
++
++  // 1. business_models
++  const { data: modelRow, error: modelErr } = await supabase
++    .from("business_models")
++    .insert({
++      workspace_id: workspaceId,
++      name: draft.business.name || "Untitled business",
++      description: draft.business.description || null,
++      model_json: draft,
++      status: "draft",
++    })
++    .select("id")
++    .single();
++
++  if (modelErr || !modelRow) {
++    return {
++      success: false,
++      failedStep: "business_models",
++      error: modelErr?.message || "Failed to create business_models row",
++      counts,
++    };
++  }
++  const businessModelId = modelRow.id as string;
++  counts.business_models = 1;
++
++  // 2. business_entities — keep a key -> id map for relationships + fields
++  const entityIdByKey = new Map<string, string>();
++  for (const entity of draft.entities) {
++    const { data: entityRow, error: entityErr } = await supabase
++      .from("business_entities")
++      .insert({
++        workspace_id: workspaceId,
++        business_model_id: businessModelId,
++        key: entity.key,
++        name: entity.name,
++        display_name: entity.display_name ?? entity.name,
++        description: entity.description ?? null,
++        config: {},
++        status: "active",
++      })
++      .select("id")
++      .single();
++
++    if (entityErr || !entityRow) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `business_entities (key: ${entity.key})`,
++        error: entityErr?.message || "Failed to insert entity",
++        counts,
++      };
++    }
++    entityIdByKey.set(entity.key, entityRow.id as string);
++    counts.business_entities++;
++
++    // 3. entity_fields for this entity
++    let order = 0;
++    for (const field of entity.fields) {
++      const { error: fieldErr } = await supabase.from("entity_fields").insert({
++        entity_id: entityRow.id,
++        key: field.key,
++        label: field.label,
++        description: field.description ?? null,
++        data_type: field.data_type || "text",
++        required: field.required ?? false,
++        default_value: field.default_value ?? null,
++        options: field.options ?? [],
++        validation: field.validation ?? {},
++        display_order: order++,
++      });
++
++      if (fieldErr) {
++        return {
++          success: false,
++          businessModelId,
++          failedStep: `entity_fields (entity: ${entity.key}, field: ${field.key})`,
++          error: fieldErr.message,
++          counts,
++        };
++      }
++      counts.entity_fields++;
++    }
++  }
++
++  // 4. entity_relationships — resolve source/target key -> entity id
++  for (const rel of draft.relationships) {
++    const sourceId = entityIdByKey.get(rel.source_key);
++    const targetId = entityIdByKey.get(rel.target_key);
++    if (!sourceId || !targetId) {
++      // Skip relationships that reference an entity key the model didn't
++      // actually produce, rather than failing the whole save.
++      continue;
++    }
++
++    const { error: relErr } = await supabase.from("entity_relationships").insert({
++      workspace_id: workspaceId,
++      source_entity_id: sourceId,
++      target_entity_id: targetId,
++      relationship_type: rel.relationship_type || "related_to",
++      source_label: rel.source_label ?? null,
++      target_label: rel.target_label ?? null,
++      config: rel.config ?? {},
++    });
++
++    if (relErr) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `entity_relationships (${rel.source_key} -> ${rel.target_key})`,
++        error: relErr.message,
++        counts,
++      };
++    }
++    counts.entity_relationships++;
++  }
++
++  // 5. business_rules
++  for (const rule of draft.rules) {
++    const { error: ruleErr } = await supabase.from("business_rules").insert({
++      workspace_id: workspaceId,
++      business_model_id: businessModelId,
++      name: rule.name,
++      description: rule.description ?? null,
++      rule_type: rule.rule_type ?? null,
++      trigger: rule.trigger ?? null,
++      conditions: rule.conditions ?? {},
++      actions: rule.actions ?? [],
++      priority: rule.priority ?? 0,
++      status: "active",
++      version: 1,
++    });
++
++    if (ruleErr) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `business_rules (${rule.name})`,
++        error: ruleErr.message,
++        counts,
++      };
++    }
++    counts.business_rules++;
++  }
++
++  // 6. business_workflows
++  for (const wf of draft.workflows) {
++    const { error: wfErr } = await supabase.from("business_workflows").insert({
++      workspace_id: workspaceId,
++      name: wf.name,
++      description: wf.description ?? null,
++      trigger: wf.trigger ?? null,
++      steps: wf.steps ?? [],
++      status: "draft",
++    });
++
++    if (wfErr) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `business_workflows (${wf.name})`,
++        error: wfErr.message,
++        counts,
++      };
++    }
++    counts.business_workflows++;
++  }
++
++  // 7. business_terms — upsert on (workspace_id, system_term)
++  for (const term of draft.terms) {
++    const { error: termErr } = await supabase
++      .from("business_terms")
++      .upsert(
++        {
++          workspace_id: workspaceId,
++          system_term: term.system_term,
++          business_term: term.business_term,
++          plural_term: term.plural_term ?? null,
++          description: term.description ?? null,
++        },
++        { onConflict: "workspace_id,system_term" }
++      );
++
++    if (termErr) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `business_terms (${term.system_term})`,
++        error: termErr.message,
++        counts,
++      };
++    }
++    counts.business_terms++;
++  }
++
++  // 8. business_knowledge
++  for (const item of draft.knowledge) {
++    const { error: knowledgeErr } = await supabase.from("business_knowledge").insert({
++      workspace_id: workspaceId,
++      category: item.category || "general",
++      title: item.title,
++      content: item.content,
++      metadata: item.metadata ?? {},
++      source: item.source || "onboarding",
++      status: "active",
++    });
++
++    if (knowledgeErr) {
++      return {
++        success: false,
++        businessModelId,
++        failedStep: `business_knowledge (${item.title})`,
++        error: knowledgeErr.message,
++        counts,
++      };
++    }
++    counts.business_knowledge++;
++  }
++
++  return { success: true, businessModelId, counts };
++}
+diff --git a/lib/business-brain/types.ts b/lib/business-brain/types.ts
+new file mode 100644
+index 0000000..1350089
+--- /dev/null
++++ b/lib/business-brain/types.ts
+@@ -0,0 +1,121 @@
++/**
++ * Shapes for the Business Brain onboarding-agent TEST page only.
++ * Mirrors the 8 existing Supabase tables (business_models, business_entities,
++ * entity_fields, entity_relationships, business_rules, business_workflows,
++ * business_terms, business_knowledge) — see lib/business-brain/save.ts for
++ * exactly how each field maps to a column.
++ *
++ * Kept deliberately generic (no gym/agency/etc. specific fields) — the LLM
++ * fills these in from whatever business the owner describes.
++ */
++
++export interface BusinessBrainField {
++  key: string;
++  label: string;
++  description?: string;
++  data_type: string; // "text" | "number" | "date" | "boolean" | "select" | ... (free text, not enforced)
++  required?: boolean;
++  default_value?: unknown;
++  options?: unknown;
++  validation?: unknown;
++}
++
++export interface BusinessBrainEntity {
++  key: string; // stable slug, unique within this draft — used to resolve relationships
++  name: string;
++  display_name?: string;
++  description?: string;
++  fields: BusinessBrainField[];
++}
++
++export interface BusinessBrainRelationship {
++  source_key: string; // an entities[].key
++  target_key: string; // an entities[].key
++  relationship_type: string; // e.g. "one_to_many"
++  source_label?: string;
++  target_label?: string;
++  config?: unknown;
++}
++
++export interface BusinessBrainRule {
++  name: string;
++  description?: string;
++  rule_type?: string;
++  trigger?: string;
++  conditions?: unknown;
++  actions?: unknown;
++  priority?: number;
++}
++
++export interface BusinessBrainWorkflow {
++  name: string;
++  description?: string;
++  trigger?: string;
++  steps?: unknown;
++}
++
++export interface BusinessBrainTerm {
++  system_term: string;
++  business_term: string;
++  plural_term?: string;
++  description?: string;
++}
++
++export interface BusinessBrainKnowledge {
++  category: string;
++  title: string;
++  content: string;
++  metadata?: unknown;
++  source?: string;
++}
++
++export interface BusinessBrainDraft {
++  business: {
++    name: string;
++    type: string;
++    description: string;
++  };
++  entities: BusinessBrainEntity[];
++  relationships: BusinessBrainRelationship[];
++  rules: BusinessBrainRule[];
++  workflows: BusinessBrainWorkflow[];
++  terms: BusinessBrainTerm[];
++  knowledge: BusinessBrainKnowledge[];
++}
++
++/** What the /chat endpoint returns after every turn. */
++export interface BusinessBrainChatResult {
++  reply: string;
++  readyToSave: boolean;
++  draft: BusinessBrainDraft;
++}
++
++/** What the /save endpoint returns — used to render "Saved successfully" + row counts. */
++export interface BusinessBrainSaveResult {
++  success: boolean;
++  businessModelId?: string;
++  counts?: {
++    business_models: number;
++    business_entities: number;
++    entity_fields: number;
++    entity_relationships: number;
++    business_rules: number;
++    business_workflows: number;
++    business_terms: number;
++    business_knowledge: number;
++  };
++  failedStep?: string;
++  error?: string;
++}
++
++export function emptyDraft(): BusinessBrainDraft {
++  return {
++    business: { name: "", type: "", description: "" },
++    entities: [],
++    relationships: [],
++    rules: [],
++    workflows: [],
++    terms: [],
++    knowledge: [],
++  };
++}
